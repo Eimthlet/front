@@ -22,7 +22,7 @@ const app = express();
 const port = process.env.PORT || 4000;
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000', // Restrict to your frontend domain
+  origin: process.env.FRONTEND_URL || 'https://car-quizz-jonathans-projects-8c96c19b.vercel.app', // Restrict to your frontend domain
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true // Enable credentials
