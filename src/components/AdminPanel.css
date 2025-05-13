@@ -1,0 +1,100 @@
+/* Admin Panel Styling Based on UI/UX Requirements */
+.admin-panel {
+  background-color: #1a1f2e; /* Dark Navy Background */
+  color: white;
+  min-height: 100vh;
+  padding: 2rem;
+  font-family: 'Arial', sans-serif;
+}
+
+.admin-panel h2 {
+  color: white;
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.admin-panel .form-group {
+  margin-bottom: 1rem;
+}
+
+.admin-panel label {
+  color: #9ca3af; /* Light gray for labels */
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.admin-panel input, 
+.admin-panel select,
+.admin-panel textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #2a2f3e;
+  background-color: #2a2f3e;
+  color: white;
+  border-radius: 0.5rem;
+  transition: border-color 0.3s ease;
+}
+
+.admin-panel input:focus, 
+.admin-panel select:focus,
+.admin-panel textarea:focus {
+  outline: none;
+  border-color: #10b981; /* Accent green for focus */
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.admin-panel button {
+  background-color: #10b981; /* Accent Green */
+  color: white;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.admin-panel button:hover {
+  background-color: #059669; /* Darker green on hover */
+}
+
+.questions-list {
+  margin-top: 2rem;
+}
+
+.questions-list .question-card {
+  background-color: #2a2f3e;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  transition: transform 0.3s ease;
+}
+
+.questions-list .question-card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+}
+
+/* Mobile-First Responsive Design */
+@media (max-width: 640px) {
+  .admin-panel {
+    padding: 1rem;
+  }
+
+  .admin-panel .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Scrollbar Styling for Dark Theme */
+.admin-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.admin-panel::-webkit-scrollbar-track {
+  background: #2a2f3e;
+}
+
+.admin-panel::-webkit-scrollbar-thumb {
+  background: #10b981;
+  border-radius: 4px;
+}

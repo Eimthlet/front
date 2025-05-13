@@ -1,0 +1,256 @@
+/* Auth Form Modern Dark Theme */
+.auth-form-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 70px);
+  padding: 80px 20px;
+  margin-top: 20px;
+  background: #101924;
+}
+
+.auth-form {
+  width: 100%;
+  max-width: 400px;
+  padding: 32px 28px 28px 28px;
+  background: #181f2e;
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(34,193,195,0.14), 0 2px 8px rgba(253,45,157,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: center;
+  border: 1.5px solid rgba(67, 206, 162, 0.13);
+  animation: fadeIn 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.auth-form h2 {
+  color: #fff;
+  font-size: 22px;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(67, 206, 162, 0.08);
+}
+
+.auth-form input,
+.password-input {
+  width: 100%;
+  min-width: 280px;
+}
+
+.auth-form input {
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1.5px solid #243047;
+  outline: none;
+  background: #212b3a;
+  color: #fff;
+  transition: border 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 4px rgba(24, 90, 157, 0.07);
+}
+
+.auth-form input:focus {
+  border: 1.5px solid #27ae60;
+  box-shadow: 0 2px 8px #27ae60aa;
+  background: #19212c;
+  color: #fff;
+}
+
+.auth-form button[type="submit"] {
+  width: 100%;
+  min-width: 280px;
+  background: linear-gradient(90deg, #27ae60 0%, #22c1c3 100%);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 11px 32px;
+  cursor: pointer;
+  transition: background 0.22s, transform 0.18s;
+  box-shadow: 0 2px 8px rgba(39, 174, 96, 0.13);
+  letter-spacing: 0.5px;
+}
+
+.auth-form button[type="submit"]:hover {
+  background: linear-gradient(90deg, #202222 0%, #e22e73 100%);
+  transform: scale(1.06);
+}
+
+.auth-form button[type="submit"]:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.switch-mode {
+  font-size: 11.5px;
+  color: #b6e8d6;
+  width: 100%;
+  text-align: center;
+  margin-top: 10px;
+}
+
+.switch-mode button {
+  background: none;
+  color: #e22e73;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  font-size: 11.5px;
+}
+
+.switch-mode button:hover {
+  color: #22c1c3;
+}
+
+.auth-error {
+  color: #e74c3c;
+  font-size: 1.09rem;
+  margin-top: 0.5rem;
+  text-align: center;
+  font-weight: 500;
+  width: 100%;
+}
+
+.password-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input input {
+  width: 100%;
+  padding-right: 45px;
+  margin: 0;
+}
+
+.password-toggle {
+  position: absolute !important;
+  right: 8px;
+  color: #b6e8d6 !important;
+  padding: 5px !important;
+}
+
+.password-toggle:hover {
+  color: #22c1c3 !important;
+}
+
+/* Checkbox styling */
+.MuiFormControlLabel-root {
+  margin: 0 !important;
+  width: 100%;
+}
+
+.MuiCheckbox-root {
+  color: #27ae60 !important;
+}
+
+.MuiCheckbox-root.Mui-checked {
+  color: #22c1c3 !important;
+}
+
+.MuiFormControlLabel-label {
+  color: #b6e8d6 !important;
+  font-size: 12px !important;
+}
+
+@media (max-width: 600px) {
+  .auth-form-container {
+    padding: 60px 16px;
+    margin-top: 15px;
+  }
+  
+  .auth-form {
+    min-width: unset;
+    padding: 18px 16px 14px 16px;
+    border-radius: 14px;
+  }
+
+  .auth-form input,
+  .password-input,
+  .auth-form button[type="submit"] {
+    min-width: 240px;
+  }
+}
+
+@media (min-width: 900px) {
+  .auth-form-container {
+    min-height: calc(100vh - 90px);
+    padding: 100px 20px;
+    margin-top: 25px;
+  }
+  
+  .auth-form {
+    max-width: 520px;
+    padding: 40px 38px 34px 38px;
+    border-radius: 32px;
+  }
+  
+  .auth-form input,
+  .password-input,
+  .auth-form button[type="submit"] {
+    min-width: 320px;
+  }
+}
+
+#paychangu-popup-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+#paychangu-wrapper {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10000;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 500px;
+  min-height: 400px;
+}
+
+#paychangu-popup-container.active {
+  display: block;
+}
+
+/* Password strength indicator */
+.password-strength {
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 2px;
+  transition: all 0.3s;
+}
+
+.password-strength.weak {
+  background: #ff4444;
+  width: 33%;
+}
+
+.password-strength.medium {
+  background: #ffa700;
+  width: 66%;
+}
+
+.password-strength.strong {
+  background: #00c851;
+  width: 100%;
+}
