@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = 'https://car-quizz.onrender.com';
 
 // Define types for API responses
 type Question = {
