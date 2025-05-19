@@ -118,22 +118,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
         setError('Please complete payment in the popup. After payment, your registration will be finalized.');
         setLoading(false);
         return;
-        const { user, token, refreshToken } = response;
-        
-        localStorage.setItem('token', token);
-        localStorage.setItem('refreshToken', refreshToken);
-        
-        const decodedToken = jwtDecode(token) as JwtPayload;
-        const isAdmin = decodedToken.isAdmin || false;
-
-        authLogin({
-          id: user.id,
-          username: user.username,
-          role: isAdmin ? 'admin' : 'user',
-          token
-        });
-
-        navigate(isAdmin ? '/admin' : '/quiz', { replace: true });
       } catch (err: any) {
         console.error('Registration error:', err);
         setError(err.message || 'Registration failed');
