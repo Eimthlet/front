@@ -19,6 +19,15 @@ interface JwtPayload {
 }
 
 const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
+  // Load PayChangu popup script if not already loaded
+  React.useEffect(() => {
+    if (!window.PaychanguCheckout) {
+      const script = document.createElement('script');
+      script.src = 'https://in.paychangu.com/js/popup.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -306,14 +315,5 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
   );
 };
 
-// Load PayChangu popup script if not already loaded
-React.useEffect(() => {
-  if (!window.PaychanguCheckout) {
-    const script = document.createElement('script');
-    script.src = 'https://in.paychangu.com/js/popup.js';
-    script.async = true;
-    document.body.appendChild(script);
-  }
-}, []);
-
 export default AuthForm;
+
