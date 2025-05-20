@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { ThemeProvider, CssBaseline, Box, Typography } from '@mui/material';
+import { ThemeProvider, CssBaseline, Box, Typography, Button } from '@mui/material';
 import { theme } from './theme';
 import Quiz from './components/Quiz';
 import Navigation from './components/Navigation';
