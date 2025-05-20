@@ -5,10 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import api from '../utils/api';
 
 interface LeaderboardEntry {
-  id: number;
+  user_id: number;
   username: string;
-  max_score: number;
-  games_played: number;
+  score: number;
 }
 
 interface LeaderboardResponse {
@@ -128,7 +127,7 @@ const Leaderboard: React.FC = () => {
       <AnimatePresence>
         {leaderboard.map((entry, index) => (
           <motion.div
-            key={entry.id}
+            key={entry.user_id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -160,12 +159,7 @@ const Leaderboard: React.FC = () => {
                   }}>
                     {entry.username}
                   </Typography>
-                  <Typography sx={{ 
-                    color: 'rgba(255, 255, 255, 0.6)',
-                    fontSize: '0.9rem'
-                  }}>
-                    {entry.games_played} games played
-                  </Typography>
+                  {/* No additional text under username */}
                 </Box>
 
                 <Box sx={{ textAlign: 'right' }}>
@@ -177,7 +171,7 @@ const Leaderboard: React.FC = () => {
                       mb: 0.5
                     }}
                   >
-                    {entry.max_score}
+                    {entry.score}
                   </Typography>
                   <Typography sx={{ 
                     color: 'rgba(255, 255, 255, 0.6)',

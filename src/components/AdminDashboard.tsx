@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import './AdminDashboard.css';
+import SeasonManager from './SeasonManager';
 
 // Remove any leftover fragments
 
@@ -32,7 +33,7 @@ interface InsightsStats {
 const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<InsightsStats | null>(null);
   const [error, setError] = useState<{ message: string; details?: string } | null>(null);
-  const [activeSection, setActiveSection] = useState<'insights' | 'overview' | 'users'>('overview');
+  const [activeSection, setActiveSection] = useState<'insights' | 'overview' | 'users' | 'seasons'>('overview');
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -126,6 +127,12 @@ const AdminDashboard: React.FC = () => {
               >
                 Users
               </button>
+              <button 
+                className={activeSection === 'seasons' ? 'active' : ''}
+                onClick={() => setActiveSection('seasons')}
+              >
+                Season Manager
+              </button>
             </div>
 
             {activeSection === 'overview' && (
@@ -172,27 +179,31 @@ const AdminDashboard: React.FC = () => {
 
             {activeSection === 'users' && (
               <div className="dashboard-card users">
-                <h3>Total Users: {stats.totalUsers}</h3>
-                <div className="users-list-container">
-                  <ul className="users-list">
-                    {stats.nonAdminUsers.map((user) => (
-                      <li key={user.id}>
-                        <div className="user-details">
-                          <span className="user-name">{user.username}</span>
-                          <span className="user-email">{user.email}</span>
-                        </div>
-                        <div className="user-stats">
-                          <span className="user-avg-score">Avg Score: {user.average_score}</span>
-                          <span className="user-total-games">Games: {user.total_games}</span>
-                          <span className="user-highest-score">Highest: {user.highest_score}</span>
-                          <span className="user-lowest-score">Lowest: {user.lowest_score}</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                <h3>User Management</h3>
+                <div className="user-list">
+                  {stats.nonAdminUsers.map(user => (
+                    <div className="user-item" key={user.id}>
+                      <div className="user-info">
+                        <span className="username">{user.username}</span>
+                        <span className="email">{user.email}</span>
+                      </div>
+                      <div className="user-stats">
+                        <span className="stat">Avg Score: {user.average_score}%</span>
+                        <span className="stat">Games: {user.total_games}</span>
+                        <span className="stat">High: {user.highest_score}%</span>
+                        <span className="stat">Low: {user.lowest_score}%</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
+            
+            {activeSection === 'seasons' && (
+              <div className="dashboard-card seasons">
+                <SeasonManager />
+              </div>
+            )}  
           </div>
         )}
       </div>

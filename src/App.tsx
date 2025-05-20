@@ -34,17 +34,34 @@ const App: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [qualification, setQualification] = useState<{
+    hasAttempted: boolean;
+    isQualified: boolean;
+    score?: number;
+    totalQuestions?: number;
+    percentageScore?: number;
+    minimumRequired?: number;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
-    const validateAndFetchQuestions = async () => {
+    const validateAndFetchData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await api.get<QuestionsResponse>('/api/questions');
-        setQuestions(response.data.questions);
+        
+        // First check qualification status
+        const qualificationResponse = await api.get('/api/qualification');
+        setQualification(qualificationResponse.data);
+        
+        // Only fetch questions if user is qualified or hasn't attempted yet
+        if (!qualificationResponse.data.hasAttempted || qualificationResponse.data.isQualified) {
+          const response = await api.get<QuestionsResponse>('/api/questions');
+          setQuestions(response.data.questions);
+        }
       } catch (err: any) {
-        console.error('Failed to fetch questions:', err);
-        setError(err.message || 'Failed to load questions');
+        console.error('Failed to fetch data:', err);
+        setError(err.message || 'Failed to load data');
         
         // If unauthorized, clear tokens and redirect to login
         if (err.response?.status === 401) {
@@ -57,9 +74,9 @@ const App: React.FC = () => {
       }
     };
 
-    // Only fetch questions if user is logged in
+    // Only fetch data if user is logged in
     if (user) {
-      validateAndFetchQuestions();
+      validateAndFetchData();
     }
   }, [user, navigate]);
 
@@ -129,6 +146,30 @@ const App: React.FC = () => {
                       <Typography variant="h5" sx={{ color: '#ff6b6b' }}>
                         {error}
                       </Typography>
+                    </Box>
+                  ) : qualification?.hasAttempted && !qualification.isQualified ? (
+                    <Box sx={{ textAlign: 'center', mt: 10 }}>
+                      <Typography variant="h4" sx={{ color: '#ff6b6b', mb: 2 }}>
+                        Quiz Access Restricted
+                      </Typography>
+                      <Typography variant="h6" sx={{ color: 'rgba(255, 255, 255, 0.8)', mb: 3 }}>
+                        {qualification.message}
+                      </Typography>
+                      <Box sx={{ background: 'rgba(0,0,0,0.2)', p: 3, borderRadius: 2, maxWidth: '500px', mx: 'auto' }}>
+                        <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 2 }}>
+                          Your Score: {qualification.score} / {qualification.totalQuestions} ({qualification.percentageScore}%)
+                        </Typography>
+                        <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                          Required Score: {qualification.minimumRequired} / {qualification.totalQuestions} (50%)
+                        </Typography>
+                      </Box>
+                      <Button 
+                        variant="contained" 
+                        sx={{ mt: 4, background: 'rgba(255,255,255,0.1)' }}
+                        onClick={() => navigate('/leaderboard')}
+                      >
+                        View Leaderboard
+                      </Button>
                     </Box>
                   ) : questions.length > 0 ? (
                     <Quiz questions={questions} onComplete={handleQuizComplete} />
