@@ -120,8 +120,18 @@ if (!paychanguConfig.public_key || !paychanguConfig.tx_ref || !paychanguConfig.a
   setLoading(false);
   return;
 }
-// @ts-ignore
-window.PaychanguCheckout(paychanguConfig);
+// Wait for PayChangu script to load before calling the popup
+function waitForPayChanguAndLaunch(config, retries = 10) {
+  if (window.PaychanguCheckout) {
+    window.PaychanguCheckout(config);
+  } else if (retries > 0) {
+    setTimeout(() => waitForPayChanguAndLaunch(config, retries - 1), 300);
+  } else {
+    setError('Payment system failed to load. Please refresh and try again.');
+    setLoading(false);
+  }
+}
+waitForPayChanguAndLaunch(paychanguConfig);
         // 3. Show user a message to complete payment in popup
         setError('Please complete payment in the popup. After payment, your registration will be finalized.');
         setLoading(false);
