@@ -44,6 +44,7 @@ const AdminDashboard: React.FC = () => {
 
       try {
         const response = await api.get('/api/admin/insights-stats');
+        // Adding explicit type assertion for API response
         const data = response.data as InsightsStats;
         
         // Validate data

@@ -106,7 +106,7 @@ const SeasonManager: React.FC = () => {
       try {
         setLoading(true);
         const response = await api.get('/api/admin/seasons');
-        setSeasons(response.data);
+        setSeasons(response.data as Season[]);
         setError(null);
       } catch (err: any) {
         console.error('Error fetching seasons:', err);
@@ -165,7 +165,7 @@ const SeasonManager: React.FC = () => {
       
       // Refresh seasons
       const response = await api.get('/api/admin/seasons');
-      setSeasons(response.data);
+      setSeasons(response.data as Season[]);
       
       handleCloseDialog();
     } catch (err: any) {
@@ -182,7 +182,7 @@ const SeasonManager: React.FC = () => {
         
         // Refresh seasons
         const response = await api.get('/api/admin/seasons');
-        setSeasons(response.data);
+        setSeasons(response.data as Season[]);
       } catch (err: any) {
         console.error('Error deleting season:', err);
         setError(err.message || 'Failed to delete season');
@@ -253,7 +253,7 @@ const SeasonManager: React.FC = () => {
       
       // Refresh seasons
       const response = await api.get('/api/admin/seasons');
-      setSeasons(response.data);
+      setSeasons(response.data as Season[]);
       
       handleCloseQuestionsDialog();
     } catch (err: any) {
@@ -267,7 +267,7 @@ const SeasonManager: React.FC = () => {
     try {
       setSelectedSeasonId(seasonId);
       const response = await api.get(`/api/admin/seasons/${seasonId}/qualified-users`);
-      setQualifiedUsers(response.data);
+      setQualifiedUsers(response.data as QualifiedUser[]);
       setOpenQualifiedUsersDialog(true);
     } catch (err: any) {
       console.error('Error fetching qualified users:', err);

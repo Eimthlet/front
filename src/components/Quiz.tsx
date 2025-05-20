@@ -105,13 +105,13 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
 
   // Validate and prepare questions
   const validQuestions = useMemo(() => 
-    questions.filter(q => 
-      q && 
-      q.id && 
-      q.question && 
+    questions.filter((q): q is Question => 
+      Boolean(q) && 
+      Boolean(q.id) && 
+      Boolean(q.question) && 
       Array.isArray(q.options) && 
       q.options.length > 0 && 
-      q.correctAnswer
+      q.correctAnswer !== undefined
     ), [questions]
   );
 
