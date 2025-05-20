@@ -42,7 +42,9 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true // Enable sending cookies with requests
+  withCredentials: true, // Enable sending cookies with requests - CRITICAL for CORS with credentials
+  // Don't reject on HTTP error responses
+  validateStatus: (status) => status < 500 // Only reject if status is server error
 });
 
 // Track if we're already trying to refresh the token
