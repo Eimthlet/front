@@ -108,10 +108,11 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
         // 2. Launch PayChangu inline payment popup
         const paychanguConfig = {
           public_key: regResult.public_key,
-          tx_ref: regResult.tx_ref,
+          tx_ref: regResult.tx_ref, // ensure this is unique per payment (already handled)
           amount: regResult.amount,
           currency: 'MWK',
           callback_url: window.location.origin + '/paychangu-callback',
+          return_url: window.location.origin + '/register', // required by PayChangu docs
           customer: {
             email: regResult.email,
             first_name: username,
@@ -122,7 +123,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
             description: 'Registration fee for quiz platform'
           },
           meta: {
-            uuid: regResult.tx_ref
+            uuid: regResult.tx_ref,
+            response: 'Response' // docs example includes this
           }
         };
         console.log('PayChangu config:', paychanguConfig);
