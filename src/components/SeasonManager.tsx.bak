@@ -163,35 +163,37 @@ const SeasonManager: React.FC = () => {
         await api.put(`/api/admin/seasons/${currentSeason.id}`, currentSeason);
       }
       
-      // Refresh seasons
+      // Refresh seasons list
       const response = await api.get('/api/admin/seasons');
       setSeasons(response.data);
       
       handleCloseDialog();
     } catch (err: any) {
-      console.error('Error submitting season:', err);
-      setError(err.message || 'Failed to submit season');
+      console.error('Error saving season:', err);
+      setError(err.message || 'Failed to save season');
     }
   };
   
   // Handle season deletion
   const handleDeleteSeason = async (id: number) => {
-    if (window.confirm('Are you sure you want to delete this season? This action cannot be undone.')) {
-      try {
-        await api.delete(`/api/admin/seasons/${id}`);
-        
-        // Refresh seasons
-        const response = await api.get('/api/admin/seasons');
-        setSeasons(response.data);
-      } catch (err: any) {
-        console.error('Error deleting season:', err);
-        setError(err.message || 'Failed to delete season');
-      }
+    if (!window.confirm('Are you sure you want to delete this season? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      await api.delete(`/api/admin/seasons/${id}`);
+      
+      // Refresh seasons list
+      const response = await api.get('/api/admin/seasons');
+      setSeasons(response.data);
+    } catch (err: any) {
+      console.error('Error deleting season:', err);
+      setError(err.message || 'Failed to delete season');
     }
   };
   
   // Handle questions dialog
-  const handleOpenQuestionsDialog = async (seasonId: number) => {
+  const handleOpenQuestionsDialog = (seasonId: number) => {
     setSelectedSeasonId(seasonId);
     setQuestions([]);
     setCurrentQuestion({
@@ -227,11 +229,11 @@ const SeasonManager: React.FC = () => {
   
   // Add question to list
   const handleAddQuestion = () => {
-    setQuestions(prev => [
-      ...prev,
-      currentQuestion
-    ]);
+    if (!currentQuestion.question_text || !currentQuestion.correct_answer) {
+      return;
+    }
     
+    setQuestions(prev => [...prev, { ...currentQuestion }]);
     setCurrentQuestion({
       question_text: '',
       options: ['', '', '', ''],
@@ -246,32 +248,38 @@ const SeasonManager: React.FC = () => {
   
   // Submit questions
   const handleSubmitQuestions = async () => {
+    if (!selectedSeasonId || questions.length === 0) {
+      return;
+    }
+    
     try {
       await api.post(`/api/admin/seasons/${selectedSeasonId}/questions`, {
         questions
       });
       
-      // Refresh seasons
+      // Refresh seasons list
       const response = await api.get('/api/admin/seasons');
       setSeasons(response.data);
       
       handleCloseQuestionsDialog();
     } catch (err: any) {
-      console.error('Error submitting questions:', err);
-      setError(err.message || 'Failed to submit questions');
+      console.error('Error adding questions:', err);
+      setError(err.message || 'Failed to add questions');
     }
   };
   
   // Handle qualified users dialog
   const handleOpenQualifiedUsersDialog = async (seasonId: number) => {
+    setSelectedSeasonId(seasonId);
+    setQualifiedUsers([]);
+    setOpenQualifiedUsersDialog(true);
+    
     try {
-      setSelectedSeasonId(seasonId);
       const response = await api.get(`/api/admin/seasons/${seasonId}/qualified-users`);
       setQualifiedUsers(response.data);
-      setOpenQualifiedUsersDialog(true);
     } catch (err: any) {
       console.error('Error fetching qualified users:', err);
-      setError(err.message || 'Failed to fetch qualified users');
+      setError(err.message || 'Failed to load qualified users');
     }
   };
   
@@ -308,7 +316,7 @@ const SeasonManager: React.FC = () => {
       </Box>
       
       {error && (
-        <Box sx={{ mb: 2 }}>
+        <Box sx={{ mb: 3, p: 2, bgcolor: 'error.light', borderRadius: 1 }}>
           <Typography color="error">{error}</Typography>
         </Box>
       )}
@@ -335,6 +343,7 @@ const SeasonManager: React.FC = () => {
           <TableBody>
             {seasons
               .filter(season => {
+                if (tabValue === 0) return true;
                 if (tabValue === 1) return season.is_active;
                 if (tabValue === 2) return season.is_qualification_round;
                 return true;
@@ -342,16 +351,16 @@ const SeasonManager: React.FC = () => {
               .map(season => (
                 <TableRow key={season.id}>
                   <TableCell>
-                    <Typography variant="subtitle1">
-                      {season.name}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      {season.description}
-                    </Typography>
+                    <Typography variant="subtitle1">{season.name}</Typography>
+                    {season.description && (
+                      <Typography variant="body2" color="textSecondary">
+                        {season.description}
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {new Date(season.start_date).toLocaleDateString()} - {new Date(season.end_date).toLocaleDateString()}
+                      {format(new Date(season.start_date), 'MMM d, yyyy')} - {format(new Date(season.end_date), 'MMM d, yyyy')}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -371,13 +380,13 @@ const SeasonManager: React.FC = () => {
                           size="small" 
                         />
                       )}
-                      <Tooltip title={`Minimum Score: ${season.minimum_score_percentage}%`}>
+                      {!season.is_active && !season.is_qualification_round && (
                         <Chip 
-                          label={`${season.minimum_score_percentage}%`} 
-                          color="secondary" 
+                          label="Inactive" 
+                          color="default" 
                           size="small" 
                         />
-                      </Tooltip>
+                      )}
                     </Box>
                   </TableCell>
                   <TableCell>{season.question_count}</TableCell>
@@ -388,10 +397,25 @@ const SeasonManager: React.FC = () => {
                       <Tooltip title="Edit Season">
                         <IconButton 
                           size="small" 
-                          color="primary" 
                           onClick={() => handleOpenDialog('edit', season)}
                         >
                           <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Add Questions">
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handleOpenQuestionsDialog(season.id)}
+                        >
+                          <CloudUploadIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="View Qualified Users">
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handleOpenQualifiedUsersDialog(season.id)}
+                        >
+                          <PeopleIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Delete Season">
@@ -401,24 +425,6 @@ const SeasonManager: React.FC = () => {
                           onClick={() => handleDeleteSeason(season.id)}
                         >
                           <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Upload Questions">
-                        <IconButton 
-                          size="small" 
-                          color="primary" 
-                          onClick={() => handleOpenQuestionsDialog(season.id)}
-                        >
-                          <CloudUploadIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="View Qualified Users">
-                        <IconButton 
-                          size="small" 
-                          color="primary" 
-                          onClick={() => handleOpenQualifiedUsersDialog(season.id)}
-                        >
-                          <PeopleIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     </Box>
@@ -435,22 +441,22 @@ const SeasonManager: React.FC = () => {
           {dialogMode === 'create' ? 'Create New Season' : 'Edit Season'}
         </DialogTitle>
         <DialogContent>
-          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <TextField 
               label="Season Name"
+              fullWidth
               value={currentSeason.name || ''}
               onChange={(e) => handleSeasonChange('name', e.target.value)}
-              fullWidth
               required
             />
             
             <TextField 
               label="Description"
-              value={currentSeason.description || ''}
-              onChange={(e) => handleSeasonChange('description', e.target.value)}
               fullWidth
               multiline
               rows={3}
+              value={currentSeason.description || ''}
+              onChange={(e) => handleSeasonChange('description', e.target.value)}
             />
             
             <Box sx={{ display: 'flex', gap: 2 }}>
@@ -474,36 +480,33 @@ const SeasonManager: React.FC = () => {
             </Box>
             
             <Box sx={{ display: 'flex', gap: 2 }}>
-              <FormControlLabel 
+              <FormControlLabel
                 control={
                   <Switch 
                     checked={currentSeason.is_active || false}
                     onChange={(e) => handleSeasonChange('is_active', e.target.checked)}
                   />
-                } 
+                }
                 label="Active Season"
               />
               
-              <FormControlLabel 
+              <FormControlLabel
                 control={
                   <Switch 
                     checked={currentSeason.is_qualification_round || false}
                     onChange={(e) => handleSeasonChange('is_qualification_round', e.target.checked)}
                   />
-                } 
+                }
                 label="Qualification Round"
               />
             </Box>
             
             <TextField 
-              label="Minimum Score Percentage"
+              label="Minimum Score Percentage to Qualify (%)"
               type="number"
+              inputProps={{ min: 0, max: 100 }}
               value={currentSeason.minimum_score_percentage || 50}
               onChange={(e) => handleSeasonChange('minimum_score_percentage', parseInt(e.target.value))}
-              fullWidth
-              InputProps={{
-                inputProps: { min: 0, max: 100 }
-              }}
             />
           </Box>
         </DialogContent>
@@ -512,120 +515,128 @@ const SeasonManager: React.FC = () => {
           <Button 
             variant="contained" 
             onClick={handleSubmitSeason}
-            disabled={!currentSeason.name}
+            disabled={!currentSeason.name || !currentSeason.start_date || !currentSeason.end_date}
           >
-            {dialogMode === 'create' ? 'Create' : 'Update'}
+            {dialogMode === 'create' ? 'Create' : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>
       
       {/* Questions Dialog */}
       <Dialog open={openQuestionsDialog} onClose={handleCloseQuestionsDialog} maxWidth="md" fullWidth>
-        <DialogTitle>Upload Questions</DialogTitle>
+        <DialogTitle>Add Questions to Season</DialogTitle>
         <DialogContent>
-          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Add a new question
-            </Typography>
-            
-            <TextField 
-              label="Question Text"
-              value={currentQuestion.question_text}
-              onChange={(e) => handleQuestionChange('question_text', e.target.value)}
-              fullWidth
-              required
-            />
-            
-            <Typography variant="subtitle2" gutterBottom>
-              Options
-            </Typography>
-            
-            {currentQuestion.options.map((option, index) => (
-              <TextField 
-                key={index}
-                label={`Option ${index + 1}`}
-                value={option}
-                onChange={(e) => handleOptionChange(index, e.target.value)}
-                fullWidth
-                required
-              />
-            ))}
-            
-            <TextField 
-              label="Correct Answer"
-              value={currentQuestion.correct_answer}
-              onChange={(e) => handleQuestionChange('correct_answer', e.target.value)}
-              fullWidth
-              required
-              helperText="Enter the exact text of the correct option"
-            />
-            
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <TextField 
-                label="Category"
-                value={currentQuestion.category || ''}
-                onChange={(e) => handleQuestionChange('category', e.target.value)}
-                fullWidth
-              />
-              
-              <TextField 
-                label="Difficulty"
-                value={currentQuestion.difficulty || ''}
-                onChange={(e) => handleQuestionChange('difficulty', e.target.value)}
-                fullWidth
-              />
-            </Box>
-            
-            <Button 
-              variant="contained" 
-              onClick={handleAddQuestion}
-              disabled={!currentQuestion.question_text || !currentQuestion.correct_answer}
-              sx={{ mt: 2 }}
-            >
-              Add Question
-            </Button>
-          </Box>
-          
-          {questions.length > 0 && (
-            <Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
+            <Box sx={{ bgcolor: 'background.paper', p: 2, borderRadius: 1 }}>
               <Typography variant="h6" gutterBottom>
-                Questions to Add ({questions.length})
+                New Question
               </Typography>
               
-              <TableContainer component={Paper} sx={{ maxHeight: 300 }}>
-                <Table stickyHeader size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Question</TableCell>
-                      <TableCell>Correct Answer</TableCell>
-                      <TableCell>Category</TableCell>
-                      <TableCell>Difficulty</TableCell>
-                      <TableCell>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {questions.map((q, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{q.question_text}</TableCell>
-                        <TableCell>{q.correct_answer}</TableCell>
-                        <TableCell>{q.category || 'General'}</TableCell>
-                        <TableCell>{q.difficulty || 'Medium'}</TableCell>
-                        <TableCell>
-                          <IconButton 
-                            size="small" 
-                            color="error" 
-                            onClick={() => handleRemoveQuestion(index)}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+              <TextField 
+                label="Question Text"
+                fullWidth
+                value={currentQuestion.question_text}
+                onChange={(e) => handleQuestionChange('question_text', e.target.value)}
+                margin="normal"
+                required
+              />
+              
+              <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
+                Options:
+              </Typography>
+              
+              {currentQuestion.options.map((option, index) => (
+                <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                  <TextField 
+                    label={`Option ${index + 1}`}
+                    fullWidth
+                    value={option}
+                    onChange={(e) => handleOptionChange(index, e.target.value)}
+                  />
+                  
+                  <IconButton 
+                    color={currentQuestion.correct_answer === option ? 'success' : 'default'}
+                    onClick={() => handleQuestionChange('correct_answer', option)}
+                    disabled={!option}
+                  >
+                    {currentQuestion.correct_answer === option ? <CheckIcon /> : <RadioButtonUncheckedIcon />}
+                  </IconButton>
+                </Box>
+              ))}
+              
+              <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                <TextField 
+                  label="Category"
+                  value={currentQuestion.category || ''}
+                  onChange={(e) => handleQuestionChange('category', e.target.value)}
+                />
+                
+                <TextField 
+                  label="Difficulty"
+                  select
+                  value={currentQuestion.difficulty || 'Medium'}
+                  onChange={(e) => handleQuestionChange('difficulty', e.target.value)}
+                  SelectProps={{
+                    native: true,
+                  }}
+                >
+                  <option value="Easy">Easy</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Hard">Hard</option>
+                </TextField>
+              </Box>
+              
+              <Button 
+                variant="contained" 
+                onClick={handleAddQuestion}
+                disabled={!currentQuestion.question_text || !currentQuestion.correct_answer}
+                sx={{ mt: 2 }}
+              >
+                Add Question
+              </Button>
             </Box>
-          )}
+            
+            {questions.length > 0 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Questions to Add ({questions.length})
+                </Typography>
+                
+                <TableContainer component={Paper} sx={{ maxHeight: 300 }}>
+                  <Table stickyHeader size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Question</TableCell>
+                        <TableCell>Correct Answer</TableCell>
+                        <TableCell>Category</TableCell>
+                        <TableCell>Difficulty</TableCell>
+                        <TableCell>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {questions.map((q, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{q.question_text}</TableCell>
+                          <TableCell>{q.correct_answer}</TableCell>
+                          <TableCell>{q.category || 'General'}</TableCell>
+                          <TableCell>{q.difficulty || 'Medium'}</TableCell>
+                          <TableCell>
+                            <IconButton 
+                              size="small" 
+                              color="error" 
+                              onClick={() => handleRemoveQuestion(index)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            )}
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseQuestionsDialog}>Cancel</Button>
@@ -662,19 +673,6 @@ const SeasonManager: React.FC = () => {
                 </TableHead>
                 <TableBody>
                   {qualifiedUsers.map((user, index) => (
-                    <TableRow key={user.id}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell>{user.username}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>{user.score}</TableCell>
-                      <TableCell>{user.percentage_score}%</TableCell>
-                      <TableCell>{new Date(user.completed_at).toLocaleString()}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseQualifiedUsersDialog}>Close</Button>
@@ -683,5 +681,12 @@ const SeasonManager: React.FC = () => {
     </Box>
   );
 };
+
+// Add missing RadioButtonUncheckedIcon
+const RadioButtonUncheckedIcon: React.FC = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
+  </svg>
+);
 
 export default SeasonManager;
