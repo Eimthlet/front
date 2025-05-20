@@ -39,9 +39,13 @@
         height: 100%;
         z-index: 9999;
         background-color: rgba(0, 0, 0, 0.5);
-        display: flex;
+        display: none; /* Hidden by default, will be shown by PayChangu script when needed */
         justify-content: center;
         align-items: center;
+      }
+      
+      #paychangu-popup-container.active {
+        display: flex; /* Show when active class is added */
       }
       
       #paychangu-popup-container iframe {
