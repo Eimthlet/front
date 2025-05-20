@@ -19,6 +19,18 @@ interface JwtPayload {
 }
 
 const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
+  // Wait for PayChangu script to load before calling the popup
+  function waitForPayChanguAndLaunch(config: any, setError: (msg: string) => void, setLoading: (loading: boolean) => void, retries = 10) {
+    if (window.PaychanguCheckout) {
+      window.PaychanguCheckout(config);
+    } else if (retries > 0) {
+      setTimeout(() => waitForPayChanguAndLaunch(config, setError, setLoading, retries - 1), 300);
+    } else {
+      setError('Payment system failed to load. Please refresh and try again.');
+      setLoading(false);
+    }
+  }
+
   // Load PayChangu popup script if not already loaded
   React.useEffect(() => {
     if (!window.PaychanguCheckout) {
@@ -94,44 +106,32 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
           return;
         }
         // 2. Launch PayChangu inline payment popup
-        // @ts-ignore
         const paychanguConfig = {
-  public_key: regResult.public_key,
-  tx_ref: regResult.tx_ref,
-  amount: regResult.amount,
-  currency: 'MWK',
-  callback_url: window.location.origin + '/paychangu-callback',
-  customer: {
-    email: regResult.email,
-    first_name: username,
-    last_name: ''
-  },
-  customization: {
-    title: 'Quiz Registration Payment',
-    description: 'Registration fee for quiz platform'
-  },
-  meta: {
-    uuid: regResult.tx_ref
-  }
-};
-console.log('PayChangu config:', paychanguConfig);
-if (!paychanguConfig.public_key || !paychanguConfig.tx_ref || !paychanguConfig.amount || !paychanguConfig.customer.email) {
-  setError('Payment initiation failed. Please contact support.');
-  setLoading(false);
-  return;
-}
-// Wait for PayChangu script to load before calling the popup
-function waitForPayChanguAndLaunch(config, retries = 10) {
-  if (window.PaychanguCheckout) {
-    window.PaychanguCheckout(config);
-  } else if (retries > 0) {
-    setTimeout(() => waitForPayChanguAndLaunch(config, retries - 1), 300);
-  } else {
-    setError('Payment system failed to load. Please refresh and try again.');
-    setLoading(false);
-  }
-}
-waitForPayChanguAndLaunch(paychanguConfig);
+          public_key: regResult.public_key,
+          tx_ref: regResult.tx_ref,
+          amount: regResult.amount,
+          currency: 'MWK',
+          callback_url: window.location.origin + '/paychangu-callback',
+          customer: {
+            email: regResult.email,
+            first_name: username,
+            last_name: ''
+          },
+          customization: {
+            title: 'Quiz Registration Payment',
+            description: 'Registration fee for quiz platform'
+          },
+          meta: {
+            uuid: regResult.tx_ref
+          }
+        };
+        console.log('PayChangu config:', paychanguConfig);
+        if (!paychanguConfig.public_key || !paychanguConfig.tx_ref || !paychanguConfig.amount || !paychanguConfig.customer.email) {
+          setError('Payment initiation failed. Please contact support.');
+          setLoading(false);
+          return;
+        }
+        waitForPayChanguAndLaunch(paychanguConfig, setError, setLoading);
         // 3. Show user a message to complete payment in popup
         setError('Please complete payment in the popup. After payment, your registration will be finalized.');
         setLoading(false);
