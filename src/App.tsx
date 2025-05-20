@@ -52,10 +52,29 @@ const App: React.FC = () => {
         
         // First check qualification status
         const qualificationResponse = await api.get('/api/qualification');
-        setQualification(qualificationResponse.data);
+        setQualification(qualificationResponse.data as {
+          hasAttempted: boolean;
+          isQualified: boolean;
+          score?: number;
+          totalQuestions?: number;
+          percentageScore?: number;
+          minimumRequired?: number;
+          message: string;
+        });
+        
+        // Type assertion for the qualification data
+        const qualificationData = qualificationResponse.data as {
+          hasAttempted: boolean;
+          isQualified: boolean;
+          score?: number;
+          totalQuestions?: number;
+          percentageScore?: number;
+          minimumRequired?: number;
+          message: string;
+        };
         
         // Only fetch questions if user is qualified or hasn't attempted yet
-        if (!qualificationResponse.data.hasAttempted || qualificationResponse.data.isQualified) {
+        if (!qualificationData.hasAttempted || qualificationData.isQualified) {
           const response = await api.get<QuestionsResponse>('/api/questions');
           setQuestions(response.data.questions);
         }
