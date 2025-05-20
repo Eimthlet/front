@@ -112,7 +112,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
           amount: regResult.amount,
           currency: 'MWK',
           callback_url: 'https://car-quizz.onrender.com/api/auth/paychangu-callback',
-          return_url: window.location.origin + '/register', // required by PayChangu docs
+          return_url: window.location.origin + '/login?payment=success', // Redirect to login page after payment
           customer: {
             email: regResult.email,
             first_name: username,
