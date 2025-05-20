@@ -34,8 +34,7 @@ import {
   Check as CheckIcon,
   Close as CloseIcon
 } from '@mui/icons-material';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
+// Using standard input fields for dates instead of date pickers
 import api from '../utils/api';
 import { format } from 'date-fns';
 
@@ -463,19 +462,23 @@ const SeasonManager: React.FC = () => {
             />
             
             <Box sx={{ display: 'flex', gap: 2 }}>
-              <LocalizationProvider dateAdapter={AdapterDateFns}>
-                <DateTimePicker
-                  label="Start Date"
-                  value={new Date(currentSeason.start_date || new Date())}
-                  onChange={(date) => handleSeasonChange('start_date', date?.toISOString())}
-                />
-                
-                <DateTimePicker
-                  label="End Date"
-                  value={new Date(currentSeason.end_date || new Date())}
-                  onChange={(date) => handleSeasonChange('end_date', date?.toISOString())}
-                />
-              </LocalizationProvider>
+              <TextField
+                label="Start Date"
+                type="datetime-local"
+                value={new Date(currentSeason.start_date || new Date()).toISOString().slice(0, 16)}
+                onChange={(e) => handleSeasonChange('start_date', new Date(e.target.value).toISOString())}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+              
+              <TextField
+                label="End Date"
+                type="datetime-local"
+                value={new Date(currentSeason.end_date || new Date()).toISOString().slice(0, 16)}
+                onChange={(e) => handleSeasonChange('end_date', new Date(e.target.value).toISOString())}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
             </Box>
             
             <Box sx={{ display: 'flex', gap: 2 }}>
