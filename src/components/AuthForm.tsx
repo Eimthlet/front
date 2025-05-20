@@ -95,25 +95,33 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
         }
         // 2. Launch PayChangu inline payment popup
         // @ts-ignore
-        window.PaychanguCheckout({
-          public_key: regResult.public_key,
-          tx_ref: regResult.tx_ref,
-          amount: regResult.amount,
-          currency: 'MWK',
-          callback_url: window.location.origin + '/paychangu-callback',
-          customer: {
-            email: regResult.email,
-            first_name: username,
-            last_name: ''
-          },
-          customization: {
-            title: 'Quiz Registration Payment',
-            description: 'Registration fee for quiz platform'
-          },
-          meta: {
-            uuid: regResult.tx_ref
-          }
-        });
+        const paychanguConfig = {
+  public_key: regResult.public_key,
+  tx_ref: regResult.tx_ref,
+  amount: regResult.amount,
+  currency: 'MWK',
+  callback_url: window.location.origin + '/paychangu-callback',
+  customer: {
+    email: regResult.email,
+    first_name: username,
+    last_name: ''
+  },
+  customization: {
+    title: 'Quiz Registration Payment',
+    description: 'Registration fee for quiz platform'
+  },
+  meta: {
+    uuid: regResult.tx_ref
+  }
+};
+console.log('PayChangu config:', paychanguConfig);
+if (!paychanguConfig.public_key || !paychanguConfig.tx_ref || !paychanguConfig.amount || !paychanguConfig.customer.email) {
+  setError('Payment initiation failed. Please contact support.');
+  setLoading(false);
+  return;
+}
+// @ts-ignore
+window.PaychanguCheckout(paychanguConfig);
         // 3. Show user a message to complete payment in popup
         setError('Please complete payment in the popup. After payment, your registration will be finalized.');
         setLoading(false);
