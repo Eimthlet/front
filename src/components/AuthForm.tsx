@@ -4,7 +4,8 @@ import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { jwtDecode } from 'jwt-decode';
 import { Checkbox, FormControlLabel, Link, IconButton } from '@mui/material';
-import { Visibility, VisibilityOff } from '@mui/icons-material';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import './AuthForm.css';
 
 interface AuthFormProps {

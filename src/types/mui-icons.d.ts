@@ -9,6 +9,8 @@ declare module '@mui/icons-material' {
   export const CloudUpload: SvgIconComponent;
   export const Check: SvgIconComponent;
   export const Close: SvgIconComponent;
+  export const Visibility: SvgIconComponent;
+  export const VisibilityOff: SvgIconComponent;
 }
 
 declare module '@mui/icons-material/Add' {
@@ -51,4 +53,16 @@ declare module '@mui/icons-material/Close' {
   import { SvgIconComponent } from '@mui/icons-material';
   const Close: SvgIconComponent;
   export default Close;
+}
+
+declare module '@mui/icons-material/Visibility' {
+  import { SvgIconComponent } from '@mui/icons-material';
+  const Visibility: SvgIconComponent;
+  export default Visibility;
+}
+
+declare module '@mui/icons-material/VisibilityOff' {
+  import { SvgIconComponent } from '@mui/icons-material';
+  const VisibilityOff: SvgIconComponent;
+  export default VisibilityOff;
 }
