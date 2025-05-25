@@ -154,7 +154,7 @@ const SeasonManager: React.FC = () => {
     }));
   };
   
-  // Handle season form submission
+// Handle season form submission
 const handleSubmitSeason = async () => {
   try {
     // Ensure dates are properly formatted as ISO strings
@@ -394,7 +394,11 @@ const handleSubmitSeason = async () => {
                         <IconButton 
                           size="small" 
                           color="error" 
-                          onClick={() => handleDeleteSeason(season.id)}
+                        onClick={() => {
+  if (typeof season.id === 'number') {
+    handleDeleteSeason(season.id);
+  }
+}}
                         >
                           <DeleteIcon fontSize="small" />
                         </IconButton>
