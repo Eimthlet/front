@@ -150,33 +150,46 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const response = await api.post<QuestionResponse>('/api/admin/questions', newQuestion);
-      const typedResponse = response.data as QuestionResponse;
-      setQuestions(prevQuestions => [...prevQuestions, typedResponse.question]);
-      
-      // Reset form
-      setNewQuestion({
-        question: '',
-        options: ['', '', '', ''],
-        correctAnswer: '',
-        timeLimit: 30,
-        category: '',
-        difficulty: 'easy'
-      });
-      
-      setSuccess('Question added successfully');
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      setError('Failed to add question');
-      
-      // Clear error message after 3 seconds
-      setTimeout(() => setError(''), 3000);
-    }
-  };
+  e.preventDefault();
+  try {
+    // Format the question data to match server expectations
+    const questionData = {
+      question: newQuestion.question,
+      options: newQuestion.options,
+      correct_answer: newQuestion.correctAnswer,
+      category: newQuestion.category,
+      difficulty: newQuestion.difficulty,
+      time_limit: newQuestion.timeLimit
+    };
+
+    console.log('Submitting question:', questionData);
+    
+    const response = await api.post<QuestionResponse>('/api/admin/questions', questionData);
+    const typedResponse = response.data as QuestionResponse;
+    setQuestions(prevQuestions => [...prevQuestions, typedResponse.question]);
+    
+    // Reset form
+    setNewQuestion({
+      question: '',
+      options: ['', '', '', ''],
+      correctAnswer: '',
+      timeLimit: 30,
+      category: '',
+      difficulty: 'easy'
+    });
+    
+    setSuccess('Question added successfully');
+    
+    // Clear success message after 3 seconds
+    setTimeout(() => setSuccess(''), 3000);
+  } catch (err: any) {
+    console.error('Error adding question:', err);
+    setError(err.response?.data?.error || err.message || 'Failed to add question');
+    
+    // Clear error message after 3 seconds
+    setTimeout(() => setError(''), 3000);
+  }
+};
 
   return (
     <Box sx={{ width: '100%' }}>
