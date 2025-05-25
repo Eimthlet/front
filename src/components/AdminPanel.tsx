@@ -355,17 +355,17 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                   }}
                 >
                   <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                    {question.question}
+                    {question?.question || 'Untitled Question'}
                   </Typography>
                   <Box sx={{ mb: 2 }}>
                     <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                      Category: {question.category}
+                      Category: {question?.category || 'General'}
                     </Typography>
                     <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                      Difficulty: {question.difficulty}
+                      Difficulty: {question?.difficulty || 'Medium'}
                     </Typography>
                     <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                      Time Limit: {question.timeLimit}s
+                      Time Limit: {question?.timeLimit || 30}s
                     </Typography>
                   </Box>
                   <Button 

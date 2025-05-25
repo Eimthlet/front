@@ -25,6 +25,7 @@ import {
   Tab,
   Divider
 } from '@mui/material';
+// @ts-ignore
 import { 
   Add as AddIcon,
   Edit as EditIcon,
@@ -53,6 +54,7 @@ interface Season {
 }
 
 interface Question {
+  id: number;
   question_text: string;
   options: string[];
   correct_answer: string;
@@ -88,7 +90,7 @@ const SeasonManager: React.FC = () => {
   
   const [openQuestionsDialog, setOpenQuestionsDialog] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [currentQuestion, setCurrentQuestion] = useState<Question>({
+  const [currentQuestion, setCurrentQuestion] = useState<Omit<Question, 'id'>>({
     question_text: '',
     options: ['', '', '', ''],
     correct_answer: ''
@@ -101,21 +103,21 @@ const SeasonManager: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   
   // Fetch seasons
+  const fetchSeasons = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/api/seasons');
+      setSeasons(response.data as Season[]);
+      setError(null);
+    } catch (err: any) {
+      console.error('Error fetching seasons:', err);
+      setError(err.message || 'Failed to load seasons');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchSeasons = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get('/api/admin/seasons');
-        setSeasons(response.data as Season[]);
-        setError(null);
-      } catch (err: any) {
-        console.error('Error fetching seasons:', err);
-        setError(err.message || 'Failed to load seasons');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchSeasons();
   }, []);
   
@@ -211,7 +213,14 @@ const handleDeleteSeason = async (id: number) => {
       options: ['', '', '', ''],
       correct_answer: ''
     });
-    setOpenQuestionsDialog(true);
+    try {
+      const response = await api.get<Question[]>(`/api/seasons/${seasonId}/questions`);
+      setQuestions(response.data);
+      setOpenQuestionsDialog(true);
+    } catch (err: any) {
+      console.error('Error fetching season questions:', err);
+      setError(err.message || 'Failed to load questions');
+    }
   };
   
   const handleCloseQuestionsDialog = () => {
@@ -239,15 +248,22 @@ const handleDeleteSeason = async (id: number) => {
   
   // Add question to list
   const handleAddQuestion = () => {
-    setQuestions(prev => [
-      ...prev,
-      currentQuestion
-    ]);
+    if (!currentQuestion.question_text || !currentQuestion.correct_answer) {
+      return;
+    }
     
+    const tempQuestion: Question = {
+      ...currentQuestion,
+      id: Math.floor(Math.random() * -1000000) // Use negative IDs for temporary questions
+    };
+    
+    setQuestions(prev => [...prev, tempQuestion]);
     setCurrentQuestion({
       question_text: '',
       options: ['', '', '', ''],
-      correct_answer: ''
+      correct_answer: '',
+      category: undefined,
+      difficulty: undefined
     });
   };
   
@@ -258,32 +274,31 @@ const handleDeleteSeason = async (id: number) => {
   
   // Submit questions
   const handleSubmitQuestions = async () => {
+    if (!selectedSeasonId) return;
+    
     try {
-      await api.post(`/api/admin/seasons/${selectedSeasonId}/questions`, {
-        questions
+      await api.post(`/api/seasons/${selectedSeasonId}/questions`, {
+        questions: questions.map(q => q.id)
       });
       
-      // Refresh seasons
-      const response = await api.get('/api/admin/seasons');
-      setSeasons(response.data as Season[]);
-      
       handleCloseQuestionsDialog();
+      fetchSeasons(); // Refresh seasons list to update question count
     } catch (err: any) {
-      console.error('Error submitting questions:', err);
-      setError(err.message || 'Failed to submit questions');
+      console.error('Error adding questions to season:', err);
+      setError(err.message || 'Failed to add questions');
     }
   };
   
   // Handle qualified users dialog
   const handleOpenQualifiedUsersDialog = async (seasonId: number) => {
+    setSelectedSeasonId(seasonId);
     try {
-      setSelectedSeasonId(seasonId);
-      const response = await api.get(`/api/admin/seasons/${seasonId}/qualified-users`);
-      setQualifiedUsers(response.data as QualifiedUser[]);
+      const response = await api.get<QualifiedUser[]>(`/api/seasons/${seasonId}/qualified-users`);
+      setQualifiedUsers(response.data);
       setOpenQualifiedUsersDialog(true);
     } catch (err: any) {
       console.error('Error fetching qualified users:', err);
-      setError(err.message || 'Failed to fetch qualified users');
+      setError(err.message || 'Failed to load qualified users');
     }
   };
   
