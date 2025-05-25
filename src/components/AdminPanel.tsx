@@ -83,7 +83,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
           firstChars: token?.substring(0, 10)
         });
 
-        const response = await api.get<QuestionsResponse>('/api/admin/questions');
+        const response = await api.get<QuestionsResponse>('/api/questions');
         const typedResponse = response.data as QuestionsResponse;
         setQuestions(typedResponse.questions);
         setIsLoading(false);
