@@ -25,16 +25,13 @@ import {
   Tab,
   Divider
 } from '@mui/material';
-// @ts-ignore
-import { 
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  People as PeopleIcon,
-  CloudUpload as CloudUploadIcon,
-  Check as CheckIcon,
-  Close as CloseIcon
-} from '@mui/icons-material';
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import PeopleIcon from '@mui/icons-material/People';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
 import api from '../utils/api';
 
 interface Season {
@@ -106,12 +103,26 @@ const SeasonManager: React.FC = () => {
   const fetchSeasons = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/seasons');
+      console.log('Fetching seasons...');
+      const token = localStorage.getItem('token');
+      console.log('Using token:', token ? 'Token exists' : 'No token found');
+      
+      const response = await api.get('/api/admin/seasons', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      console.log('Seasons response:', response.data);
       setSeasons(response.data as Season[]);
       setError(null);
     } catch (err: any) {
-      console.error('Error fetching seasons:', err);
-      setError(err.message || 'Failed to load seasons');
+      console.error('Error fetching seasons:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      setError(err.response?.data?.message || err.message || 'Failed to load seasons');
     } finally {
       setLoading(false);
     }
@@ -171,15 +182,24 @@ const handleSubmitSeason = async () => {
 
     console.log('Submitting season data:', seasonData);
     
+    const token = localStorage.getItem('token');
+    
     if (dialogMode === 'create') {
-      await api.post('/admin/seasons', seasonData);
+      await api.post('/api/admin/seasons', seasonData, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
     } else {
-      await api.put(`/admin/seasons/${currentSeason.id}`, seasonData);
+      await api.put(`/api/admin/seasons/${currentSeason.id}`, seasonData, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
     }
     
     // Refresh seasons
-    const response = await api.get('/admin/seasons');
-    setSeasons(response.data as Season[]);
+    await fetchSeasons();
     
     handleCloseDialog();
   } catch (err: any) {
@@ -188,17 +208,25 @@ const handleSubmitSeason = async () => {
   }
 };
 
-  //Handle season deletion
+  // Handle season deletion
 const handleDeleteSeason = async (id: number) => {
   if (window.confirm('Are you sure you want to delete this season? This action cannot be undone.')) {
     try {
-      await api.delete(`/admin/seasons/${id}`);
+      const token = localStorage.getItem('token');
+      await api.delete(`/api/admin/seasons/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       // Refresh seasons
-      const response = await api.get('/admin/seasons');
-      setSeasons(response.data as Season[]);
+      await fetchSeasons();
     } catch (err: any) {
-      console.error('Error deleting season:', err);
+      console.error('Error deleting season:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
       setError(err.response?.data?.error || err.message || 'Failed to delete season');
     }
   }
