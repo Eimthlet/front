@@ -51,7 +51,7 @@ const App: React.FC = () => {
         setError(null);
         
         // First check qualification status
-        const qualificationResponse = await api.get('/api/qualification');
+        const qualificationResponse = await api.get('/qualification');
         setQualification(qualificationResponse.data as {
           hasAttempted: boolean;
           isQualified: boolean;
@@ -75,7 +75,7 @@ const App: React.FC = () => {
         
         // Only fetch questions if user is qualified or hasn't attempted yet
         if (!qualificationData.hasAttempted || qualificationData.isQualified) {
-          const response = await api.get<QuestionsResponse>('/api/questions');
+          const response = await api.get<QuestionsResponse>('/questions');
           setQuestions(response.data.questions);
         }
       } catch (err: any) {
@@ -101,7 +101,7 @@ const App: React.FC = () => {
 
   const handleQuizComplete = async (score: number) => {
     try {
-      await api.post('/api/progress', { 
+      await api.post('/progress', { 
         userId: user?.id, 
         score, 
         total: questions.length 

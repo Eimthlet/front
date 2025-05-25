@@ -45,7 +45,7 @@ useEffect(() => {
 
     try {
       // Fetch users data from the working endpoint
-      const response = await api.get('/api/admin/users');
+      const response = await api.get('/admin/users');
       
       if (!response.data || !Array.isArray(response.data)) {
         throw new Error('Invalid user data format');
