@@ -43,6 +43,13 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true, // Enable sending cookies with requests - CRITICAL for CORS with credentials
+  xsrfCookieName: 'accessToken',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
+  // Add cookie attributes
+  cookieAttributes: {
+    SameSite: 'Lax',
+    Partitioned: true
+  }
   // Don't reject on HTTP error responses
   validateStatus: (status) => status < 500 // Only reject if status is server error
 });

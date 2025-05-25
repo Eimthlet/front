@@ -360,7 +360,7 @@ const handleDeleteSeason = async (id: number) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {seasons
+            {(Array.isArray(seasons) ? seasons : [])
               .filter(season => {
                 if (tabValue === 1) return season.is_active;
                 if (tabValue === 2) return season.is_qualification_round;
