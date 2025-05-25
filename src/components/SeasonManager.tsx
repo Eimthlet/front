@@ -170,41 +170,57 @@ const SeasonManager: React.FC = () => {
 // Handle season form submission
 const handleSubmitSeason = async () => {
   try {
-    // Ensure dates are properly formatted as ISO strings
+    // Ensure required fields are present
+    if (!currentSeason.name || !currentSeason.start_date || !currentSeason.end_date) {
+      throw new Error('Name, start date, and end date are required');
+    }
+
+    // Format dates to ISO string without milliseconds
+    const formatDate = (date: Date | string): string => {
+      const d = new Date(date);
+      return d.toISOString().split('.')[0] + 'Z';
+    };
+
     const seasonData = {
-      ...currentSeason,
-      start_date: typeof currentSeason.start_date === 'string' ? currentSeason.start_date : new Date(currentSeason.start_date!).toISOString(),
-      end_date: typeof currentSeason.end_date === 'string' ? currentSeason.end_date : new Date(currentSeason.end_date!).toISOString(),
-      minimum_score_percentage: Number(currentSeason.minimum_score_percentage) || 50,
+      name: currentSeason.name,
+      description: currentSeason.description || '',
+      start_date: formatDate(currentSeason.start_date),
+      end_date: formatDate(currentSeason.end_date),
       is_active: Boolean(currentSeason.is_active),
-      is_qualification_round: Boolean(currentSeason.is_qualification_round)
+      is_qualification_round: Boolean(currentSeason.is_qualification_round),
+      minimum_score_percentage: Number(currentSeason.minimum_score_percentage) || 50
     };
 
     console.log('Submitting season data:', seasonData);
     
     const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+    
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
     
     if (dialogMode === 'create') {
-      await api.post('/admin/seasons', seasonData, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      await api.post('/admin/seasons', seasonData, { headers });
+    } else if (currentSeason.id) {
+      await api.put(`/admin/seasons/${currentSeason.id}`, seasonData, { headers });
     } else {
-      await api.put(`/admin/seasons/${currentSeason.id}`, seasonData, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      throw new Error('Cannot update season: No season ID provided');
     }
     
     // Refresh seasons
     await fetchSeasons();
-    
     handleCloseDialog();
   } catch (err: any) {
-    console.error('Error submitting season:', err);
-    setError(err.response?.data?.error || err.message || 'Failed to submit season');
+    console.error('Error submitting season:', {
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status
+    });
+    setError(err.response?.data?.message || err.message || 'Failed to submit season');
   }
 };
 
