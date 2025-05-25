@@ -185,6 +185,22 @@ const handleSubmitSeason = async () => {
     setError(err.response?.data?.error || err.message || 'Failed to submit season');
   }
 };
+
+  //Handle season deletion
+const handleDeleteSeason = async (id: number) => {
+  if (window.confirm('Are you sure you want to delete this season? This action cannot be undone.')) {
+    try {
+      await api.delete(`/api/admin/seasons/${id}`);
+      
+      // Refresh seasons
+      const response = await api.get('/api/admin/seasons');
+      setSeasons(response.data as Season[]);
+    } catch (err: any) {
+      console.error('Error deleting season:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to delete season');
+    }
+  }
+};
   
   // Handle questions dialog
   const handleOpenQuestionsDialog = async (seasonId: number) => {
