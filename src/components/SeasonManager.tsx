@@ -155,40 +155,36 @@ const SeasonManager: React.FC = () => {
   };
   
   // Handle season form submission
-  const handleSubmitSeason = async () => {
-    try {
-      if (dialogMode === 'create') {
-        await api.post('/api/admin/seasons', currentSeason);
-      } else {
-        await api.put(`/api/admin/seasons/${currentSeason.id}`, currentSeason);
-      }
-      
-      // Refresh seasons
-      const response = await api.get('/api/admin/seasons');
-      setSeasons(response.data as Season[]);
-      
-      handleCloseDialog();
-    } catch (err: any) {
-      console.error('Error submitting season:', err);
-      setError(err.message || 'Failed to submit season');
+const handleSubmitSeason = async () => {
+  try {
+    // Ensure dates are properly formatted as ISO strings
+    const seasonData = {
+      ...currentSeason,
+      start_date: typeof currentSeason.start_date === 'string' ? currentSeason.start_date : new Date(currentSeason.start_date!).toISOString(),
+      end_date: typeof currentSeason.end_date === 'string' ? currentSeason.end_date : new Date(currentSeason.end_date!).toISOString(),
+      minimum_score_percentage: Number(currentSeason.minimum_score_percentage) || 50,
+      is_active: Boolean(currentSeason.is_active),
+      is_qualification_round: Boolean(currentSeason.is_qualification_round)
+    };
+
+    console.log('Submitting season data:', seasonData);
+    
+    if (dialogMode === 'create') {
+      await api.post('/api/admin/seasons', seasonData);
+    } else {
+      await api.put(`/api/admin/seasons/${currentSeason.id}`, seasonData);
     }
-  };
-  
-  // Handle season deletion
-  const handleDeleteSeason = async (id: number) => {
-    if (window.confirm('Are you sure you want to delete this season? This action cannot be undone.')) {
-      try {
-        await api.delete(`/api/admin/seasons/${id}`);
-        
-        // Refresh seasons
-        const response = await api.get('/api/admin/seasons');
-        setSeasons(response.data as Season[]);
-      } catch (err: any) {
-        console.error('Error deleting season:', err);
-        setError(err.message || 'Failed to delete season');
-      }
-    }
-  };
+    
+    // Refresh seasons
+    const response = await api.get('/api/admin/seasons');
+    setSeasons(response.data as Season[]);
+    
+    handleCloseDialog();
+  } catch (err: any) {
+    console.error('Error submitting season:', err);
+    setError(err.response?.data?.error || err.message || 'Failed to submit season');
+  }
+};
   
   // Handle questions dialog
   const handleOpenQuestionsDialog = async (seasonId: number) => {
