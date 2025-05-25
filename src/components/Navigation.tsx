@@ -91,19 +91,27 @@ const Navigation: React.FC = () => {
       return null;
     }
     
-    if (isAdmin()) {
-      return (
-        <>
-          <Button
-            color="inherit"
-            onClick={() => navigate('/admin')}
-            startIcon={<AdminPanelSettingsIcon />}
-          >
-            Admin
-          </Button>
-        </>
-      );
-    }
+if (isAdmin()) {
+  return (
+    <>
+      <Button
+        color="inherit"
+        onClick={() => navigate('/admin')}
+        startIcon={<AdminPanelSettingsIcon />}
+        sx={{ mr: 2 }}
+      >
+        Admin
+      </Button>
+      <Button
+        color="inherit"
+        onClick={() => navigate('/dashboard')}
+        startIcon={<DashboardIcon />}
+      >
+        Dashboard
+      </Button>
+    </>
+  );
+}
     return null;
   };
 
