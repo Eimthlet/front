@@ -343,7 +343,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
               gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: '1fr 1fr 1fr' },
               gap: 3 
             }}>
-              {questions.map((question) => (
+              {questions?.map((question) => (
                 <Box 
                   key={question.id}
                   sx={{
