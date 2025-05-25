@@ -107,7 +107,7 @@ const SeasonManager: React.FC = () => {
       const token = localStorage.getItem('token');
       console.log('Using token:', token ? 'Token exists' : 'No token found');
       
-      const response = await api.get('/api/admin/seasons', {
+      const response = await api.get('/admin/seasons', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -185,13 +185,13 @@ const handleSubmitSeason = async () => {
     const token = localStorage.getItem('token');
     
     if (dialogMode === 'create') {
-      await api.post('/api/admin/seasons', seasonData, {
+      await api.post('/admin/seasons', seasonData, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
     } else {
-      await api.put(`/api/admin/seasons/${currentSeason.id}`, seasonData, {
+      await api.put(`/admin/seasons/${currentSeason.id}`, seasonData, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -213,7 +213,7 @@ const handleDeleteSeason = async (id: number) => {
   if (window.confirm('Are you sure you want to delete this season? This action cannot be undone.')) {
     try {
       const token = localStorage.getItem('token');
- await api.delete(`/api/admin/seasons/${id}`, {
+ await api.delete(`/admin/seasons/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -242,7 +242,7 @@ const handleDeleteSeason = async (id: number) => {
       correct_answer: ''
     });
     try {
- const response = await api.get<Question[]>(`/api/seasons/${seasonId}/questions`);
+ const response = await api.get<Question[]>(`/seasons/${seasonId}/questions`);
       setQuestions(response.data);
       setOpenQuestionsDialog(true);
     } catch (err: any) {
@@ -305,7 +305,7 @@ const handleDeleteSeason = async (id: number) => {
     if (!selectedSeasonId) return;
     
     try {
- await api.post(`/api/seasons/${selectedSeasonId}/questions`, {
+ await api.post(`/seasons/${selectedSeasonId}/questions`, {
         questions: questions.map(q => q.id)
       });
       
@@ -321,7 +321,7 @@ const handleDeleteSeason = async (id: number) => {
   const handleOpenQualifiedUsersDialog = async (seasonId: number) => {
     setSelectedSeasonId(seasonId);
     try {
- const response = await api.get<QualifiedUser[]>(`/api/seasons/${seasonId}/qualified-users`);
+ const response = await api.get<QualifiedUser[]>(`/seasons/${seasonId}/qualified-users`);
       setQualifiedUsers(response.data);
       setOpenQualifiedUsersDialog(true);
     } catch (err: any) {
