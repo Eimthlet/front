@@ -1,4 +1,7 @@
-const API_BASE = 'https://car-quizz.onrender.com/api';
+// This file is deprecated. Please use the axios-based client in src/utils/api.ts instead.
+// This file is kept for backward compatibility only and will be removed in a future version.
+
+const API_BASE = 'https://car-quizz.onrender.com';
 
 export interface User {
   id: number;
@@ -21,7 +24,7 @@ export interface AuthResponse {
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
   try {
-    const response = await fetch(`${API_BASE}/auth/login`, {
+    const response = await fetch(`${API_BASE}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -45,7 +48,7 @@ export async function login(email: string, password: string): Promise<AuthRespon
 
 export async function register(username: string, email: string, password: string, phone: string, amount: number): Promise<any> {
   try {
-    const response = await fetch(`${API_BASE}/auth/register`, {
+    const response = await fetch(`${API_BASE}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, email, password, phone, amount }),
@@ -69,7 +72,7 @@ export async function register(username: string, email: string, password: string
 
 export async function refreshToken(refreshToken: string): Promise<AuthResponse> {
   try {
-    const response = await fetch(`${API_BASE}/auth/refresh-token`, {
+    const response = await fetch(`${API_BASE}/api/auth/refresh-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
@@ -93,7 +96,7 @@ export async function refreshToken(refreshToken: string): Promise<AuthResponse> 
 
 export async function fetchAdminData(endpoint: string) {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_BASE}/admin/${endpoint}`, {
+  const response = await fetch(`${API_BASE}/api/admin/${endpoint}`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -140,7 +143,7 @@ export async function addQuestion(question: Question): Promise<Question> {
 
 export async function editQuestion(question: Question): Promise<Question> {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_BASE}/admin/questions/${question.id}`, {
+  const response = await fetch(`${API_BASE}/api/admin/questions/${question.id}`, {
     method: 'PUT',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -159,7 +162,7 @@ export async function editQuestion(question: Question): Promise<Question> {
 
 export async function deleteQuestion(questionId: string): Promise<void> {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_BASE}/admin/questions/${questionId}`, {
+  const response = await fetch(`${API_BASE}/api/admin/questions/${questionId}`, {
     method: 'DELETE',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -175,7 +178,7 @@ export async function deleteQuestion(questionId: string): Promise<void> {
 
 export async function fetchAllQuestions(): Promise<Question[]> {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_BASE}/admin/questions`, {
+  const response = await fetch(`${API_BASE}/api/admin/questions`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -191,7 +194,7 @@ export async function fetchAllQuestions(): Promise<Question[]> {
 }
 
 export async function saveProgress(userId: number, score: number, total: number) {
-  const response = await fetch(`${API_BASE}/progress`, {
+  const response = await fetch(`${API_BASE}/api/progress`, {
     method: 'POST',
     headers: { 
       'Content-Type': 'application/json',
@@ -213,7 +216,7 @@ export async function fetchQuestions() {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token');
 
-  const response = await fetch(`${API_BASE}/questions`, {
+  const response = await fetch(`${API_BASE}/api/questions`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'

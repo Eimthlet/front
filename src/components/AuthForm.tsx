@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login, register } from '../api';
+import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { jwtDecode } from 'jwt-decode';
 import { Checkbox, FormControlLabel, Link, IconButton } from '@mui/material';
@@ -48,7 +48,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
   const [amount, setAmount] = useState<number>(1000); // Default amount, adjust as needed
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [currentMode, setCurrentMode] = useState<'login' | 'register'>(mode);
+  const [currentMode, setCurrentMode] = useState<'login' | 'register'>(mode as 'login' | 'register');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -99,12 +99,25 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
 
       try {
         // 1. Send registration info to backend and get tx_ref, public_key, etc.
-        const regResult = await register(username, email, password, phone, amount);
+        const endpoint = '/auth/register';
+        const payload = { username, email, password, phone, amount };
+        
+        interface RegisterResponse {
+          tx_ref: string;
+          public_key: string;
+          amount: number;
+          email: string;
+        }
+        
+        const response = await api.post<RegisterResponse>(endpoint, payload);
+        const regResult = response.data;
+        
         if (!regResult.tx_ref || !regResult.public_key) {
           setError('Registration initiation failed. Please try again.');
           setLoading(false);
           return;
         }
+        
         // 2. Launch PayChangu inline payment popup
         const paychanguConfig = {
           public_key: regResult.public_key,
@@ -148,8 +161,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
 
     // Login flow
     try {
-      const response = await login(email, password);
-      const { user, token, refreshToken } = response;
+      const response = await api.post<{ user: any; token: string; refreshToken: string }>('/auth/login', { email, password });
+      const { user, token, refreshToken } = response.data;
       
       localStorage.setItem('token', token);
       localStorage.setItem('refreshToken', refreshToken);

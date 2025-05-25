@@ -106,7 +106,7 @@ const SeasonManager: React.FC = () => {
   const fetchSeasons = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/seasons');
+      const response = await api.get('/seasons');
       setSeasons(response.data as Season[]);
       setError(null);
     } catch (err: any) {
@@ -172,13 +172,13 @@ const handleSubmitSeason = async () => {
     console.log('Submitting season data:', seasonData);
     
     if (dialogMode === 'create') {
-      await api.post('/api/admin/seasons', seasonData);
+      await api.post('/admin/seasons', seasonData);
     } else {
-      await api.put(`/api/admin/seasons/${currentSeason.id}`, seasonData);
+      await api.put(`/admin/seasons/${currentSeason.id}`, seasonData);
     }
     
     // Refresh seasons
-    const response = await api.get('/api/admin/seasons');
+    const response = await api.get('/admin/seasons');
     setSeasons(response.data as Season[]);
     
     handleCloseDialog();
@@ -192,10 +192,10 @@ const handleSubmitSeason = async () => {
 const handleDeleteSeason = async (id: number) => {
   if (window.confirm('Are you sure you want to delete this season? This action cannot be undone.')) {
     try {
-      await api.delete(`/api/admin/seasons/${id}`);
+      await api.delete(`/admin/seasons/${id}`);
       
       // Refresh seasons
-      const response = await api.get('/api/admin/seasons');
+      const response = await api.get('/admin/seasons');
       setSeasons(response.data as Season[]);
     } catch (err: any) {
       console.error('Error deleting season:', err);
