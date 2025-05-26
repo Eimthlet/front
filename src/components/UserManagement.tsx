@@ -139,10 +139,18 @@ const UserManagement: React.FC<UserManagementProps> = () => {
       if (roleFilter) queryParams.append('role', roleFilter);
       if (statusFilter) queryParams.append('status', statusFilter);
       
-      const response = await api.get<UsersResponse>(`/admin/users?${queryParams.toString()}`);
+      const response = await api.get<UsersResponse>(`/api/admin/users?${queryParams.toString()}`);
       
-      setUsers(response.data.users);
-      setPagination(response.data.pagination);
+      // Add null checks to prevent undefined errors
+      if (response.data && response.data.users) {
+        setUsers(response.data.users || []);
+      } else {
+        setUsers([]);
+      }
+      
+      if (response.data && response.data.pagination) {
+        setPagination(response.data.pagination);
+      }
     } catch (err: any) {
       console.error('Error fetching users:', err);
       setError(err.response?.data?.error || err.message || 'Failed to fetch users');
@@ -156,9 +164,15 @@ const UserManagement: React.FC<UserManagementProps> = () => {
       setLoading(true);
       setError(null);
       
-      const response = await api.get<UserDetail>(`/admin/users/${userId}`);
-      setSelectedUser(response.data);
-      setOpenUserDialog(true);
+      const response = await api.get<UserDetail>(`/api/admin/users/${userId}`);
+      
+      // Add null check to prevent undefined errors
+      if (response.data) {
+        setSelectedUser(response.data);
+        setOpenUserDialog(true);
+      } else {
+        throw new Error('User data not found');
+      }
     } catch (err: any) {
       console.error('Error fetching user details:', err);
       setError(err.response?.data?.error || err.message || 'Failed to fetch user details');

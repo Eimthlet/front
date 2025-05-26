@@ -178,28 +178,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Extract the error message from the API response if available
     let userFriendlyMessage = defaultMessage;
     
+    // Check if the error is from our updated API format
+    if (error.message && typeof error.message === 'string') {
+      userFriendlyMessage = error.message;
+    }
+    
+    // If there's a response with error data, prioritize that
     if (error.response?.data?.error) {
-      // Handle specific error cases with user-friendly messages
-      const apiErrorMessage = error.response.data.error;
+      userFriendlyMessage = error.response.data.error;
+    }
+    
+    // For specific error codes, provide even more user-friendly messages
+    if (error.response?.data?.code) {
+      const errorCode = error.response.data.code;
       
-      if (apiErrorMessage.includes('Invalid email or password')) {
-        userFriendlyMessage = 'The email or password you entered is incorrect. Please try again.';
-      } else if (apiErrorMessage.includes('Email already registered')) {
-        userFriendlyMessage = 'This email is already registered. Please use a different email or try logging in.';
-      } else if (apiErrorMessage.includes('Username already taken')) {
-        userFriendlyMessage = 'This username is already taken. Please choose a different username.';
-      } else if (apiErrorMessage.includes('Token expired')) {
-        userFriendlyMessage = 'Your session has expired. Please log in again.';
-      } else if (apiErrorMessage.includes('No token provided')) {
-        userFriendlyMessage = 'You need to log in to access this feature.';
-      } else {
-        // Use the API error message but make it more user-friendly
-        userFriendlyMessage = apiErrorMessage.charAt(0).toUpperCase() + apiErrorMessage.slice(1);
+      switch(errorCode) {
+        case 'INVALID_CREDENTIALS':
+          userFriendlyMessage = 'The email or password you entered is incorrect. Please try again.';
+          break;
+        case 'TOKEN_EXPIRED':
+          userFriendlyMessage = 'Your session has expired. Please log in again.';
+          break;
+        case 'INVALID_TOKEN':
+          userFriendlyMessage = 'Your session is invalid. Please log in again.';
+          break;
+        case 'ACCOUNT_SUSPENDED':
+          userFriendlyMessage = 'Your account has been temporarily suspended. Please contact support.';
+          break;
       }
-    } else if (error.message === 'Network Error') {
-      userFriendlyMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
-    } else if (error.message?.includes('timeout')) {
-      userFriendlyMessage = 'The server is taking too long to respond. Please try again later.';
     }
     
     setError(userFriendlyMessage);

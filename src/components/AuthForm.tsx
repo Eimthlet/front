@@ -106,7 +106,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const navigate = useNavigate();
-  const { login: authLogin, isAdmin } = useAuth();
+  const { login: authLogin, isAdmin, error: authError, clearError } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -291,6 +291,9 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
 
     // Login flow
     try {
+      // Clear any previous errors from the context
+      clearError();
+      
       // Use the authLogin function from AuthContext which handles cookies properly
       await authLogin(email, password);
       
@@ -301,32 +304,21 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
       }, 500); // Small delay to ensure state is updated
     } catch (err: unknown) {
       console.error('Authentication error:', err);
-      const apiError = err as ApiError;
-      
-      // Create user-friendly error message
-      let userFriendlyMessage = 'Unable to log in. Please try again.';
-      
-      if (apiError.response?.data?.error) {
-        const errorMessage = apiError.response.data.error;
-        
-        if (errorMessage.includes('Invalid email or password')) {
-          userFriendlyMessage = 'The email or password you entered is incorrect. Please try again.';
-        } else if (errorMessage.includes('Email already registered')) {
-          userFriendlyMessage = 'This email is already registered. Please use a different email or try logging in.';
-        } else if (errorMessage.includes('Username already taken')) {
-          userFriendlyMessage = 'This username is already taken. Please choose a different username.';
-        } else {
-          // Make the first letter uppercase for better presentation
-          userFriendlyMessage = errorMessage.charAt(0).toUpperCase() + errorMessage.slice(1);
-        }
-      } else if (apiError.message === 'Network Error') {
-        userFriendlyMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
-      } else if (apiError.message?.includes('timeout')) {
-        userFriendlyMessage = 'The server is taking too long to respond. Please try again later.';
-      }
-      
-      setError(userFriendlyMessage);
+      // No need to handle the error here as it's already handled in the AuthContext
+      // Just set loading to false
       setLoading(false);
+      
+      // If for some reason the error wasn't set in the context, set it locally
+      if (!authError) {
+        const apiError = err as ApiError;
+        let userFriendlyMessage = 'Unable to log in. Please try again.';
+        
+        if (apiError.message) {
+          userFriendlyMessage = apiError.message;
+        }
+        
+        setError(userFriendlyMessage);
+      }
     }
   };
 
@@ -471,7 +463,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
             <span>Already have an account? <button type="button" onClick={handleSwitchMode}>Login</button></span>
           )}
         </div>
-        {error && <div className="auth-error">{error}</div>}
+        {(error || authError) && <div className="auth-error">{error || authError}</div>}
       </form>
     </div>
   );
