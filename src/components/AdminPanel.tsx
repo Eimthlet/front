@@ -68,9 +68,7 @@ interface ErrorState {
 }
 
 interface QuestionsResponse {
-  data: {
-    questions: Question[];
-  };
+  questions: Question[];
 }
 
 interface QuestionResponse {
@@ -160,8 +158,22 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const fetchQuestions = async () => {
     try {
       setIsLoading(true);
-      const response = await api.get<Question[]>('/admin/questions');
-      setQuestions(response.data);
+      const response = await api.get<QuestionsResponse | Question[]>('/admin/questions');
+      
+      // Check if response.data is an array or has a questions property
+      if (Array.isArray(response.data)) {
+        setQuestions(response.data as Question[]);
+      } else if (response.data && 'questions' in response.data && Array.isArray((response.data as QuestionsResponse).questions)) {
+        // If the response has a nested questions array
+        setQuestions((response.data as QuestionsResponse).questions);
+      } else {
+        console.error('Unexpected API response format:', response.data);
+        setQuestions([]);
+        setError({
+          message: 'Failed to load questions',
+          details: 'Unexpected data format received from server'
+        });
+      }
     } catch (err: unknown) {
       console.error('Error fetching questions:', err);
       const apiError = err as ApiError;
@@ -439,7 +451,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                 gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: '1fr 1fr 1fr' },
                 gap: 3 
               }}>
-                {questions?.map((question) => (
+                {Array.isArray(questions) && questions.length > 0 ? questions.map((question) => (
                   <Box 
                     key={question.id}
                     sx={{
@@ -493,7 +505,13 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                       ))}
                     </Box>
                   </Box>
-                ))}
+                )) : (
+                  <Box sx={{ p: 3, textAlign: 'center' }}>
+                    <Typography variant="body1">
+                      No questions found. Add your first question using the form above.
+                    </Typography>
+                  </Box>
+                )}
               </Box>
             </Box>
           </Box>
