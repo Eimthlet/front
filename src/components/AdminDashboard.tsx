@@ -71,105 +71,54 @@ interface DashboardResponse {
   };
 }
 
+interface DashboardStatsResponse {
+  totalUsers: number;
+  topPlayers: Array<{
+    username: string;
+    highest_score: number;
+    games_played: number;
+  }>;
+  recentActivity: Array<{
+    username: string;
+    score: number;
+    created_at: string;
+  }>;
+}
+
 const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<InsightsStats | null>(null);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStatsResponse | null>(null);
   const [error, setError] = useState<ErrorState | null>(null);
   const [activeSection, setActiveSection] = useState<'insights' | 'overview' | 'users' | 'seasons'>('overview');
-
   const [isLoading, setIsLoading] = useState(true);
 
-  
-useEffect(() => {
-  const fetchUserData = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Fetch users data from the working endpoint
-      const response = await api.get('/admin/users');
-      
-      if (!response.data || !Array.isArray(response.data)) {
-        throw new Error('Invalid user data format');
-      }
-      
-      // Convert the users data to our stats format
-      const users = response.data;
-      const nonAdminUsers = users
-        .filter((user: any) => user.role !== 'admin')
-        .map((user: any) => ({
-          id: user.id,
-          username: user.username || 'User ' + user.id,
-          email: user.email,
-          average_score: user.score || 0,
-          total_games: 1,
-          highest_score: user.score || 0,
-          lowest_score: user.score || 0,
-        }));
-      
-      // Create a stats object with the available data
-      const calculatedStats: InsightsStats = {
-        averageScore: nonAdminUsers.reduce((sum, user) => sum + user.average_score, 0) / (nonAdminUsers.length || 1),
-        mostPlayedGame: 'Car Quiz',
-        leastPlayedGame: 'Car Quiz',
-        insights: nonAdminUsers.map(user => ({
-          id: user.id,
-          username: user.username,
-          insight: user.average_score > 70 ? 'Top Performer' : 'Regular Player',
-          average_score: user.average_score,
-          total_games: user.total_games
-        })),
-        totalUsers: nonAdminUsers.length,
-        nonAdminUsers: nonAdminUsers
-      };
-      
-      setStats(calculatedStats);
-    } catch (err: unknown) {
-      console.error('Dashboard data fetch error:', err);
-
-      const apiError = err as ApiError;
-      const errorMessage = apiError.response?.data?.error || 
-        apiError.message || 
-        'Failed to load dashboard data';
-
-      setError({
-        message: errorMessage,
-        details: apiError.response?.data?.details
-      });
-
-      // Handle specific error scenarios
-      if (apiError.response) {
-        switch (apiError.response.status) {
-          case 401:
-            window.location.href = '/login';
-            break;
-          case 403:
-            console.warn('Access forbidden');
-            break;
-        }
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchDashboardData = async () => {
-    try {
+  useEffect(() => {
+    const fetchData = async () => {
       setIsLoading(true);
-      const response = await api.get<DashboardResponse>('/admin/dashboard');
-      setStats(response.data.data);
       setError(null);
-    } catch (err: unknown) {
-      console.error('Error fetching dashboard data:', err);
-      const apiError = err as ApiError;
-      setError({ message: apiError.response?.data?.error || apiError.message });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  fetchUserData();
-  fetchDashboardData();
-}, []);
+      try {
+        // Fetch insights stats
+        const insightsResponse = await api.get<DashboardResponse>('/admin/insights-stats');
+        setStats(insightsResponse.data.data);
+
+        // Fetch dashboard stats
+        const dashboardResponse = await api.get<DashboardStatsResponse>('/admin/dashboard-stats');
+        setDashboardStats(dashboardResponse.data);
+      } catch (err: unknown) {
+        console.error('Error fetching dashboard data:', err);
+        const apiError = err as ApiError;
+        setError({ 
+          message: apiError.response?.data?.error || apiError.message,
+          details: apiError.response?.data?.details
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   return (
     <div className="admin-dashboard">
@@ -190,108 +139,68 @@ useEffect(() => {
             {error.details && <p className="error-details">{error.details}</p>}
             <button onClick={() => window.location.reload()}>Retry</button>
           </div>
-        ) : !stats ? (
+        ) : !stats || !dashboardStats ? (
           <div className="no-data-message">
             <p>No dashboard data available</p>
           </div>
         ) : (
           <div className="dashboard-content">
-            <div className="dashboard-sections">
-              <button 
-                className={activeSection === 'overview' ? 'active' : ''}
-                onClick={() => setActiveSection('overview')}
-              >
-                Overview
-              </button>
-              <button 
-                className={activeSection === 'insights' ? 'active' : ''}
-                onClick={() => setActiveSection('insights')}
-              >
-                Player Insights
-              </button>
-              <button 
-                className={activeSection === 'users' ? 'active' : ''}
-                onClick={() => setActiveSection('users')}
-              >
-                Users
-              </button>
-              <button 
-                className={activeSection === 'seasons' ? 'active' : ''}
-                onClick={() => setActiveSection('seasons')}
-              >
-                Season Manager
-              </button>
+            <div className="stats-overview">
+              <h2>Overview</h2>
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <h3>Total Users</h3>
+                  <p>{dashboardStats.totalUsers}</p>
+                </div>
+                <div className="stat-card">
+                  <h3>Average Score</h3>
+                  <p>{stats.averageScore}%</p>
+                </div>
+                <div className="stat-card">
+                  <h3>Most Played Game</h3>
+                  <p>{stats.mostPlayedGame}</p>
+                </div>
+              </div>
             </div>
 
-            {activeSection === 'overview' && (
-              <div className="dashboard-card overview">
-                <h3>Game Statistics</h3>
-                <div className="overview-stats">
-                  <div className="stat-item">
-                    <span className="stat-label">Average Score</span>
-                    <span className="stat-value">{stats.averageScore}%</span>
+            <div className="top-players">
+              <h2>Top Players</h2>
+              <div className="players-list">
+                {dashboardStats.topPlayers.map((player, index) => (
+                  <div key={index} className="player-card">
+                    <h3>{player.username}</h3>
+                    <p>Highest Score: {player.highest_score}</p>
+                    <p>Games Played: {player.games_played}</p>
                   </div>
-                  <div className="stat-item">
-                    <span className="stat-label">Most Played Game</span>
-                    <span className="stat-value">{stats.mostPlayedGame}</span>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-label">Least Played Game</span>
-                    <span className="stat-value">{stats.leastPlayedGame}</span>
-                  </div>
-                </div>
+                ))}
               </div>
-            )}
+            </div>
 
-            {activeSection === 'insights' && (
-              <div className="dashboard-card insights">
-                <h3>Player Insights</h3>
-                <div className="insights-list-container">
-                  <ul className="insights-list">
-                    {stats.insights.map((insight) => (
-                      <li key={insight.id}>
-                        <div className="player-details">
-                          <span className="player-name">{insight.username}</span>
-                          <span className="player-insight">{insight.insight}</span>
-                        </div>
-                        <div className="player-stats">
-                          <span className="player-avg-score">Avg Score: {insight.average_score}</span>
-                          <span className="player-total-games">Games: {insight.total_games}</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+            <div className="recent-activity">
+              <h2>Recent Activity</h2>
+              <div className="activity-list">
+                {dashboardStats.recentActivity.map((activity, index) => (
+                  <div key={index} className="activity-card">
+                    <p>{activity.username} scored {activity.score}%</p>
+                    <small>{new Date(activity.created_at).toLocaleString()}</small>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
 
-            {activeSection === 'users' && (
-              <div className="dashboard-card users">
-                <h3>User Management</h3>
-                <div className="user-list">
-                  {stats.nonAdminUsers.map(user => (
-                    <div className="user-item" key={user.id}>
-                      <div className="user-info">
-                        <span className="username">{user.username}</span>
-                        <span className="email">{user.email}</span>
-                      </div>
-                      <div className="user-stats">
-                        <span className="stat">Avg Score: {user.average_score}%</span>
-                        <span className="stat">Games: {user.total_games}</span>
-                        <span className="stat">High: {user.highest_score}%</span>
-                        <span className="stat">Low: {user.lowest_score}%</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            <div className="user-insights">
+              <h2>User Insights</h2>
+              <div className="insights-list">
+                {stats.insights.map((insight) => (
+                  <div key={insight.id} className="insight-card">
+                    <h3>{insight.username}</h3>
+                    <p>{insight.insight}</p>
+                    <p>Average Score: {insight.average_score}%</p>
+                    <p>Total Games: {insight.total_games}</p>
+                  </div>
+                ))}
               </div>
-            )}
-            
-            {activeSection === 'seasons' && (
-              <div className="dashboard-card seasons">
-                <SeasonManager />
-              </div>
-            )}  
+            </div>
           </div>
         )}
       </div>
