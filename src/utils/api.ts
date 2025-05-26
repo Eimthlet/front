@@ -25,6 +25,11 @@ interface FailedRequest {
   reject: (error: Error) => void;
 }
 
+interface RefreshTokenResponse {
+  token: string;
+  refreshToken: string;
+}
+
 // Create a custom Axios instance with retry logic
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -167,9 +172,9 @@ api.interceptors.response.use(
           throw new Error('No refresh token available');
         }
 
-        const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, { refreshToken });
+        const response = await axios.post<RefreshTokenResponse>(`${API_BASE_URL}/api/auth/refresh`, { refreshToken });
         
-        const { token: newToken, refreshToken: newRefreshToken } = response.data as { token: string; refreshToken?: string };
+        const { token: newToken, refreshToken: newRefreshToken } = response.data;
         
         if (newToken) {
           localStorage.setItem('token', newToken);

@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('No refresh token available');
       }
 
-      const response = await api.post<AuthResponse>('/auth/refresh-token', { refreshToken: storedRefreshToken });
+      const response = await api.post<AuthResponse>('/api/auth/refresh', { refreshToken: storedRefreshToken });
       const { data } = response;
 
       localStorage.setItem('token', data.token);
