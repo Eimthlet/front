@@ -11,9 +11,7 @@ interface LeaderboardEntry {
 }
 
 interface LeaderboardResponse {
-  data: {
-    users: LeaderboardEntry[];
-  };
+  users: LeaderboardEntry[];
 }
 
 const StyledToggleButton = styled(ToggleButton)(({ theme }) => ({
@@ -55,8 +53,8 @@ const Leaderboard: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await api.get<LeaderboardResponse>('/leaderboard');
-        setLeaderboard(response.data.data.users);
+        const response = await api.get<LeaderboardResponse>('/api/leaderboard');
+        setLeaderboard(response.data.users);
       } catch (err: any) {
         console.error('Error fetching leaderboard:', err);
         setError(err.message || 'Failed to load leaderboard data');

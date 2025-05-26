@@ -40,7 +40,7 @@ export default function ProtectedRoute({
   }
 
   // If user is an admin and tries to access user-specific routes, redirect to admin panel
-  if (user.isAdmin && !adminOnly && location.pathname === '/quiz') {
+  if (user.isAdmin && !adminOnly && (location.pathname === '/quiz' || location.pathname === '/')) {
     return <Navigate to="/admin" replace />;
   }
 
