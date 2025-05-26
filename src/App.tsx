@@ -12,16 +12,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import { useAuth } from './contexts/AuthContext';
 import api from './utils/api';
-
-// Define Question type with additional fields
-type Question = {
-  id: string;
-  question: string;
-  options: string[];
-  correctAnswer: string;
-  category: string;
-  difficulty: string;
-};
+import { Question } from './types';
 
 interface QuestionsResponse {
   questions: Question[];
@@ -75,8 +66,8 @@ const App: React.FC = () => {
         
         // Only fetch questions if user is qualified or hasn't attempted yet
         if (!qualificationData.hasAttempted || qualificationData.isQualified) {
-          const response = await api.get<QuestionsResponse>('/questions');
-          setQuestions(response.data.questions);
+          const response = await api.get<{ data: QuestionsResponse }>('/questions');
+          setQuestions(response.data.data.questions);
         }
       } catch (err: any) {
         console.error('Failed to fetch data:', err);

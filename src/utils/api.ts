@@ -161,11 +161,19 @@ const ensureApiPrefix = (endpoint: string) => {
   return endpoint;
 };
 
-// Export the API instance with helper methods
-export default {
-  ...api,
-  get: (url: string, config = {}) => api.get(ensureApiPrefix(url), config),
-  post: (url: string, data = {}, config = {}) => api.post(ensureApiPrefix(url), data, config),
-  put: (url: string, data = {}, config = {}) => api.put(ensureApiPrefix(url), data, config),
-  delete: (url: string, config = {}) => api.delete(ensureApiPrefix(url), config)
+// Create a typed API client
+const typedApi = {
+  get: <T>(url: string, config = {}) => 
+    api.get<T>(ensureApiPrefix(url), config),
+  
+  post: <T>(url: string, data = {}, config = {}) => 
+    api.post<T>(ensureApiPrefix(url), data, config),
+  
+  put: <T>(url: string, data = {}, config = {}) => 
+    api.put<T>(ensureApiPrefix(url), data, config),
+  
+  delete: <T>(url: string, config = {}) => 
+    api.delete<T>(ensureApiPrefix(url), config)
 };
+
+export default typedApi;

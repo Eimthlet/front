@@ -1,9 +1,12 @@
 export interface Question {
-  id: string;
+  id: number;
   question: string;
   options: string[];
-  correctAnswer: string;
-  timeLimit: number; // in seconds
+  correctAnswer: number;
+  explanation?: string;
+  category?: string;
+  difficulty?: string;
+  timeLimit?: number; // in seconds
 }
 
 export interface User {
