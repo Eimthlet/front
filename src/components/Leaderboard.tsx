@@ -54,7 +54,7 @@ const Leaderboard: React.FC = () => {
         setLoading(true);
         setError(null);
         const response = await api.get<LeaderboardResponse>('/api/leaderboard');
-        setLeaderboard(response.data.users);
+        setLeaderboard(response.data?.users || []);
       } catch (err: any) {
         console.error('Error fetching leaderboard:', err);
         setError(err.message || 'Failed to load leaderboard data');

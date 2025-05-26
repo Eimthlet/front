@@ -155,13 +155,36 @@ const App: React.FC = () => {
           }
         }}>
           <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={
-              user ? <Navigate to={isAdmin ? '/admin' : '/quiz'} replace /> : <AuthForm mode="login" />
+            {/* Auth routes */}
+            <Route path="/login" element={<AuthForm mode="login" />} />
+            <Route path="/register" element={<AuthForm mode="register" />} />
+
+            {/* Protected admin routes - must come first */}
+            <Route path="/admin" element={
+              <ProtectedRoute adminOnly>
+                <Layout>
+                  <AdminPanel />
+                </Layout>
+              </ProtectedRoute>
             } />
-            <Route path="/register" element={
-              user ? <Navigate to={isAdmin ? '/admin' : '/quiz'} replace /> : <AuthForm mode="register" />
+            
+            <Route path="/dashboard" element={
+              <ProtectedRoute adminOnly>
+                <Layout>
+                  <AdminDashboard />
+                </Layout>
+              </ProtectedRoute>
             } />
+            
+            <Route path="/admin/users" element={
+              <ProtectedRoute adminOnly>
+                <Layout>
+                  <UserManagement />
+                </Layout>
+              </ProtectedRoute>
+            } />
+
+
 
             {/* Protected user routes */}
             <Route path="/quiz" element={
@@ -223,31 +246,6 @@ const App: React.FC = () => {
               <ProtectedRoute>
                 <Layout>
                   <Leaderboard />
-                </Layout>
-              </ProtectedRoute>
-            } />
-
-            {/* Protected admin routes */}
-            <Route path="/admin" element={
-              <ProtectedRoute adminOnly>
-                <Layout>
-                  <AdminPanel />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/dashboard" element={
-              <ProtectedRoute adminOnly>
-                <Layout>
-                  <AdminDashboard />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/admin/users" element={
-              <ProtectedRoute adminOnly>
-                <Layout>
-                  <UserManagement />
                 </Layout>
               </ProtectedRoute>
             } />
