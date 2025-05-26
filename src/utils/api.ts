@@ -14,6 +14,12 @@ interface AuthResponse {
   };
 }
 
+interface ApiResponse<T> {
+  data: T;
+  message?: string;
+  error?: string;
+}
+
 interface FailedRequest {
   resolve: (token: string) => void;
   reject: (error: Error) => void;
@@ -78,7 +84,18 @@ const retryRequest = async (config: any, retries = 3, delay = 1000) => {
 
 // Add a response interceptor to handle token refresh and errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Transform the response to ensure consistent data structure
+    if (response.data && typeof response.data === 'object') {
+      // If the response already has a data property, return as is
+      if ('data' in response.data) {
+        return response;
+      }
+      // Otherwise, wrap the response in a data property
+      response.data = { data: response.data };
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
@@ -187,13 +204,15 @@ api.interceptors.response.use(
       status: error.response?.status,
       message: errorMessage,
       url: originalRequest.url,
-      method: originalRequest.method
+      method: originalRequest.method,
+      response: error.response?.data
     });
 
     return Promise.reject({
       message: errorMessage,
       status: error.response?.status,
-      originalError: error
+      originalError: error,
+      response: error.response?.data
     });
   }
 );
@@ -209,16 +228,16 @@ const ensureApiPrefix = (endpoint: string) => {
 // Create a typed API client
 const typedApi = {
   get: <T>(url: string, config = {}) => 
-    api.get<T>(ensureApiPrefix(url), config),
+    api.get<T>(ensureApiPrefix(url), config).then(response => response.data),
   
   post: <T>(url: string, data = {}, config = {}) => 
-    api.post<T>(ensureApiPrefix(url), data, config),
+    api.post<T>(ensureApiPrefix(url), data, config).then(response => response.data),
   
   put: <T>(url: string, data = {}, config = {}) => 
-    api.put<T>(ensureApiPrefix(url), data, config),
+    api.put<T>(ensureApiPrefix(url), data, config).then(response => response.data),
   
   delete: <T>(url: string, config = {}) => 
-    api.delete<T>(ensureApiPrefix(url), config)
+    api.delete<T>(ensureApiPrefix(url), config).then(response => response.data)
 };
 
 export default typedApi;

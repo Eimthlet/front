@@ -88,6 +88,14 @@ interface SeasonsResponse {
   data: Season[];
 }
 
+interface QuestionsResponse {
+  data: Question[];
+}
+
+interface QualifiedUsersResponse {
+  data: QualifiedUser[];
+}
+
 interface SeasonManagerProps {}
 
 const SeasonManager: React.FC<SeasonManagerProps> = () => {
@@ -119,44 +127,24 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
   const [tabValue, setTabValue] = useState(0);
 
   // Fetch seasons on component mount
-  const fetchSeasons = useCallback(async () => {
+  const fetchSeasons = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-      
-      const response = await api.get<SeasonsResponse>('/admin/seasons', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
-      
-      setSeasons(response.data.data);
+      const response = await api.get<SeasonsResponse>('/admin/seasons');
+      setSeasons(response.data);
       setError(null);
-      return response.data.data;
     } catch (err: unknown) {
-      console.error('Error fetching seasons:', {
-        message: (err as ApiError).message,
-        response: (err as ApiError).response?.data,
-        status: (err as ApiError).response?.status
-      });
-      
+      console.error('Error fetching seasons:', err);
       const apiError = err as ApiError;
       const errorMessage = apiError.response?.data?.message || 
                          apiError.response?.data?.error || 
                          apiError.message || 
-                         'Failed to load seasons';
-      
+                         'Failed to fetch seasons';
       setError(errorMessage);
-      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
   
   useEffect(() => {
     fetchSeasons().catch(console.error);
@@ -229,12 +217,8 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
 
       const seasonData = {
         name: currentSeason.name,
-        description: currentSeason.description || '',
-        start_date: formatDate(currentSeason.start_date),
-        end_date: formatDate(currentSeason.end_date),
-        is_active: Boolean(currentSeason.is_active),
-        is_qualification_round: Boolean(currentSeason.is_qualification_round),
-        minimum_score_percentage: Number(currentSeason.minimum_score_percentage) || 50
+        startDate: formatDate(currentSeason.start_date),
+        endDate: formatDate(currentSeason.end_date)
       };
 
       console.log('Submitting season data:', JSON.stringify(seasonData, null, 2));
@@ -378,7 +362,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
       correct_answer: ''
     });
     try {
-      const response = await api.get<Question[]>(`/seasons/${numSeasonId}/questions`);
+      const response = await api.get<QuestionsResponse>(`/seasons/${numSeasonId}/questions`);
       setQuestions(response.data);
       setOpenQuestionsDialog(true);
     } catch (err: any) {
@@ -459,7 +443,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
     const numSeasonId = Number(seasonId);
     setSelectedSeasonId(numSeasonId);
     try {
-      const response = await api.get<QualifiedUser[]>(`/seasons/${numSeasonId}/qualified-users`);
+      const response = await api.get<QualifiedUsersResponse>(`/seasons/${numSeasonId}/qualified-users`);
       setQualifiedUsers(response.data);
       setOpenQualifiedUsersDialog(true);
     } catch (err: any) {
