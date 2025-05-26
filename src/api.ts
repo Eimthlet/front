@@ -10,12 +10,14 @@ const API_TIMEOUT = 30000; // 30 seconds timeout
 const api = axios.create({
   baseURL: API_BASE,
   timeout: API_TIMEOUT,
-  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Credentials': 'true'
   },
   xsrfCookieName: 'accessToken',
-  xsrfHeaderName: 'X-CSRF-Token'
+  xsrfHeaderName: 'X-CSRF-Token',
+  withCredentials: true
 });
 
 // Request interceptor for logging
