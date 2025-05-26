@@ -59,11 +59,9 @@ const processQueue = (error: Error | null, token: string | null = null) => {
 // Add a request interceptor to include the token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers = config.headers || {};
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    // No need to manually add the token as it's sent automatically via cookies
+    // Set withCredentials to true to include cookies in cross-site requests
+    config.withCredentials = true;
     return config;
   },
   (error) => {
@@ -169,31 +167,23 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) {
-          throw new Error('No refresh token available');
-        }
-
-        const response = await axios.post<RefreshTokenResponse>(`${API_BASE_URL}/api/auth/refresh`, { refreshToken });
+        // Use the refresh endpoint without sending the token (it will be sent via cookies)
+        const response = await axios.post<RefreshTokenResponse>(
+          `${API_BASE_URL}/api/auth/refresh`, 
+          {}, 
+          { withCredentials: true }
+        );
         
-        const { token: newToken, refreshToken: newRefreshToken } = response.data;
-        
-        if (newToken) {
-          localStorage.setItem('token', newToken);
-          if (newRefreshToken) {
-            localStorage.setItem('refreshToken', newRefreshToken);
-          }
-          
-          processQueue(null, newToken);
-          originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
-          return api(originalRequest);
-        }
+        // The server sets the cookies automatically, no need to store tokens
+        // Just process the queue and retry the request
+        processQueue(null, 'token-refreshed');
+        return api(originalRequest);
         
         throw new Error('Invalid refresh token response');
       } catch (refreshError) {
         processQueue(refreshError as Error, null);
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
+        // No need to remove tokens from localStorage as we're using cookies
+        // The server will handle invalidating the cookies
         window.location.href = '/login';
         return Promise.reject(refreshError);
       } finally {

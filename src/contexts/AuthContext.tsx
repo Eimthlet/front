@@ -67,13 +67,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshTokenAndUpdateUser = async () => {
     try {
       // Call refresh endpoint without sending the token (it will be sent via cookies)
-      const response = await api.post<AuthResponse>('/api/auth/refresh', {});
+      await api.post<AuthResponse>('/api/auth/refresh', {}, { withCredentials: true });
       
       // After successful token refresh, check token validity to get user info
-      const response2 = await api.get<TokenCheckResponse>('/api/auth/check-token');
+      const response = await api.get<TokenCheckResponse>('/api/auth/check-token', { withCredentials: true });
       
-      if (response2.data.valid && response2.data.user) {
-        const userData = response2.data.user;
+      if (response.data.valid && response.data.user) {
+        const userData = response.data.user;
         setUser({
           id: userData.id,
           email: userData.email,
@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initializeAuth = async () => {
       try {
         // Check if user is authenticated by validating the token with the server
-        const response = await api.get<TokenCheckResponse>('/api/auth/check-token');
+        const response = await api.get<TokenCheckResponse>('/api/auth/check-token', { withCredentials: true });
         
         if (response.data.valid && response.data.user) {
           const userData = response.data.user;
@@ -112,7 +112,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error('Auth initialization failed:', error);
-        // No need to clear localStorage tokens as we're using HTTP-only cookies now
+        // Cookies are handled by the browser automatically
+        setUser(null);
+        setIsAuthenticated(false);
+        setIsAdmin(false);
       } finally {
         setIsLoading(false);
       }
@@ -124,10 +127,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<void> => {
     setError(null);
     try {
-      await api.post<AuthResponse>('/api/auth/login', { email, password });
+      await api.post<AuthResponse>('/api/auth/login', { email, password }, { withCredentials: true });
       
       // After successful login, check token validity to get user info
-      const response = await api.get<TokenCheckResponse>('/api/auth/check-token');
+      const response = await api.get<TokenCheckResponse>('/api/auth/check-token', { withCredentials: true });
       
       if (response.data.valid && response.data.user) {
         const userData = response.data.user;
@@ -147,10 +150,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: RegisterData): Promise<void> => {
     setError(null);
     try {
-      await api.post<AuthResponse>('/api/auth/register', userData);
+      await api.post<AuthResponse>('/api/auth/register', userData, { withCredentials: true });
       
       // After successful registration, check token validity to get user info
-      const response = await api.get<TokenCheckResponse>('/api/auth/check-token');
+      const response = await api.get<TokenCheckResponse>('/api/auth/check-token', { withCredentials: true });
       
       if (response.data.valid && response.data.user) {
         const userData = response.data.user;
@@ -170,7 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async (): Promise<void> => {
     setError(null);
     try {
-      await api.post('/api/auth/logout');
+      await api.post('/api/auth/logout', {}, { withCredentials: true });
       setUser(null);
       setIsAuthenticated(false);
       setIsAdmin(false);
