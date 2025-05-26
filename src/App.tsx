@@ -156,35 +156,24 @@ const App: React.FC = () => {
         }}>
           <Routes>
             {/* Auth routes */}
-            <Route path="/login" element={<AuthForm mode="login" />} />
-            <Route path="/register" element={<AuthForm mode="register" />} />
+            <Route path="/login" element={
+              user ? <Navigate to={isAdmin ? '/admin' : '/quiz'} replace /> : <AuthForm mode="login" />
+            } />
+            <Route path="/register" element={
+              user ? <Navigate to={isAdmin ? '/admin' : '/quiz'} replace /> : <AuthForm mode="register" />
+            } />
 
             {/* Protected admin routes - must come first */}
-            <Route path="/admin" element={
+            <Route path="/admin/*" element={
               <ProtectedRoute adminOnly>
-                <Layout>
-                  <AdminPanel />
-                </Layout>
+                <Routes>
+                  <Route path="" element={<AdminPanel />} />
+                  <Route path="dashboard" element={<AdminDashboard />} />
+                  <Route path="users" element={<UserManagement />} />
+                  <Route path="*" element={<Navigate to="" replace />} />
+                </Routes>
               </ProtectedRoute>
             } />
-            
-            <Route path="/dashboard" element={
-              <ProtectedRoute adminOnly>
-                <Layout>
-                  <AdminDashboard />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/admin/users" element={
-              <ProtectedRoute adminOnly>
-                <Layout>
-                  <UserManagement />
-                </Layout>
-              </ProtectedRoute>
-            } />
-
-
 
             {/* Protected user routes */}
             <Route path="/quiz" element={
@@ -257,10 +246,11 @@ const App: React.FC = () => {
               <Navigate to="/leaderboard" replace />
             } />
             
+            {/* Catch-all route */}
             <Route path="*" element={
               !user ? <Navigate to="/login" replace /> :
               isAdmin ? <Navigate to="/admin" replace /> :
-              <Navigate to="/leaderboard" replace />
+              <Navigate to="/quiz" replace />
             } />
           </Routes>
         </Box>
