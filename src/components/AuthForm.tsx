@@ -42,6 +42,21 @@ interface PayChanguConfig {
   };
 }
 
+interface ApiError {
+  response?: {
+    status: number;
+    statusText: string;
+    data: {
+      error?: string;
+      message?: string;
+    };
+    headers?: Record<string, string>;
+  };
+  message: string;
+  name: string;
+  stack?: string;
+}
+
 interface User {
   id: number;
   username: string;
@@ -135,7 +150,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
 
       try {
         // 1. Send registration info to backend and get tx_ref, public_key, etc.
-        const endpoint = '/auth/register';
+        const endpoint = '/api/auth/register';
         const payload = { username, email, password, phone, amount };
         
         interface RegisterResponse {
@@ -157,11 +172,11 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
         // 2. Launch PayChangu inline payment popup
         const paychanguConfig = {
           public_key: regResult.public_key,
-          tx_ref: regResult.tx_ref, // ensure this is unique per payment (already handled)
+          tx_ref: regResult.tx_ref,
           amount: regResult.amount,
           currency: 'MWK',
-          callback_url: 'https://car-quizz.onrender.com/paychangu-callback',
-          return_url: window.location.origin + '/login?payment=success', // Redirect to login page after payment
+          callback_url: 'https://car-quizz.onrender.com/api/paychangu-callback',
+          return_url: window.location.origin + '/login?payment=success',
           customer: {
             email: regResult.email,
             first_name: username,
@@ -173,7 +188,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
           },
           meta: {
             uuid: regResult.tx_ref,
-            response: 'Response' // docs example includes this
+            response: 'Response'
           }
         };
         console.log('PayChangu config:', paychanguConfig);
@@ -197,7 +212,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
 
     // Login flow
     try {
-      const response = await api.post<LoginResponse>('/auth/login', { email, password });
+      const response = await api.post<LoginResponse>('/api/auth/login', { email, password });
       const { user, token, refreshToken } = response.data;
       
       localStorage.setItem('token', token);
@@ -214,9 +229,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
       });
 
       navigate(isAdmin ? '/admin' : '/quiz', { replace: true });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Authentication error:', err);
-      setError(err.message || 'Authentication failed');
+      const apiError = err as ApiError;
+      setError(apiError.response?.data?.error || apiError.message || 'Authentication failed');
       setLoading(false);
     }
   };

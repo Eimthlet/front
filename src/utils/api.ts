@@ -22,7 +22,7 @@ interface FailedRequest {
 // Create a custom Axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // 30 seconds
+  timeout: 15000, // Reduced timeout to 15 seconds
   headers: {
     'Content-Type': 'application/json'
   }
@@ -53,16 +53,40 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error('Request interceptor error:', error);
+    return Promise.reject(error);
+  }
 );
 
-// Add a response interceptor to handle token refresh
+// Add a response interceptor to handle token refresh and errors
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Handle timeout errors
+    if (error.code === 'ECONNABORTED') {
+      console.error('Request timeout:', {
+        url: originalRequest.url,
+        method: originalRequest.method
+      });
+      return Promise.reject({
+        message: 'Request timed out. Please check your internet connection and try again.',
+        originalError: error
+      });
+    }
+
+    // Handle network errors
+    if (!error.response) {
+      console.error('Network error:', error);
+      return Promise.reject({
+        message: 'Network error. Please check your internet connection and try again.',
+        originalError: error
+      });
+    }
+
+    if (error.response.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -77,6 +101,10 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) {
+          throw new Error('No refresh token available');
+        }
+
         const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, { refreshToken });
         
         const { token: newToken, refreshToken: newRefreshToken } = response.data as { token: string; refreshToken?: string };
@@ -104,7 +132,24 @@ api.interceptors.response.use(
       }
     }
 
-    return Promise.reject(error);
+    // Handle other errors
+    const errorMessage = error.response?.data?.error || 
+                        error.response?.data?.message || 
+                        error.message || 
+                        'An unexpected error occurred';
+    
+    console.error('API Error:', {
+      status: error.response?.status,
+      message: errorMessage,
+      url: originalRequest.url,
+      method: originalRequest.method
+    });
+
+    return Promise.reject({
+      message: errorMessage,
+      status: error.response?.status,
+      originalError: error
+    });
   }
 );
 
