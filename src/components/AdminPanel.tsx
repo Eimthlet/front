@@ -1,29 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Button, 
-  TextField, 
-  Select, 
-  MenuItem, 
-  FormControl, 
-  InputLabel, 
-  CircularProgress,
-  Tabs,
-  Tab,
-  Paper,
-  Alert,
-  Snackbar
-} from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
-import { jwtDecode } from 'jwt-decode';
 import SeasonManagement from './SeasonManagement';
+import {
+  Box,
+  Button,
+  TextField,
+  Typography,
+  Alert,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Snackbar,
+  Tabs,
+  Tab,
+  SelectChangeEvent
+} from '@mui/material';
+
+// Define Season interface with all required fields
+interface Season {
+  id: number;
+  name: string;
+  is_active: boolean;
+}
 
 // Define Question interface with all required fields
 interface Question {
-  id?: string;
+  id?: number;
   question: string;
   options: string[];
   correctAnswer: string;
@@ -43,18 +49,17 @@ interface JwtPayload {
 // Add these interfaces after the Question interface
 interface ApiError {
   response?: {
-    status: number;
-    statusText: string;
-    data: {
+    data?: {
       error?: string;
-      message?: string;
       details?: string;
     };
-    headers?: Record<string, string>;
   };
-  message: string;
-  name: string;
-  stack?: string;
+  message?: string;
+}
+
+interface ApiResponse<T> {
+  data: T;
+  message?: string;
 }
 
 interface ErrorState {
@@ -85,30 +90,23 @@ interface TabPanelProps {
   value: number;
 }
 
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
+const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
   return (
     <div
       role="tabpanel"
       hidden={value !== index}
-      id={`admin-tabpanel-${index}`}
-      aria-labelledby={`admin-tab-${index}`}
-      {...other}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
     >
-      {value === index && (
-        <Box sx={{ p: 3 }}>
-          {children}
-        </Box>
-      )}
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
     </div>
   );
-}
+};
 
 function a11yProps(index: number) {
   return {
-    id: `admin-tab-${index}`,
-    'aria-controls': `admin-tabpanel-${index}`,
+    id: `simple-tab-${index}`,
+    'aria-controls': `simple-tabpanel-${index}`,
   };
 }
 
@@ -119,21 +117,56 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const [error, setError] = useState<ErrorState | null>(null);
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [tabValue, setTabValue] = useState(0);  // Added for tab control
-  
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
-  
-  // Initialize state with full type definition
+  const [tabValue, setTabValue] = useState(0);
+  const [selectedSeasonId, setSelectedSeasonId] = useState<number | null>(null);
+  const [seasons, setSeasons] = useState<Season[]>([]);
   const [newQuestion, setNewQuestion] = useState<Question>({
     question: '',
     options: ['', '', '', ''],
     correctAnswer: '',
     timeLimit: 30,
-    category: '',
-    difficulty: 'easy'
-  });
+    category: 'General Knowledge',
+    difficulty: 'Medium'
+  })
+  
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+  
+  // Fetch seasons when component mounts
+  useEffect(() => {
+    const fetchSeasons = async () => {
+      try {
+        const response = await api.get<Season[]>('/admin/seasons');
+        const seasonsData = response.data;
+        setSeasons(seasonsData);
+        // Set the first active season as selected
+        const activeSeason = seasonsData.find(s => s.is_active);
+        if (activeSeason) {
+          setSelectedSeasonId(activeSeason.id);
+        }
+      } catch (error) {
+        console.error('Error fetching seasons:', error);
+        setError({
+          message: 'Failed to fetch seasons',
+          details: error instanceof Error ? error.message : undefined
+        });
+      }
+    };
+    fetchSeasons();
+  }, []);
+
+  // Fetch questions when component mounts
+  useEffect(() => {
+    fetchQuestions();
+  }, []);
+
+  // Check if user is admin and redirect if not
+  useEffect(() => {
+    if (!isAdmin) {
+      navigate('/');
+    }
+  }, [isAdmin, navigate]);
 
   useEffect(() => {
     // Check if user is authenticated and has admin privileges
@@ -146,40 +179,20 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       return;
     }
 
-    // Fetch questions when component mounts
+    // Function to fetch questions
     const fetchQuestions = async () => {
       try {
         setIsLoading(true);
-        const response = await api.get<{questions?: Question[]; data?: {questions?: Question[]}}>
-          ('/api/admin/questions');
-        
-        // Check the response format and extract questions
-        if (response?.data?.questions) {
-          // Format matches { questions: [...] }
-          setQuestions(response.data.questions);
-        } else if (response?.data?.data?.questions) {
-          // Format matches { data: { questions: [...] } }
-          setQuestions(response.data.data.questions);
-        } else if (Array.isArray(response?.data)) {
-          // Format matches direct array
-          setQuestions(response.data as Question[]);
-        } else {
-          console.warn('Unexpected response format:', response);
-          setQuestions([]);
-        }
-        
-        setError(null);
+        const response = await api.get<Question[]>('/admin/questions');
+        setQuestions(response.data);
       } catch (err: unknown) {
         console.error('Error fetching questions:', err);
         const apiError = err as ApiError;
         setError({ 
-          message: apiError.response?.data?.error || 
-                 apiError.response?.data?.message || 
-                 apiError.message ||
-                 'Failed to fetch questions',
+          message: apiError.message || 'Failed to fetch questions',
           details: apiError.response?.data?.details
         });
-        setQuestions([]); // Ensure questions is set to empty array on error
+        setQuestions([]);
       } finally {
         setIsLoading(false);
       }
@@ -189,87 +202,55 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   }, [isAdmin, navigate]);
 
   // Delete a question
-  const handleDeleteQuestion = async (questionId: string) => {
+  const handleDeleteQuestion = async (questionId: number) => {
     try {
-      await api.delete(`/api/admin/questions/${questionId}`);
-      setQuestions(prevQuestions => prevQuestions.filter(q => q.id !== questionId));
+      await api.delete(`/admin/questions/${questionId}`);
       setSuccess('Question deleted successfully');
-      setTimeout(() => setSuccess(''), 3000);
+      fetchQuestions();
     } catch (err: unknown) {
-      console.error('Error deleting question:', err);
       const apiError = err as ApiError;
-      setError({ 
-        message: apiError.response?.data?.error || apiError.message,
+      setError({
+        message: apiError.message || 'Failed to delete question',
         details: apiError.response?.data?.details
       });
-      setTimeout(() => setError(null), 3000);
     }
   };
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      // Create a local copy of the form data to avoid TypeScript errors
-      const formData = {...newQuestion};
-      
-      // Create question data from the form data
-      const questionData = {
-        question: formData.question,
-        options: formData.options,
-        correct_answer: formData.correctAnswer,
-        category: formData.category,
-        difficulty: formData.difficulty,
-        time_limit: formData.timeLimit
-      };
+    if (!selectedSeasonId) {
+      setError({ message: 'Please select a season' });
+      return;
+    }
+    const questionData = {
+      question: newQuestion.question,
+      options: newQuestion.options,
+      correct_answer: newQuestion.correctAnswer,
+      time_limit: newQuestion.timeLimit,
+      category: newQuestion.category,
+      difficulty: newQuestion.difficulty,
+      season_id: selectedSeasonId
+    };
 
-      console.log('Submitting question:', questionData);
-      
-      const response = await api.post<{question?: Question; data?: {question?: Question}}>
-        ('/api/admin/questions', questionData);
-      
-      // Handle different response formats
-      let addedQuestion: Question;
-      if (response?.data?.question) {
-        addedQuestion = response.data.question;
-      } else if (response?.data?.data?.question) {
-        addedQuestion = response.data.data.question;
-      } else {
-        // If the response format doesn't match expected structure,
-        // use the data we sent with a generated ID
-        addedQuestion = {
-          question: questionData.question,
-          options: questionData.options,
-          correctAnswer: questionData.correct_answer,
-          category: questionData.category,
-          difficulty: questionData.difficulty,
-          timeLimit: questionData.time_limit,
-          id: `temp-${Date.now()}`
-        };
-      }
-      
-      setQuestions(prevQuestions => [...prevQuestions, addedQuestion]);
-      
-      // Reset form
+    try {
+      await api.post('/admin/questions', questionData);
+      setSuccess('Question added successfully');
       setNewQuestion({
         question: '',
         options: ['', '', '', ''],
         correctAnswer: '',
         timeLimit: 30,
-        category: '',
-        difficulty: 'easy'
+        category: 'General Knowledge',
+        difficulty: 'Medium'
       });
-      
-      setSuccess('Question added successfully');
-      setTimeout(() => setSuccess(''), 3000);
+      fetchQuestions();
     } catch (err: unknown) {
-      console.error('Error adding question:', err);
       const apiError = err as ApiError;
-      setError({ 
-        message: apiError.response?.data?.error || apiError.message || 'Failed to add question',
+      setError({
+        message: apiError.message || 'Failed to add question',
         details: apiError.response?.data?.details
       });
-      setTimeout(() => setError(null), 3000);
     }
   };
 
@@ -348,77 +329,45 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                 Add New Question
               </Typography>
 
-              <Box component="form" onSubmit={handleSubmit}>
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
-                  <TextField
-                    label="Question"
-                    value={newQuestion.question}
-                    onChange={(e) => setNewQuestion({ ...newQuestion, question: e.target.value })}
+              <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%', maxWidth: 600, mx: 'auto' }}>
+                {/* Season Selection */}
+                <FormControl fullWidth sx={{ mb: 3 }}>
+                  <InputLabel id="season-select-label">Season</InputLabel>
+                  <Select
+                    labelId="season-select-label"
+                    value={selectedSeasonId || ''}
+                    onChange={(e) => setSelectedSeasonId(e.target.value as number)}
                     required
-                    fullWidth
-                    InputProps={{ style: { color: 'white' } }}
-                    InputLabelProps={{ style: { color: 'rgba(255, 255, 255, 0.7)' } }}
-                    sx={{ mb: 2 }}
-                  />
+                  >
+                    {seasons.map((season) => (
+                      <MenuItem key={season.id} value={season.id}>
+                        {season.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
 
-                  <FormControl fullWidth sx={{ mb: 2 }}>
-                    <InputLabel id="category-label" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                      Category
-                    </InputLabel>
-                    <Select
-                      labelId="category-label"
-                      value={newQuestion.category}
-                      onChange={(e) => setNewQuestion({ ...newQuestion, category: e.target.value })}
-                      required
-                      sx={{ color: 'white' }}
-                    >
-                      <MenuItem value="Car Brands">Car Brands</MenuItem>
-                      <MenuItem value="Car Models">Car Models</MenuItem>
-                      <MenuItem value="Car Technology">Car Technology</MenuItem>
-                      <MenuItem value="Car History">Car History</MenuItem>
-                      <MenuItem value="General Knowledge">General Knowledge</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Box>
+                <TextField
+                  fullWidth
+                  label="Question"
+                  value={newQuestion.question}
+                  onChange={(e) => setNewQuestion({ ...newQuestion, question: e.target.value })}
+                  required
+                  sx={{ mb: 3 }}
+                />
 
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
-                  <FormControl fullWidth sx={{ mb: 2 }}>
-                    <InputLabel id="difficulty-label" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                      Difficulty
-                    </InputLabel>
-                    <Select
-                      labelId="difficulty-label"
-                      value={newQuestion.difficulty}
-                      onChange={(e) => setNewQuestion({ ...newQuestion, difficulty: e.target.value })}
-                      required
-                      sx={{ color: 'white' }}
-                    >
-                      <MenuItem value="Easy">Easy</MenuItem>
-                      <MenuItem value="Medium">Medium</MenuItem>
-                      <MenuItem value="Hard">Hard</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  <TextField
-                    label="Time Limit (seconds)"
-                    type="number"
-                    value={newQuestion.timeLimit}
-                    onChange={(e) => setNewQuestion({ ...newQuestion, timeLimit: Number(e.target.value) })}
-                    required
-                    fullWidth
-                    InputProps={{ style: { color: 'white' } }}
-                    InputLabelProps={{ style: { color: 'rgba(255, 255, 255, 0.7)' } }}
-                    sx={{ mb: 2 }}
-                  />
-                </Box>
-
-                <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
-                  Options
-                </Typography>
-
-                {newQuestion.options.map((option, index) => (
-                  <Box key={index} sx={{ display: 'flex', mb: 2, gap: 1 }}>
+                {/* Options */}
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle1" sx={{ mb: 2 }}>
+                    Options
+                  </Typography>
+                  {newQuestion.options.map((option, index) => (
                     <TextField
+                      key={index}
+                      fullWidth
                       label={`Option ${index + 1}`}
                       value={option}
                       onChange={(e) => {
@@ -426,62 +375,57 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                         newOptions[index] = e.target.value;
                         setNewQuestion({ ...newQuestion, options: newOptions });
                       }}
-                      required
-                      fullWidth
-                      InputProps={{ style: { color: 'white' } }}
-                      InputLabelProps={{ style: { color: 'rgba(255, 255, 255, 0.7)' } }}
                     />
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      onClick={() => {
-                        const newOptions = [...newQuestion.options];
-                        newOptions.splice(index, 1);
-                        setNewQuestion({ ...newQuestion, options: newOptions });
-                      }}
-                      sx={{ minWidth: '40px', ml: 1 }}
-                    >
-                      X
-                    </Button>
-                  </Box>
-                ))}
+                  ))}
+                </Box>
 
-                <Button
-                  type="button"
-                  onClick={() => setNewQuestion({ ...newQuestion, options: [...newQuestion.options, ''] })}
-                  variant="outlined"
-                  sx={{ 
-                    mt: 1, 
-                    mb: 3,
-                    color: 'white',
-                    borderColor: 'white',
-                    '&:hover': {
-                      borderColor: 'white',
-                      backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                    }
-                  }}
-                >
-                  Add Option
-                </Button>
-
+                {/* Category */}
                 <FormControl fullWidth sx={{ mb: 3 }}>
-                  <InputLabel id="correct-answer-label" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                    Correct Answer
-                  </InputLabel>
+                  <InputLabel id="category-label">Category</InputLabel>
                   <Select
-                    labelId="correct-answer-label"
-                    value={newQuestion.correctAnswer}
-                    onChange={(e) => setNewQuestion({ ...newQuestion, correctAnswer: e.target.value })}
+                    labelId="category-label"
+                    value={newQuestion.category}
+                    onChange={(e) => setNewQuestion({ ...newQuestion, category: e.target.value })}
                     required
-                    sx={{ color: 'white' }}
                   >
-                    {newQuestion.options.map((option, index) => (
-                      <MenuItem key={index} value={option}>
-                        {option}
-                      </MenuItem>
-                    ))}
+                    <MenuItem value="Car Brands">Car Brands</MenuItem>
+                    <MenuItem value="Car Models">Car Models</MenuItem>
+                    <MenuItem value="Car Technology">Car Technology</MenuItem>
+                    <MenuItem value="Car History">Car History</MenuItem>
+                    <MenuItem value="General Knowledge">General Knowledge</MenuItem>
                   </Select>
                 </FormControl>
+
+                {/* Difficulty */}
+                <FormControl fullWidth sx={{ mb: 3 }}>
+                  <InputLabel id="difficulty-label">Difficulty</InputLabel>
+                  <Select
+                    labelId="difficulty-label"
+                    value={newQuestion.difficulty}
+                    onChange={(e) => setNewQuestion({ ...newQuestion, difficulty: e.target.value })}
+                    required
+                  >
+                    <MenuItem value="Easy">Easy</MenuItem>
+                    <MenuItem value="Medium">Medium</MenuItem>
+                    <MenuItem value="Hard">Hard</MenuItem>
+                  </Select>
+                    <MenuItem value="Easy">Easy</MenuItem>
+                    <MenuItem value="Medium">Medium</MenuItem>
+                    <MenuItem value="Hard">Hard</MenuItem>
+                  </Select>
+                </FormControl>
+
+                {/* Time Limit */}
+                <TextField
+                  fullWidth
+                  label="Time Limit (seconds)"
+                  type="number"
+                  value={newQuestion.timeLimit}
+                  onChange={(e) => setNewQuestion({ ...newQuestion, timeLimit: Number(e.target.value) })}
+                  required
+                  sx={{ mb: 3 }}
+                  InputProps={{ inputProps: { min: 10, max: 120 } }}
+                />
 
                 <Button 
                   type="submit" 
