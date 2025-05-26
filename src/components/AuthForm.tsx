@@ -106,7 +106,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const navigate = useNavigate();
-  const { login: authLogin } = useAuth();
+  const { login: authLogin, isAdmin } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,19 +260,14 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
 
     // Login flow
     try {
-      const response = await api.post<LoginResponse>('/api/auth/login', { email, password });
-      const { user, token, refreshToken } = response.data;
-      
-      localStorage.setItem('token', token);
-      localStorage.setItem('refreshToken', refreshToken);
-      
-      const decodedToken = jwtDecode(token) as JwtPayload;
-      const isAdmin = decodedToken.isAdmin || false;
-
-      // Login with email and password instead of user object
+      // Use the authLogin function from AuthContext which handles cookies properly
       await authLogin(email, password);
-
-      navigate(isAdmin ? '/admin' : '/quiz', { replace: true });
+      
+      // After successful login, navigate to the appropriate page based on user role
+      // The isAdmin state will be updated by the authLogin function
+      setTimeout(() => {
+        navigate(isAdmin ? '/admin' : '/quiz', { replace: true });
+      }, 500); // Small delay to ensure state is updated
     } catch (err: unknown) {
       console.error('Authentication error:', err);
       const apiError = err as ApiError;
