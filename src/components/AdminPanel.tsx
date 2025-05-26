@@ -1,9 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, TextField, Select, MenuItem, FormControl, InputLabel, CircularProgress } from '@mui/material';
+import { 
+  Box, 
+  Typography, 
+  Button, 
+  TextField, 
+  Select, 
+  MenuItem, 
+  FormControl, 
+  InputLabel, 
+  CircularProgress,
+  Tabs,
+  Tab,
+  Paper,
+  Alert,
+  Snackbar
+} from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import { jwtDecode } from 'jwt-decode';
+import SeasonManagement from './SeasonManagement';
 
 // Define Question interface with all required fields
 interface Question {
@@ -62,6 +78,40 @@ interface QuestionResponse {
 interface AdminPanelProps {}
 
 // AdminPanel component with full type annotations
+// Tab panel component
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`admin-tabpanel-${index}`}
+      aria-labelledby={`admin-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+function a11yProps(index: number) {
+  return {
+    id: `admin-tab-${index}`,
+    'aria-controls': `admin-tabpanel-${index}`,
+  };
+}
+
 const AdminPanel: React.FC<AdminPanelProps> = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
@@ -69,6 +119,11 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const [error, setError] = useState<ErrorState | null>(null);
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [tabValue, setTabValue] = useState(0);  // Added for tab control
+  
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
   
   // Initialize state with full type definition
   const [newQuestion, setNewQuestion] = useState<Question>({
@@ -219,201 +274,308 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   };
 
   return (
-    <Box sx={{ width: '100%' }}>
-      <Typography variant="h4" sx={{ mb: 4, fontWeight: 600 }}>
-        Admin Panel
+    <Box sx={{ 
+      p: { xs: 2, md: 4 },
+      maxWidth: '1200px', 
+      mx: 'auto',
+      minHeight: '100vh',
+      background: 'linear-gradient(to right, rgba(24, 42, 115, 0.8), rgba(33, 138, 174, 0.8))',
+      color: 'white'
+    }}>
+      <Typography variant="h4" component="h1" sx={{ mb: 4, fontWeight: 700 }}>
+        Admin Dashboard
       </Typography>
-      
-      {/* Error and Success Messages */}
-      {error && (
-        <Box sx={{ 
-          p: 2, 
-          mb: 3, 
-          borderRadius: 1,
-          backgroundColor: 'rgba(255, 107, 107, 0.1)',
-          color: '#ff6b6b'
-        }}>
-          {error.message}
-          {error.details && <Typography variant="body2" sx={{ mt: 1, color: 'rgba(255, 255, 255, 0.6)' }}>{error.details}</Typography>}
-        </Box>
-      )}
-      {success && (
-        <Box sx={{ 
-          p: 2, 
-          mb: 3, 
-          borderRadius: 1,
-          backgroundColor: 'rgba(67, 206, 162, 0.1)',
-          color: '#43cea2'
-        }}>
-          {success}
-        </Box>
-      )}
 
-      {isLoading ? (
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          minHeight: '200px' 
-        }}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <>
-          {/* Add Question Form */}
-          <Box component="form" onSubmit={handleSubmit} sx={{ mb: 6 }}>
-            <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-              Add New Question
-            </Typography>
-            
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <TextField
-                label="Question"
-                value={newQuestion.question}
-                onChange={(e) => setNewQuestion({ ...newQuestion, question: e.target.value })}
-                required
-                fullWidth
-              />
+      {/* Tab Navigation */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs 
+          value={tabValue} 
+          onChange={handleTabChange} 
+          aria-label="admin tabs"
+          sx={{ 
+            '& .MuiTab-root': { color: 'rgba(255, 255, 255, 0.7)' },
+            '& .Mui-selected': { color: 'white' },
+            '& .MuiTabs-indicator': { backgroundColor: 'white' }
+          }}
+        >
+          <Tab label="Question Management" {...a11yProps(0)} />
+          <Tab label="Season Management" {...a11yProps(1)} />
+        </Tabs>
+      </Box>
 
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Typography variant="subtitle1">Options:</Typography>
-                {newQuestion.options.map((option, index) => (
+      {/* Question Management Tab */}
+      <TabPanel value={tabValue} index={0}>
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+            <CircularProgress sx={{ color: 'white' }} />
+          </Box>
+        ) : (
+          <Box>
+            {error && (
+              <Box sx={{ 
+                p: 2, 
+                mb: 3, 
+                borderRadius: 2, 
+                bgcolor: 'rgba(255, 0, 0, 0.1)', 
+                border: '1px solid rgba(255, 0, 0, 0.3)' 
+              }}>
+                <Typography color="error">{error.message}</Typography>
+                {error.details && <Typography variant="body2" color="error">{error.details}</Typography>}
+              </Box>
+            )}
+
+            {success && (
+              <Box sx={{ 
+                p: 2, 
+                mb: 3, 
+                borderRadius: 2, 
+                bgcolor: 'rgba(0, 255, 0, 0.1)', 
+                border: '1px solid rgba(0, 255, 0, 0.3)' 
+              }}>
+                <Typography color="success.main">{success}</Typography>
+              </Box>
+            )}
+
+            {/* Add Question Form */}
+            <Box sx={{ 
+              p: 3, 
+              borderRadius: 2, 
+              background: 'rgba(18, 18, 18, 0.8)',
+              backdropFilter: 'blur(10px)',
+              boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)'
+            }}>
+              <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+                Add New Question
+              </Typography>
+
+              <Box component="form" onSubmit={handleSubmit}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
                   <TextField
-                    key={index}
-                    label={`Option ${index + 1}`}
-                    value={option}
-                    onChange={(e) => {
-                      const newOptions = [...newQuestion.options];
-                      newOptions[index] = e.target.value;
-                      setNewQuestion({ ...newQuestion, options: newOptions });
-                    }}
+                    label="Question"
+                    value={newQuestion.question}
+                    onChange={(e) => setNewQuestion({ ...newQuestion, question: e.target.value })}
                     required
                     fullWidth
+                    InputProps={{ style: { color: 'white' } }}
+                    InputLabelProps={{ style: { color: 'rgba(255, 255, 255, 0.7)' } }}
+                    sx={{ mb: 2 }}
                   />
+
+                  <FormControl fullWidth sx={{ mb: 2 }}>
+                    <InputLabel id="category-label" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                      Category
+                    </InputLabel>
+                    <Select
+                      labelId="category-label"
+                      value={newQuestion.category}
+                      onChange={(e) => setNewQuestion({ ...newQuestion, category: e.target.value })}
+                      required
+                      sx={{ color: 'white' }}
+                    >
+                      <MenuItem value="Car Brands">Car Brands</MenuItem>
+                      <MenuItem value="Car Models">Car Models</MenuItem>
+                      <MenuItem value="Car Technology">Car Technology</MenuItem>
+                      <MenuItem value="Car History">Car History</MenuItem>
+                      <MenuItem value="General Knowledge">General Knowledge</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
+                  <FormControl fullWidth sx={{ mb: 2 }}>
+                    <InputLabel id="difficulty-label" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                      Difficulty
+                    </InputLabel>
+                    <Select
+                      labelId="difficulty-label"
+                      value={newQuestion.difficulty}
+                      onChange={(e) => setNewQuestion({ ...newQuestion, difficulty: e.target.value })}
+                      required
+                      sx={{ color: 'white' }}
+                    >
+                      <MenuItem value="Easy">Easy</MenuItem>
+                      <MenuItem value="Medium">Medium</MenuItem>
+                      <MenuItem value="Hard">Hard</MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  <TextField
+                    label="Time Limit (seconds)"
+                    type="number"
+                    value={newQuestion.timeLimit}
+                    onChange={(e) => setNewQuestion({ ...newQuestion, timeLimit: Number(e.target.value) })}
+                    required
+                    fullWidth
+                    InputProps={{ style: { color: 'white' } }}
+                    InputLabelProps={{ style: { color: 'rgba(255, 255, 255, 0.7)' } }}
+                    sx={{ mb: 2 }}
+                  />
+                </Box>
+
+                <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
+                  Options
+                </Typography>
+
+                {newQuestion.options.map((option, index) => (
+                  <Box key={index} sx={{ display: 'flex', mb: 2, gap: 1 }}>
+                    <TextField
+                      label={`Option ${index + 1}`}
+                      value={option}
+                      onChange={(e) => {
+                        const newOptions = [...newQuestion.options];
+                        newOptions[index] = e.target.value;
+                        setNewQuestion({ ...newQuestion, options: newOptions });
+                      }}
+                      required
+                      fullWidth
+                      InputProps={{ style: { color: 'white' } }}
+                      InputLabelProps={{ style: { color: 'rgba(255, 255, 255, 0.7)' } }}
+                    />
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      onClick={() => {
+                        const newOptions = [...newQuestion.options];
+                        newOptions.splice(index, 1);
+                        setNewQuestion({ ...newQuestion, options: newOptions });
+                      }}
+                      sx={{ minWidth: '40px', ml: 1 }}
+                    >
+                      X
+                    </Button>
+                  </Box>
                 ))}
-              </Box>
 
-              <FormControl fullWidth required>
-                <InputLabel>Correct Answer</InputLabel>
-                <Select
-                  value={newQuestion.correctAnswer}
-                  onChange={(e) => setNewQuestion({ ...newQuestion, correctAnswer: e.target.value })}
-                  label="Correct Answer"
-                >
-                  <MenuItem value="">
-                    <em>Select correct answer</em>
-                  </MenuItem>
-                  {newQuestion.options.map((option, index) => (
-                    <MenuItem key={index} value={option} disabled={!option}>
-                      {option || `Option ${index + 1}`}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
-                <TextField
-                  label="Category"
-                  value={newQuestion.category}
-                  onChange={(e) => setNewQuestion({ ...newQuestion, category: e.target.value })}
-                  required
-                  fullWidth
-                />
-
-                <FormControl fullWidth required>
-                  <InputLabel>Difficulty</InputLabel>
-                  <Select
-                    value={newQuestion.difficulty}
-                    onChange={(e) => setNewQuestion({ ...newQuestion, difficulty: e.target.value })}
-                    label="Difficulty"
-                  >
-                    <MenuItem value="easy">Easy</MenuItem>
-                    <MenuItem value="medium">Medium</MenuItem>
-                    <MenuItem value="hard">Hard</MenuItem>
-                  </Select>
-                </FormControl>
-              </Box>
-
-              <TextField
-                label="Time Limit (seconds)"
-                type="number"
-                value={newQuestion.timeLimit}
-                onChange={(e) => setNewQuestion({ ...newQuestion, timeLimit: Number(e.target.value) })}
-                required
-                fullWidth
-                inputProps={{ min: 10, max: 300 }}
-              />
-
-              <Button 
-                type="submit" 
-                variant="contained" 
-                sx={{ 
-                  mt: 2,
-                  bgcolor: 'rgba(67, 206, 162, 0.1)',
-                  color: '#43cea2',
-                  '&:hover': {
-                    bgcolor: 'rgba(67, 206, 162, 0.2)',
-                  }
-                }}
-              >
-                Add Question
-              </Button>
-            </Box>
-          </Box>
-
-          {/* Questions List */}
-          <Box sx={{ mt: 6 }}>
-            <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-              Existing Questions
-            </Typography>
-            <Box sx={{ 
-              display: 'grid', 
-              gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: '1fr 1fr 1fr' },
-              gap: 3 
-            }}>
-              {questions?.map((question) => (
-                <Box 
-                  key={question.id}
-                  sx={{
-                    p: 3,
-                    borderRadius: 2,
-                    background: 'rgba(18, 18, 18, 0.8)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                <Button
+                  type="button"
+                  onClick={() => setNewQuestion({ ...newQuestion, options: [...newQuestion.options, ''] })}
+                  variant="outlined"
+                  sx={{ 
+                    mt: 1, 
+                    mb: 3,
+                    color: 'white',
+                    borderColor: 'white',
+                    '&:hover': {
+                      borderColor: 'white',
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                    }
                   }}
                 >
-                  <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                    {question?.question || 'Untitled Question'}
-                  </Typography>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                      Category: {question?.category || 'General'}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                      Difficulty: {question?.difficulty || 'Medium'}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                      Time Limit: {question?.timeLimit || 30}s
-                    </Typography>
-                  </Box>
-                  <Button 
-                    onClick={() => question.id && handleDeleteQuestion(question.id)}
+                  Add Option
+                </Button>
+
+                <FormControl fullWidth sx={{ mb: 3 }}>
+                  <InputLabel id="correct-answer-label" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    Correct Answer
+                  </InputLabel>
+                  <Select
+                    labelId="correct-answer-label"
+                    value={newQuestion.correctAnswer}
+                    onChange={(e) => setNewQuestion({ ...newQuestion, correctAnswer: e.target.value })}
+                    required
+                    sx={{ color: 'white' }}
+                  >
+                    {newQuestion.options.map((option, index) => (
+                      <MenuItem key={index} value={option}>
+                        {option}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <Button 
+                  type="submit" 
+                  variant="contained" 
+                  fullWidth
+                  sx={{ 
+                    mt: 2,
+                    bgcolor: 'rgba(67, 206, 162, 0.1)',
+                    color: '#43cea2',
+                    '&:hover': {
+                      bgcolor: 'rgba(67, 206, 162, 0.2)',
+                    }
+                  }}
+                >
+                  Add Question
+                </Button>
+              </Box>
+            </Box>
+
+            {/* Questions List */}
+            <Box sx={{ mt: 6 }}>
+              <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+                Existing Questions
+              </Typography>
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: '1fr 1fr 1fr' },
+                gap: 3 
+              }}>
+                {questions?.map((question) => (
+                  <Box 
+                    key={question.id}
                     sx={{
-                      bgcolor: 'rgba(255, 107, 107, 0.1)',
-                      color: '#ff6b6b',
-                      '&:hover': {
-                        bgcolor: 'rgba(255, 107, 107, 0.2)',
-                      }
+                      p: 3,
+                      borderRadius: 2,
+                      background: 'rgba(18, 18, 18, 0.8)',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
+                      position: 'relative'
                     }}
                   >
-                    Delete
-                  </Button>
-                </Box>
-              ))}
+                    <Typography variant="h6" sx={{ mb: 2, pr: 4 }}>
+                      {question.question}
+                    </Typography>
+                    
+                    <Box sx={{ position: 'absolute', top: 12, right: 12 }}>
+                      <Button 
+                        variant="text" 
+                        color="error"
+                        onClick={() => handleDeleteQuestion(question.id)}
+                        sx={{ minWidth: 'auto', p: 0.5 }}
+                      >
+                        X
+                      </Button>
+                    </Box>
+
+                    <Typography variant="body2" sx={{ mb: 1, opacity: 0.7 }}>
+                      Category: {question.category}
+                    </Typography>
+                    
+                    <Typography variant="body2" sx={{ mb: 2, opacity: 0.7 }}>
+                      Difficulty: {question.difficulty}
+                    </Typography>
+
+                    <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+                      Options:
+                    </Typography>
+                    
+                    <Box component="ul" sx={{ pl: 2, mb: 2 }}>
+                      {question.options.map((option, index) => (
+                        <Typography 
+                          component="li" 
+                          key={index} 
+                          sx={{ 
+                            color: option === question.correctAnswer ? '#43cea2' : 'white',
+                            fontWeight: option === question.correctAnswer ? 'bold' : 'normal'
+                          }}
+                        >
+                          {option} {option === question.correctAnswer && '✓'}
+                        </Typography>
+                      ))}
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
             </Box>
           </Box>
-        </>
-      )}
+        )}
+      </TabPanel>
+
+      {/* Season Management Tab */}
+      <TabPanel value={tabValue} index={1}>
+        <SeasonManagement />
+      </TabPanel>
     </Box>
   );
 };
