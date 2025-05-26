@@ -360,7 +360,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                 />
 
                 {/* Options */}
-                <Box sx={{ mb: 3 }}>
+                <Box sx={{ mb: 4 }}>
                   <Typography variant="subtitle1" sx={{ mb: 2 }}>
                     Options
                   </Typography>
@@ -380,9 +380,26 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                     />
                   ))}
                 </Box>
+                
+                {/* Correct Answer Selection */}
+                <FormControl fullWidth sx={{ mb: 4 }}>
+                  <InputLabel id="correct-answer-label">Correct Answer</InputLabel>
+                  <Select
+                    labelId="correct-answer-label"
+                    value={newQuestion.correctAnswer || ''}
+                    onChange={(e) => setNewQuestion({ ...newQuestion, correctAnswer: e.target.value })}
+                    required
+                  >
+                    {newQuestion.options.filter(option => option.trim() !== '').map((option, index) => (
+                      <MenuItem key={index} value={option}>
+                        {option}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
 
                 {/* Category */}
-                <FormControl fullWidth sx={{ mb: 3 }}>
+                <FormControl fullWidth sx={{ mb: 4 }}>
                   <InputLabel id="category-label">Category</InputLabel>
                   <Select
                     labelId="category-label"
@@ -399,7 +416,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                 </FormControl>
 
                 {/* Difficulty */}
-                <FormControl fullWidth sx={{ mb: 3 }}>
+                <FormControl fullWidth sx={{ mb: 4 }}>
                   <InputLabel id="difficulty-label">Difficulty</InputLabel>
                   <Select
                     labelId="difficulty-label"
@@ -421,7 +438,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                   value={newQuestion.timeLimit}
                   onChange={(e) => setNewQuestion({ ...newQuestion, timeLimit: Number(e.target.value) })}
                   required
-                  sx={{ mb: 3 }}
+                  sx={{ mb: 4 }}
                   InputProps={{ inputProps: { min: 10, max: 120 } }}
                 />
 
