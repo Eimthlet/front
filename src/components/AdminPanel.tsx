@@ -69,26 +69,20 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const [error, setError] = useState<ErrorState | null>(null);
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Initialize state with full type definition
+  const [newQuestion, setNewQuestion] = useState<Question>({
+    question: '',
+    options: ['', '', '', ''],
+    correctAnswer: '',
+    timeLimit: 30,
+    category: '',
+    difficulty: 'easy'
+  });
 
   useEffect(() => {
-    // Debug token information
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const decoded = jwtDecode<JwtPayload>(token);
-        console.log('Token debug info:', {
-          decoded,
-          isAdmin: decoded.isAdmin,
-          exp: decoded.exp,
-          currentTime: Math.floor(Date.now() / 1000),
-          isExpired: decoded.exp ? decoded.exp < Math.floor(Date.now() / 1000) : false
-        });
-      } catch (err) {
-        console.error('Error decoding token:', err);
-      }
-    } else {
-      console.log('No token found in localStorage');
-    }
+    // Check if user is authenticated and has admin privileges
+    console.log('Admin panel access check:', { isAdmin });
 
     // Check if user is admin
     if (!isAdmin) {
@@ -101,14 +95,19 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     const fetchQuestions = async () => {
       try {
         setIsLoading(true);
-        const response = await api.get<QuestionsResponse>('/admin/questions');
+        const response = await api.get<{questions?: Question[]; data?: {questions?: Question[]}}>
+          ('/api/admin/questions');
         
-        // Check if response.data exists and has a data property
-        if (response?.data?.data?.questions) {
+        // Check the response format and extract questions
+        if (response?.data?.questions) {
+          // Format matches { questions: [...] }
+          setQuestions(response.data.questions);
+        } else if (response?.data?.data?.questions) {
+          // Format matches { data: { questions: [...] } }
           setQuestions(response.data.data.questions);
         } else if (Array.isArray(response?.data)) {
-          // Handle case where the response is directly the questions array
-          setQuestions(response.data);
+          // Format matches direct array
+          setQuestions(response.data as Question[]);
         } else {
           console.warn('Unexpected response format:', response);
           setQuestions([]);
@@ -137,7 +136,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   // Delete a question
   const handleDeleteQuestion = async (questionId: string) => {
     try {
-      await api.delete(`/admin/questions/${questionId}`);
+      await api.delete(`/api/admin/questions/${questionId}`);
       setQuestions(prevQuestions => prevQuestions.filter(q => q.id !== questionId));
       setSuccess('Question deleted successfully');
       setTimeout(() => setSuccess(''), 3000);
@@ -152,33 +151,49 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     }
   };
 
-  // Initialize state with full type definition
-  const [newQuestion, setNewQuestion] = useState<Question>({
-    question: '',
-    options: ['', '', '', ''],
-    correctAnswer: '',
-    timeLimit: 30,
-    category: '',
-    difficulty: 'easy'
-  });
-
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Create a local copy of the form data to avoid TypeScript errors
+      const formData = {...newQuestion};
+      
+      // Create question data from the form data
       const questionData = {
-        question: newQuestion.question,
-        options: newQuestion.options,
-        correct_answer: newQuestion.correctAnswer,
-        category: newQuestion.category,
-        difficulty: newQuestion.difficulty,
-        time_limit: newQuestion.timeLimit
+        question: formData.question,
+        options: formData.options,
+        correct_answer: formData.correctAnswer,
+        category: formData.category,
+        difficulty: formData.difficulty,
+        time_limit: formData.timeLimit
       };
 
       console.log('Submitting question:', questionData);
       
-      const response = await api.post<QuestionResponse>('/api/admin/questions', questionData);
-      setQuestions(prevQuestions => [...prevQuestions, response.data.data.question]);
+      const response = await api.post<{question?: Question; data?: {question?: Question}}>
+        ('/api/admin/questions', questionData);
+      
+      // Handle different response formats
+      let addedQuestion: Question;
+      if (response?.data?.question) {
+        addedQuestion = response.data.question;
+      } else if (response?.data?.data?.question) {
+        addedQuestion = response.data.data.question;
+      } else {
+        // If the response format doesn't match expected structure,
+        // use the data we sent with a generated ID
+        addedQuestion = {
+          question: questionData.question,
+          options: questionData.options,
+          correctAnswer: questionData.correct_answer,
+          category: questionData.category,
+          difficulty: questionData.difficulty,
+          timeLimit: questionData.time_limit,
+          id: `temp-${Date.now()}`
+        };
+      }
+      
+      setQuestions(prevQuestions => [...prevQuestions, addedQuestion]);
       
       // Reset form
       setNewQuestion({

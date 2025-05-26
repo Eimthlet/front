@@ -252,7 +252,38 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
         return;
       } catch (err: any) {
         console.error('Registration error:', err);
-        setError(err.message || 'Registration failed');
+        
+        // Create user-friendly error message
+        let userFriendlyMessage = 'Unable to complete registration. Please try again.';
+        
+        if (err.response?.data?.error) {
+          const errorMessage = err.response.data.error;
+          
+          if (errorMessage.includes('Email already registered')) {
+            userFriendlyMessage = 'This email is already registered. Please use a different email or try logging in.';
+          } else if (errorMessage.includes('Username already taken')) {
+            userFriendlyMessage = 'This username is already taken. Please choose a different username.';
+          } else if (errorMessage.includes('Missing required fields')) {
+            userFriendlyMessage = 'Please fill in all required fields to complete registration.';
+          } else if (errorMessage.includes('Password must be')) {
+            userFriendlyMessage = 'Your password must be at least 8 characters long.';
+          } else if (errorMessage.includes('valid email')) {
+            userFriendlyMessage = 'Please enter a valid email address.';
+          } else if (errorMessage.includes('valid phone')) {
+            userFriendlyMessage = 'Please enter a valid phone number.';
+          } else if (errorMessage.includes('pending registration')) {
+            userFriendlyMessage = 'You already have a pending registration. Please complete payment or wait.';
+          } else {
+            // Make the first letter uppercase for better presentation
+            userFriendlyMessage = errorMessage.charAt(0).toUpperCase() + errorMessage.slice(1);
+          }
+        } else if (err.message === 'Network Error') {
+          userFriendlyMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
+        } else if (err.message?.includes('timeout')) {
+          userFriendlyMessage = 'The server is taking too long to respond. Please try again later.';
+        }
+        
+        setError(userFriendlyMessage);
         setLoading(false);
       }
       return;
@@ -271,7 +302,30 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
     } catch (err: unknown) {
       console.error('Authentication error:', err);
       const apiError = err as ApiError;
-      setError(apiError.response?.data?.error || apiError.message || 'Authentication failed');
+      
+      // Create user-friendly error message
+      let userFriendlyMessage = 'Unable to log in. Please try again.';
+      
+      if (apiError.response?.data?.error) {
+        const errorMessage = apiError.response.data.error;
+        
+        if (errorMessage.includes('Invalid email or password')) {
+          userFriendlyMessage = 'The email or password you entered is incorrect. Please try again.';
+        } else if (errorMessage.includes('Email already registered')) {
+          userFriendlyMessage = 'This email is already registered. Please use a different email or try logging in.';
+        } else if (errorMessage.includes('Username already taken')) {
+          userFriendlyMessage = 'This username is already taken. Please choose a different username.';
+        } else {
+          // Make the first letter uppercase for better presentation
+          userFriendlyMessage = errorMessage.charAt(0).toUpperCase() + errorMessage.slice(1);
+        }
+      } else if (apiError.message === 'Network Error') {
+        userFriendlyMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
+      } else if (apiError.message?.includes('timeout')) {
+        userFriendlyMessage = 'The server is taking too long to respond. Please try again later.';
+      }
+      
+      setError(userFriendlyMessage);
       setLoading(false);
     }
   };

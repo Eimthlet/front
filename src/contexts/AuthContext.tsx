@@ -172,9 +172,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
   };
 
-  const handleApiError = (error: any, message: string) => {
-    setError(message);
-    console.error(message, error);
+  const handleApiError = (error: any, defaultMessage: string) => {
+    console.error(defaultMessage, error);
+    
+    // Extract the error message from the API response if available
+    let userFriendlyMessage = defaultMessage;
+    
+    if (error.response?.data?.error) {
+      // Handle specific error cases with user-friendly messages
+      const apiErrorMessage = error.response.data.error;
+      
+      if (apiErrorMessage.includes('Invalid email or password')) {
+        userFriendlyMessage = 'The email or password you entered is incorrect. Please try again.';
+      } else if (apiErrorMessage.includes('Email already registered')) {
+        userFriendlyMessage = 'This email is already registered. Please use a different email or try logging in.';
+      } else if (apiErrorMessage.includes('Username already taken')) {
+        userFriendlyMessage = 'This username is already taken. Please choose a different username.';
+      } else if (apiErrorMessage.includes('Token expired')) {
+        userFriendlyMessage = 'Your session has expired. Please log in again.';
+      } else if (apiErrorMessage.includes('No token provided')) {
+        userFriendlyMessage = 'You need to log in to access this feature.';
+      } else {
+        // Use the API error message but make it more user-friendly
+        userFriendlyMessage = apiErrorMessage.charAt(0).toUpperCase() + apiErrorMessage.slice(1);
+      }
+    } else if (error.message === 'Network Error') {
+      userFriendlyMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
+    } else if (error.message?.includes('timeout')) {
+      userFriendlyMessage = 'The server is taking too long to respond. Please try again later.';
+    }
+    
+    setError(userFriendlyMessage);
   };
 
   return (

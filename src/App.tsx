@@ -64,12 +64,12 @@ const App: React.FC = () => {
         setError(null);
         
         // First check qualification status
-        const qualificationResponse = await api.get<QualificationResponse>('/qualification');
+        const qualificationResponse = await api.get<QualificationResponse>('/api/qualification');
         setQualification(qualificationResponse.data);
         
         // Only fetch questions if user is qualified or hasn't attempted yet
         if (!qualificationResponse.data.hasAttempted || qualificationResponse.data.isQualified) {
-          const response = await api.get<QuestionsResponse>('/questions');
+          const response = await api.get<QuestionsResponse>('/api/questions');
           
           // Handle season-related messages
           if (response.data.status) {

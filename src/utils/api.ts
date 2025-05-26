@@ -38,7 +38,8 @@ const api = axios.create({
   timeout: 30000, // Increased timeout to 30 seconds
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  withCredentials: true // Always include credentials for cross-origin requests
 });
 
 // Track if we're already trying to refresh the token
@@ -192,11 +193,15 @@ api.interceptors.response.use(
     }
 
     // Handle other errors
-    const errorMessage = error.response?.data?.error || 
-                        error.response?.data?.message || 
-                        error.message || 
-                        'An unexpected error occurred';
+    let errorMessage = error.response?.data?.error || 
+                      error.response?.data?.message || 
+                      error.message || 
+                      'An unexpected error occurred';
     
+    // Create a more user-friendly error message for logging purposes
+    let userFriendlyMessage = errorMessage;
+    
+    // Only log the technical details, don't expose them to the user
     console.error('API Error:', {
       status: error.response?.status,
       message: errorMessage,
@@ -204,11 +209,26 @@ api.interceptors.response.use(
       method: originalRequest.method,
       response: error.response?.data
     });
+    
+    // For timeout errors
+    if (error.code === 'ECONNABORTED' || errorMessage.includes('timeout')) {
+      userFriendlyMessage = 'Request timed out after multiple attempts. Please check your internet connection and try again.';
+    }
+    // For network errors
+    else if (errorMessage === 'Network Error') {
+      userFriendlyMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
+    }
+    // For server errors (500 range)
+    else if (error.response?.status >= 500) {
+      userFriendlyMessage = 'The server encountered an error. Please try again later.';
+    }
 
     return Promise.reject({
-      message: errorMessage,
+      message: userFriendlyMessage, // Use the user-friendly message
+      originalError: error, // Keep the original error for debugging
       status: error.response?.status,
-      originalError: error,
+      url: originalRequest.url,
+      method: originalRequest.method,
       response: error.response?.data
     });
   }
