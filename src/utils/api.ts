@@ -19,10 +19,10 @@ interface FailedRequest {
   reject: (error: Error) => void;
 }
 
-// Create a custom Axios instance
+// Create a custom Axios instance with retry logic
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000, // Reduced timeout to 15 seconds
+  timeout: 30000, // Increased timeout to 30 seconds
   headers: {
     'Content-Type': 'application/json'
   }
@@ -59,6 +59,23 @@ api.interceptors.request.use(
   }
 );
 
+// Helper function to retry failed requests
+const retryRequest = async (config: any, retries = 3, delay = 1000) => {
+  try {
+    return await api(config);
+  } catch (error: any) {
+    if (retries === 0 || error.response?.status === 401) {
+      throw error;
+    }
+    
+    // Wait for the specified delay
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    // Retry the request
+    return retryRequest(config, retries - 1, delay * 2);
+  }
+};
+
 // Add a response interceptor to handle token refresh and errors
 api.interceptors.response.use(
   (response) => response,
@@ -71,6 +88,20 @@ api.interceptors.response.use(
         url: originalRequest.url,
         method: originalRequest.method
       });
+
+      // Retry the request if it's not a retry attempt
+      if (!originalRequest._retry) {
+        originalRequest._retry = true;
+        try {
+          return await retryRequest(originalRequest);
+        } catch (retryError) {
+          return Promise.reject({
+            message: 'Request timed out after multiple attempts. Please check your internet connection and try again.',
+            originalError: retryError
+          });
+        }
+      }
+
       return Promise.reject({
         message: 'Request timed out. Please check your internet connection and try again.',
         originalError: error
@@ -80,6 +111,20 @@ api.interceptors.response.use(
     // Handle network errors
     if (!error.response) {
       console.error('Network error:', error);
+      
+      // Retry the request if it's not a retry attempt
+      if (!originalRequest._retry) {
+        originalRequest._retry = true;
+        try {
+          return await retryRequest(originalRequest);
+        } catch (retryError) {
+          return Promise.reject({
+            message: 'Network error after multiple attempts. Please check your internet connection and try again.',
+            originalError: retryError
+          });
+        }
+      }
+
       return Promise.reject({
         message: 'Network error. Please check your internet connection and try again.',
         originalError: error
