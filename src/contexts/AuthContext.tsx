@@ -1,36 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import { api } from '../utils/api';
+import api from '../utils/api';
 
-// Define types
-interface AuthResponse {
-  token: string;
-  refreshToken: string;
-}
-
-// Define types
-interface AuthResponse {
-  token: string;
-  refreshToken: string;
-}
-
-// Define the shape of the user
+// Define User and AuthContextType interfaces locally
 interface User {
   id: number;
   username: string;
   role: 'admin' | 'user';
   token: string;
-  refreshToken: string;
+  refreshToken?: string;
 }
 
-// Define the context type
-interface AuthContextType {
-  user: User | null;
-  isLoading: boolean;
-  login: (userData: User) => Promise<void>;
-  logout: () => void;
-  isAdmin: () => boolean;
-  refreshToken: () => Promise<void>;
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
@@ -40,11 +20,8 @@ interface AuthContextType {
   refreshToken: () => Promise<void>;
 }
 
-// Define the shape of the user
-interface User {
-  id: number;
-  username: string;
-  role: 'admin' | 'user';
+// Define types
+interface AuthResponse {
   token: string;
   refreshToken: string;
 }
@@ -55,16 +32,6 @@ interface JwtPayload {
   email: string;
   isAdmin?: boolean;
   exp?: number;
-}
-
-// Define the context type
-interface AuthContextType {
-  user: User | null;
-  isLoading: boolean;
-  login: (user: User) => void;
-  logout: () => void;
-  isAdmin: () => boolean;
-  refreshToken: () => Promise<void>;
 }
 
 // Create the context

@@ -87,9 +87,7 @@ export async function login(email: string, password: string): Promise<AuthRespon
     const response = await fetch(`${API_BASE}/api/auth/login`, {
       method: 'POST',
       headers: { 
-        'Content-Type': 'application/json',
-        'Cookie': 'accessToken=; SameSite=Strict; Secure; Partitioned',
-        'Cookie': 'refreshToken=; SameSite=Strict; Secure; Partitioned'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ email, password }),
       credentials: 'include',
@@ -294,4 +292,8 @@ export async function fetchQuestions() {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'Failed to fetch questi
+    throw new Error(error.error || 'Failed to fetch questions');
+  }
+
+  return response.json();
+}

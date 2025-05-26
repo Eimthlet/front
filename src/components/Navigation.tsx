@@ -147,4 +147,51 @@ const Navigation: React.FC = () => {
               <DashboardIcon sx={{ mr: 1 }} /> Dashboard
             </MenuItem>
             <MenuItem onClick={handleLogout}>
-              <PowerSettingsNewIcon sx={{ mr: 1 }} /
+              <PowerSettingsNewIcon sx={{ mr: 1 }} /> Logout
+            </MenuItem>
+          </>
+        ) : null
+      ) : (
+        <MenuItem onClick={() => handleNavigation('/login')}>
+          <LoginIcon sx={{ mr: 1 }} /> Login
+        </MenuItem>
+      )}
+    </Menu>
+  );
+
+  return (
+    <StyledAppBar position="static">
+      <Toolbar>
+        <IconButton
+          edge="start"
+          color="inherit"
+          aria-label="menu"
+          onClick={handleMenu}
+          sx={{ mr: 2 }}
+        >
+          <MenuIcon />
+        </IconButton>
+        <Typography variant="h6" sx={{ flexGrow: 1 }}>
+          Car Quiz
+        </Typography>
+        {!isMobile && renderNavButtons()}
+        {user ? (
+          <Tooltip title="Logout">
+            <IconButton color="inherit" onClick={handleLogout}>
+              <PowerSettingsNewIcon />
+            </IconButton>
+          </Tooltip>
+        ) : (
+          <Tooltip title="Login">
+            <IconButton color="inherit" onClick={() => navigate('/login')}>
+              <LoginIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Toolbar>
+      {isMobile && renderMobileMenu()}
+    </StyledAppBar>
+  );
+};
+
+export default Navigation;
