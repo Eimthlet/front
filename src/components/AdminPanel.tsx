@@ -156,18 +156,31 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     fetchSeasons();
   }, []);
 
+  // Function to fetch questions
+  const fetchQuestions = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get<Question[]>('/admin/questions');
+      setQuestions(response.data);
+    } catch (err: unknown) {
+      console.error('Error fetching questions:', err);
+      const apiError = err as ApiError;
+      setError({ 
+        message: apiError.message || 'Failed to fetch questions',
+        details: apiError.response?.data?.details
+      });
+      setQuestions([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Fetch questions when component mounts
   useEffect(() => {
     fetchQuestions();
   }, []);
 
   // Check if user is admin and redirect if not
-  useEffect(() => {
-    if (!isAdmin) {
-      navigate('/');
-    }
-  }, [isAdmin, navigate]);
-
   useEffect(() => {
     // Check if user is authenticated and has admin privileges
     console.log('Admin panel access check:', { isAdmin });
@@ -176,29 +189,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     if (!isAdmin) {
       console.log('Non-admin user attempting to access admin panel');
       navigate('/login');
-      return;
     }
-
-    // Function to fetch questions
-    const fetchQuestions = async () => {
-      try {
-        setIsLoading(true);
-        const response = await api.get<Question[]>('/admin/questions');
-        setQuestions(response.data);
-      } catch (err: unknown) {
-        console.error('Error fetching questions:', err);
-        const apiError = err as ApiError;
-        setError({ 
-          message: apiError.message || 'Failed to fetch questions',
-          details: apiError.response?.data?.details
-        });
-        setQuestions([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchQuestions();
   }, [isAdmin, navigate]);
 
   // Delete a question
@@ -345,9 +336,6 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                       </MenuItem>
                     ))}
                   </Select>
-                      </MenuItem>
-                    ))}
-                  </Select>
                 </FormControl>
 
                 <TextField
@@ -405,10 +393,6 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                     onChange={(e) => setNewQuestion({ ...newQuestion, difficulty: e.target.value })}
                     required
                   >
-                    <MenuItem value="Easy">Easy</MenuItem>
-                    <MenuItem value="Medium">Medium</MenuItem>
-                    <MenuItem value="Hard">Hard</MenuItem>
-                  </Select>
                     <MenuItem value="Easy">Easy</MenuItem>
                     <MenuItem value="Medium">Medium</MenuItem>
                     <MenuItem value="Hard">Hard</MenuItem>
