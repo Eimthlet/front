@@ -25,6 +25,16 @@ interface ApiQuestion {
   timeLimit?: number;
 }
 
+interface QualificationResponse {
+  hasAttempted: boolean;
+  isQualified: boolean;
+  score?: number;
+  totalQuestions?: number;
+  percentageScore?: number;
+  minimumRequired?: number;
+  message: string;
+}
+
 const App: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
@@ -32,15 +42,7 @@ const App: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [qualification, setQualification] = useState<{
-    hasAttempted: boolean;
-    isQualified: boolean;
-    score?: number;
-    totalQuestions?: number;
-    percentageScore?: number;
-    minimumRequired?: number;
-    message: string;
-  } | null>(null);
+  const [qualification, setQualification] = useState<QualificationResponse | null>(null);
 
   useEffect(() => {
     const validateAndFetchData = async () => {
@@ -49,30 +51,11 @@ const App: React.FC = () => {
         setError(null);
         
         // First check qualification status
-        const qualificationResponse = await api.get('/qualification');
-        setQualification(qualificationResponse.data as {
-          hasAttempted: boolean;
-          isQualified: boolean;
-          score?: number;
-          totalQuestions?: number;
-          percentageScore?: number;
-          minimumRequired?: number;
-          message: string;
-        });
-        
-        // Type assertion for the qualification data
-        const qualificationData = qualificationResponse.data as {
-          hasAttempted: boolean;
-          isQualified: boolean;
-          score?: number;
-          totalQuestions?: number;
-          percentageScore?: number;
-          minimumRequired?: number;
-          message: string;
-        };
+        const qualificationResponse = await api.get<QualificationResponse>('/qualification');
+        setQualification(qualificationResponse.data);
         
         // Only fetch questions if user is qualified or hasn't attempted yet
-        if (!qualificationData.hasAttempted || qualificationData.isQualified) {
+        if (!qualificationResponse.data.hasAttempted || qualificationResponse.data.isQualified) {
           const response = await api.get<{ data: { questions: ApiQuestion[] } }>('/questions');
 
           // Convert numeric IDs to strings

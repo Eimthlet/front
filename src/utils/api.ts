@@ -228,16 +228,16 @@ const ensureApiPrefix = (endpoint: string) => {
 // Create a typed API client
 const typedApi = {
   get: <T>(url: string, config = {}) => 
-    api.get<T>(ensureApiPrefix(url), config).then(response => response.data),
+    api.get<ApiResponse<T>>(ensureApiPrefix(url), config).then(response => response.data),
   
   post: <T>(url: string, data = {}, config = {}) => 
-    api.post<T>(ensureApiPrefix(url), data, config).then(response => response.data),
+    api.post<ApiResponse<T>>(ensureApiPrefix(url), data, config).then(response => response.data),
   
   put: <T>(url: string, data = {}, config = {}) => 
-    api.put<T>(ensureApiPrefix(url), data, config).then(response => response.data),
+    api.put<ApiResponse<T>>(ensureApiPrefix(url), data, config).then(response => response.data),
   
   delete: <T>(url: string, config = {}) => 
-    api.delete<T>(ensureApiPrefix(url), config).then(response => response.data)
+    api.delete<ApiResponse<T>>(ensureApiPrefix(url), config).then(response => response.data)
 };
 
 export default typedApi;
