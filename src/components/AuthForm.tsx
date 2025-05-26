@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { jwtDecode } from 'jwt-decode';
+import { API_CONFIG, AUTH_CONFIG, PAYMENT_CONFIG } from '../config';
 import { Checkbox, FormControlLabel, Link, IconButton } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -112,38 +113,85 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
     setLoading(true);
     setError('');
 
-    // Basic validation
+    // Email validation
     if (!email) {
       setError('Email is required');
       setLoading(false);
       return;
     }
+    
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      setLoading(false);
+      return;
+    }
+    
+    // Password validation
+    if (!password) {
+      setError('Password is required');
+      setLoading(false);
+      return;
+    }
+    
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      setLoading(false);
+      return;
+    }
 
     if (currentMode === 'register') {
+      // Phone validation
       if (!phone.trim()) {
         setError('Phone number is required');
         setLoading(false);
         return;
       }
+      
+      const phoneRegex = /^\+?[0-9]{10,15}$/;
+      if (!phoneRegex.test(phone.replace(/\s/g, ''))) {
+        setError('Please enter a valid phone number (10-15 digits)');
+        setLoading(false);
+        return;
+      }
+      
+      // Amount validation
       if (!amount || amount <= 0) {
         setError('Amount is required and must be positive');
         setLoading(false);
         return;
       }
+      
+      // Terms validation
       if (!acceptedTerms) {
         setError('Please accept the Terms and Conditions');
         setLoading(false);
         return;
       }
 
+      // Password confirmation validation
       if (password !== confirmPassword) {
         setError('Passwords do not match');
         setLoading(false);
         return;
       }
 
+      // Username validation
       if (!username.trim()) {
         setError('Username is required');
+        setLoading(false);
+        return;
+      }
+      
+      if (username.length < 3 || username.length > 20) {
+        setError('Username must be between 3 and 20 characters');
+        setLoading(false);
+        return;
+      }
+      
+      const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+      if (!usernameRegex.test(username)) {
+        setError('Username can only contain letters, numbers, underscores and hyphens');
         setLoading(false);
         return;
       }
@@ -174,9 +222,9 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
           public_key: regResult.public_key,
           tx_ref: regResult.tx_ref,
           amount: regResult.amount,
-          currency: 'MWK',
-          callback_url: 'https://car-quizz.onrender.com/api/paychangu-callback',
-          return_url: window.location.origin + '/login?payment=success',
+          currency: PAYMENT_CONFIG.CURRENCY,
+          callback_url: PAYMENT_CONFIG.CALLBACK_URL,
+          return_url: PAYMENT_CONFIG.RETURN_URL,
           customer: {
             email: regResult.email,
             first_name: username,
@@ -221,12 +269,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
       const decodedToken = jwtDecode(token) as JwtPayload;
       const isAdmin = decodedToken.isAdmin || false;
 
-      authLogin({
-        id: user.id,
-        username: user.username,
-        role: isAdmin ? 'admin' : 'user',
-        token
-      });
+      // Login with email and password instead of user object
+      await authLogin(email, password);
 
       navigate(isAdmin ? '/admin' : '/quiz', { replace: true });
     } catch (err: unknown) {

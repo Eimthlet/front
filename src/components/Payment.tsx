@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { AUTH_CONFIG, PAYMENT_CONFIG } from '../config';
 
 interface PaymentProps {
   onSuccess: () => void;
@@ -127,25 +128,54 @@ const Payment: React.FC<PaymentProps> = ({
 
     // Add URL change listener for payment completion
     const handleUrlChange = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const status = urlParams.get('status');
-      const returnedTxRef = urlParams.get('tx_ref');
-
-      if (status && returnedTxRef) {
-        if (status === 'successful' && returnedTxRef === txRef) {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const status = urlParams.get('status');
+        const returnedTxRef = urlParams.get('tx_ref');
+        
+        console.log('Payment callback received:', { status, returnedTxRef, expectedTxRef: txRef });
+        
+        if (status && returnedTxRef) {
+          // Verify the payment status with the server to prevent tampering
           try {
-            await onSuccess();
-            navigate('/quiz');
+            const verifyUrl = `${AUTH_CONFIG.ENDPOINTS.VERIFY_PAYMENT}`;
+            const response = await fetch(verifyUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tx_ref: returnedTxRef })
+            });
+            
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || 'Payment verification failed');
+            }
+            
+            const verificationResult = await response.json();
+            
+            if (verificationResult.success) {
+              await onSuccess();
+              navigate('/quiz');
+            } else {
+              throw new Error(verificationResult.error || 'Payment verification failed');
+            }
           } catch (error) {
-            onError('Registration failed after payment');
+            console.error('Payment verification error:', error);
+            onError(error instanceof Error ? error.message : 'Registration failed after payment');
             navigate('/register');
           }
-        } else {
-          onError('Payment failed or was cancelled');
+        } else if (urlParams.has('error') || urlParams.has('cancelled')) {
+          // Handle explicit error or cancellation parameters
+          const errorMsg = urlParams.get('error') || 'Payment was cancelled';
+          onError(errorMsg);
           navigate('/register');
         }
         onClose();
-      }
+      } catch (error) {
+        console.error('Error in payment callback handling:', error);
+        onError('An unexpected error occurred during payment processing');
+        navigate('/register');
+        onClose();
+      }  
     };
 
     window.addEventListener('popstate', handleUrlChange);

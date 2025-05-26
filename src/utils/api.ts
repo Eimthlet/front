@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
+import { API_CONFIG, AUTH_CONFIG } from '../config';
 
-const API_BASE_URL = 'https://car-quizz.onrender.com';
+// Use the centralized configuration
+const API_BASE_URL = API_CONFIG.BASE_URL;
 
 // Define types for API responses
 interface AuthResponse {

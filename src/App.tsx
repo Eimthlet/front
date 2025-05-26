@@ -7,6 +7,7 @@ import Navigation from './components/Navigation';
 import AuthForm from './components/AuthForm';
 import AdminPanel from './components/AdminPanel';
 import AdminDashboard from './components/AdminDashboard';
+import UserManagement from './components/UserManagement';
 import Leaderboard from './components/Leaderboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
@@ -36,8 +37,14 @@ interface QualificationResponse {
 }
 
 interface QuestionsResponse {
-  data: {
-    questions: ApiQuestion[];
+  questions: ApiQuestion[];
+  message?: string;
+  status?: 'NO_ACTIVE_SEASON' | 'NOT_QUALIFIED' | 'NO_QUESTIONS';
+  season?: {
+    id: number;
+    name: string;
+    isQualificationRound: boolean;
+    minimumScorePercentage: number;
   };
 }
 
@@ -63,12 +70,26 @@ const App: React.FC = () => {
         // Only fetch questions if user is qualified or hasn't attempted yet
         if (!qualificationResponse.data.hasAttempted || qualificationResponse.data.isQualified) {
           const response = await api.get<QuestionsResponse>('/questions');
-          const convertedQuestions = response.data.data.questions.map(q => ({
-            ...q,
-            id: q.id.toString(),
-            correctAnswer: q.correctAnswer.toString()
-          }));
-          setQuestions(convertedQuestions);
+          
+          // Handle season-related messages
+          if (response.data.status) {
+            // If there's a status, it means there's an issue with accessing questions
+            setError(response.data.message || 'Unable to access quiz questions');
+            setQuestions([]);
+            return;
+          }
+          
+          if (response.data.questions && response.data.questions.length > 0) {
+            const convertedQuestions = response.data.questions.map(q => ({
+              ...q,
+              id: q.id.toString(),
+              correctAnswer: q.correctAnswer.toString()
+            }));
+            setQuestions(convertedQuestions);
+          } else {
+            setQuestions([]);
+            setError(response.data.message || 'No questions available');
+          }
         }
       } catch (err: any) {
         console.error('Failed to fetch data:', err);
@@ -136,10 +157,10 @@ const App: React.FC = () => {
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={
-              user ? <Navigate to={isAdmin() ? '/admin' : '/quiz'} replace /> : <AuthForm mode="login" />
+              user ? <Navigate to={isAdmin ? '/admin' : '/quiz'} replace /> : <AuthForm mode="login" />
             } />
             <Route path="/register" element={
-              user ? <Navigate to={isAdmin() ? '/admin' : '/quiz'} replace /> : <AuthForm mode="register" />
+              user ? <Navigate to={isAdmin ? '/admin' : '/quiz'} replace /> : <AuthForm mode="register" />
             } />
 
             {/* Protected user routes */}
@@ -219,6 +240,14 @@ const App: React.FC = () => {
               <ProtectedRoute adminOnly>
                 <Layout>
                   <AdminDashboard />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/admin/users" element={
+              <ProtectedRoute adminOnly>
+                <Layout>
+                  <UserManagement />
                 </Layout>
               </ProtectedRoute>
             } />

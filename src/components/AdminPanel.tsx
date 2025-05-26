@@ -91,7 +91,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     }
 
     // Check if user is admin
-    if (!isAdmin()) {
+    if (!isAdmin) {
       console.log('Non-admin user attempting to access admin panel');
       navigate('/login');
       return;

@@ -35,12 +35,12 @@ export default function ProtectedRoute({
   }
 
   // If route is admin-only and user is not an admin, redirect to quiz
-  if (adminOnly && user.role !== 'admin') {
+  if (adminOnly && !user.isAdmin) {
     return <Navigate to="/quiz" replace />;
   }
 
   // If user is an admin and tries to access a non-admin route, redirect to admin panel
-  if (user.role === 'admin' && !adminOnly && location.pathname !== '/admin') {
+  if (user.isAdmin && !adminOnly && location.pathname !== '/admin') {
     return <Navigate to="/admin" replace />;
   }
 

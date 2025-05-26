@@ -23,6 +23,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import LeaderboardIcon from '@mui/icons-material/Leaderboard';
 import MenuIcon from '@mui/icons-material/Menu';
 import HomeIcon from '@mui/icons-material/Home';
+import PeopleIcon from '@mui/icons-material/People';
 import { styled, Theme } from '@mui/material/styles';
 
 const StyledAppBar = styled(AppBar)(({ theme }: { theme: Theme }) => ({
@@ -92,7 +93,7 @@ const Navigation: React.FC = () => {
       return null;
     }
     
-    if (isAdmin()) {
+    if (isAdmin) {
       return (
         <>
           <Button
@@ -107,8 +108,16 @@ const Navigation: React.FC = () => {
             color="inherit"
             onClick={() => navigate('/dashboard')}
             startIcon={<DashboardIcon />}
+            sx={{ mr: 2 }}
           >
             Dashboard
+          </Button>
+          <Button
+            color="inherit"
+            onClick={() => navigate('/admin/users')}
+            startIcon={<PeopleIcon />}
+          >
+            Users
           </Button>
         </>
       );
@@ -138,7 +147,7 @@ const Navigation: React.FC = () => {
       }}
     >
       {user ? (
-        isAdmin() ? (
+        isAdmin ? (
           <>
             <MenuItem onClick={() => handleNavigation('/admin')}>
               <AdminPanelSettingsIcon sx={{ mr: 1 }} /> Admin
@@ -146,11 +155,18 @@ const Navigation: React.FC = () => {
             <MenuItem onClick={() => handleNavigation('/dashboard')}>
               <DashboardIcon sx={{ mr: 1 }} /> Dashboard
             </MenuItem>
+            <MenuItem onClick={() => handleNavigation('/admin/users')}>
+              <PeopleIcon sx={{ mr: 1 }} /> Users
+            </MenuItem>
             <MenuItem onClick={handleLogout}>
               <PowerSettingsNewIcon sx={{ mr: 1 }} /> Logout
             </MenuItem>
           </>
-        ) : null
+        ) : (
+          <MenuItem onClick={handleLogout}>
+            <PowerSettingsNewIcon sx={{ mr: 1 }} /> Logout
+          </MenuItem>
+        )
       ) : (
         <MenuItem onClick={() => handleNavigation('/login')}>
           <LoginIcon sx={{ mr: 1 }} /> Login

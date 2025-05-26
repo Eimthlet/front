@@ -1,10 +1,11 @@
-// This file is deprefront end cated. Please use the axios-based client in src/utils/api.ts instead.
+// This file is deprecated. Please use the axios-based client in src/utils/api.ts instead.
 // This file is kept for backward compatibility only and will be removed in a future version.
 
 import axios from 'axios';
+import { API_CONFIG, AUTH_CONFIG } from './config';
 
-const API_BASE = 'https://car-quizz.onrender.com';
-const API_TIMEOUT = 30000; // 30 seconds timeout
+const API_BASE = API_CONFIG.BASE_URL;
+const API_TIMEOUT = API_CONFIG.TIMEOUT; // 30 seconds timeout
 
 // Create axios instance with default config
 const api = axios.create({

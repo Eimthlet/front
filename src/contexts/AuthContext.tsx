@@ -1,29 +1,48 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import api from '../utils/api';
+import { AUTH_CONFIG } from '../config';
 
 // Define User and AuthContextType interfaces locally
 interface User {
   id: number;
-  username: string;
-  role: 'admin' | 'user';
-  token: string;
-  refreshToken?: string;
+  email: string;
+  isAdmin: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
+  isAuthenticated: boolean;
+  isAdmin: boolean;
   isLoading: boolean;
-  login: (userData: User) => Promise<void>;
-  logout: () => void;
-  isAdmin: () => boolean;
-  refreshToken: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (userData: RegisterData) => Promise<void>;
+  logout: () => Promise<void>;
+  error: string | null;
+  clearError: () => void;
+}
+
+interface RegisterData {
+  email: string;
+  password: string;
 }
 
 // Define types
 interface AuthResponse {
   token: string;
   refreshToken: string;
+  success?: boolean;
+}
+
+interface TokenCheckResponse {
+  success: boolean;
+  valid: boolean;
+  user?: {
+    id: number;
+    email: string;
+    isAdmin: boolean;
+  };
+  error?: string;
 }
 
 // Define JWT payload type
@@ -40,59 +59,60 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Provider component
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refreshTokenAndUpdateUser = async () => {
     try {
-      const storedRefreshToken = localStorage.getItem('refreshToken');
-      if (!storedRefreshToken) {
-        throw new Error('No refresh token available');
+      // Call refresh endpoint without sending the token (it will be sent via cookies)
+      const response = await api.post<AuthResponse>('/api/auth/refresh', {});
+      
+      // After successful token refresh, check token validity to get user info
+      const response2 = await api.get<TokenCheckResponse>('/api/auth/check-token');
+      
+      if (response2.data.valid && response2.data.user) {
+        const userData = response2.data.user;
+        setUser({
+          id: userData.id,
+          email: userData.email,
+          isAdmin: userData.isAdmin
+        });
+        setIsAuthenticated(true);
+        setIsAdmin(userData.isAdmin);
       }
-
-      const response = await api.post<AuthResponse>('/api/auth/refresh', { refreshToken: storedRefreshToken });
-      const { data } = response;
-
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('refreshToken', data.refreshToken);
-
-      const decoded = jwtDecode(data.token) as any;
-      setUser({
-        id: decoded.id,
-        username: decoded.email.split('@')[0],
-        role: decoded.isAdmin ? 'admin' : 'user',
-        token: data.token,
-        refreshToken: data.refreshToken
-      });
     } catch (error) {
       console.error('Token refresh failed:', error);
-      logout();
-      throw error;
+      setUser(null);
+      setIsAuthenticated(false);
+      setIsAdmin(false);
     }
   };
 
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (token) {
-          const decoded = jwtDecode(token) as any;
-          if (decoded.exp && decoded.exp * 1000 > Date.now()) {
-            setUser({
-              id: decoded.id,
-              username: decoded.email.split('@')[0],
-              role: decoded.isAdmin ? 'admin' : 'user',
-              token
-            });
-          } else {
-            // Token expired, try to refresh
-            await refreshTokenAndUpdateUser();
-          }
+        // Check if user is authenticated by validating the token with the server
+        const response = await api.get<TokenCheckResponse>('/api/auth/check-token');
+        
+        if (response.data.valid && response.data.user) {
+          const userData = response.data.user;
+          
+          setUser({
+            id: userData.id,
+            email: userData.email,
+            isAdmin: userData.isAdmin
+          });
+          setIsAuthenticated(true);
+          setIsAdmin(userData.isAdmin);
+        } else {
+          // Try to refresh the token if the current one is invalid
+          await refreshTokenAndUpdateUser();
         }
       } catch (error) {
         console.error('Auth initialization failed:', error);
-        // Clear any invalid tokens
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
+        // No need to clear localStorage tokens as we're using HTTP-only cookies now
       } finally {
         setIsLoading(false);
       }
@@ -101,73 +121,91 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializeAuth();
   }, []);
 
-  const login = async (userData: User): Promise<void> => {
+  const login = async (email: string, password: string): Promise<void> => {
+    setError(null);
     try {
-      // Validate token format
-      const decoded = jwtDecode(userData.token) as any;
-      if (!decoded || !decoded.id || !decoded.email) {
-        throw new Error('Invalid token format');
-      }
-
-      console.log('AuthContext Login:', {
-        userId: userData.id,
-        username: userData.username,
-        role: userData.role,
-        tokenLength: userData.token.length,
-        tokenFirstChars: userData.token.substring(0, 10)
-      });
-
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('token', userData.token);
-      localStorage.setItem('refreshToken', userData.refreshToken);
+      await api.post<AuthResponse>('/api/auth/login', { email, password });
       
-      // Additional verification logging
-      const storedUser = localStorage.getItem('user');
-      const storedToken = localStorage.getItem('token');
-      console.log('Storage Verification:', {
-        userStored: !!storedUser,
-        tokenStored: !!storedToken,
-        storedTokenLength: storedToken?.length
-      });
+      // After successful login, check token validity to get user info
+      const response = await api.get<TokenCheckResponse>('/api/auth/check-token');
+      
+      if (response.data.valid && response.data.user) {
+        const userData = response.data.user;
+        setUser({
+          id: userData.id,
+          email: userData.email,
+          isAdmin: userData.isAdmin
+        });
+        setIsAuthenticated(true);
+        setIsAdmin(userData.isAdmin);
+      }
     } catch (error) {
-      console.error('Token validation failed:', error);
-      throw error;
+      handleApiError(error, 'Login failed');
     }
   };
 
-  const logout = () => {
-    console.log('AuthContext Logout:', {
-      currentUser: user?.username
-    });
-
-    setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    
-    // Verification logging
-    const storedUser = localStorage.getItem('user');
-    const storedToken = localStorage.getItem('token');
-    console.log('Logout Verification:', {
-      userRemoved: !storedUser,
-      tokenRemoved: !storedToken
-    });
+  const register = async (userData: RegisterData): Promise<void> => {
+    setError(null);
+    try {
+      await api.post<AuthResponse>('/api/auth/register', userData);
+      
+      // After successful registration, check token validity to get user info
+      const response = await api.get<TokenCheckResponse>('/api/auth/check-token');
+      
+      if (response.data.valid && response.data.user) {
+        const userData = response.data.user;
+        setUser({
+          id: userData.id,
+          email: userData.email,
+          isAdmin: userData.isAdmin
+        });
+        setIsAuthenticated(true);
+        setIsAdmin(userData.isAdmin);
+      }
+    } catch (error) {
+      handleApiError(error, 'Registration failed');
+    }
   };
 
-  const isAdmin = () => {
-    return user?.role === 'admin';
+  const logout = async (): Promise<void> => {
+    setError(null);
+    try {
+      await api.post('/api/auth/logout');
+      setUser(null);
+      setIsAuthenticated(false);
+      setIsAdmin(false);
+    } catch (error) {
+      // Even if the server call fails, we still want to clear the local state
+      console.error('Logout error:', error);
+      setUser(null);
+      setIsAuthenticated(false);
+      setIsAdmin(false);
+    }
+  };
+
+  const clearError = () => {
+    setError(null);
+  };
+
+  const handleApiError = (error: any, message: string) => {
+    setError(message);
+    console.error(message, error);
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isLoading, 
-      login, 
-      logout, 
-      isAdmin,
-      refreshToken: refreshTokenAndUpdateUser 
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated,
+        isAdmin,
+        isLoading,
+        login,
+        register,
+        logout,
+        error,
+        clearError
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
