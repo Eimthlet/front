@@ -25,6 +25,21 @@ interface JwtPayload {
 }
 
 // Add these interfaces after the Question interface
+interface ApiError {
+  response?: {
+    status: number;
+    statusText: string;
+    data: {
+      error?: string;
+      message?: string;
+    };
+    headers?: Record<string, string>;
+  };
+  message: string;
+  name: string;
+  stack?: string;
+}
+
 interface QuestionsResponse {
   questions: Question[];
 }
@@ -75,7 +90,6 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     // Fetch questions when component mounts
     const fetchQuestions = async () => {
       try {
-        // Log the current token for debugging
         const token = localStorage.getItem('token');
         console.log('Fetching questions with token:', {
           exists: !!token,
@@ -84,23 +98,23 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
         });
 
         const response = await api.get<QuestionsResponse>('/questions');
-        const typedResponse = response.data as QuestionsResponse;
-        setQuestions(typedResponse.questions);
+        setQuestions(response.data.questions);
         setIsLoading(false);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching questions:', {
-          status: err.response?.status,
-          statusText: err.response?.statusText,
-          data: err.response?.data,
-          headers: err.response?.headers
+          status: (err as ApiError).response?.status,
+          statusText: (err as ApiError).response?.statusText,
+          data: (err as ApiError).response?.data,
+          headers: (err as ApiError).response?.headers
         });
 
-        if (err.response?.status === 401) {
+        const apiError = err as ApiError;
+        if (apiError.response?.status === 401) {
           setError('Unauthorized: Please log in as an admin. Your session may have expired.');
-        } else if (err.response?.status === 403) {
+        } else if (apiError.response?.status === 403) {
           setError('Forbidden: Admin access required. Your account does not have admin privileges.');
         } else {
-          setError(`Failed to fetch questions: ${err.response?.data?.error || err.message}`);
+          setError(`Failed to fetch questions: ${apiError.response?.data?.error || apiError.message}`);
         }
         setIsLoading(false);
       }
@@ -118,20 +132,21 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       setSuccess('Question deleted successfully');
       
       setTimeout(() => setSuccess(''), 3000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error deleting question:', {
         questionId,
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        data: err.response?.data
+        status: (err as ApiError).response?.status,
+        statusText: (err as ApiError).response?.statusText,
+        data: (err as ApiError).response?.data
       });
       
-      if (err.response?.status === 401) {
+      const apiError = err as ApiError;
+      if (apiError.response?.status === 401) {
         setError('Unauthorized: Please log in again as admin');
-      } else if (err.response?.status === 403) {
+      } else if (apiError.response?.status === 403) {
         setError('Forbidden: Admin access required');
       } else {
-        setError(`Failed to delete question: ${err.response?.data?.error || err.message}`);
+        setError(`Failed to delete question: ${apiError.response?.data?.error || apiError.message}`);
       }
       
       setTimeout(() => setError(''), 3000);
@@ -150,46 +165,45 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  try {
-    // Format the question data to match server expectations
-    const questionData = {
-      question: newQuestion.question,
-      options: newQuestion.options,
-      correct_answer: newQuestion.correctAnswer,
-      category: newQuestion.category,
-      difficulty: newQuestion.difficulty,
-      time_limit: newQuestion.timeLimit
-    };
+    e.preventDefault();
+    try {
+      const questionData = {
+        question: newQuestion.question,
+        options: newQuestion.options,
+        correct_answer: newQuestion.correctAnswer,
+        category: newQuestion.category,
+        difficulty: newQuestion.difficulty,
+        time_limit: newQuestion.timeLimit
+      };
 
-    console.log('Submitting question:', questionData);
-    
-    const response = await api.post<QuestionResponse>('/api/admin/questions', questionData);
-    const typedResponse = response.data as QuestionResponse;
-    setQuestions(prevQuestions => [...prevQuestions, typedResponse.question]);
-    
-    // Reset form
-    setNewQuestion({
-      question: '',
-      options: ['', '', '', ''],
-      correctAnswer: '',
-      timeLimit: 30,
-      category: '',
-      difficulty: 'easy'
-    });
-    
-    setSuccess('Question added successfully');
-    
-    // Clear success message after 3 seconds
-    setTimeout(() => setSuccess(''), 3000);
-  } catch (err: any) {
-    console.error('Error adding question:', err);
-    setError(err.response?.data?.error || err.message || 'Failed to add question');
-    
-    // Clear error message after 3 seconds
-    setTimeout(() => setError(''), 3000);
-  }
-};
+      console.log('Submitting question:', questionData);
+      
+      const response = await api.post<QuestionResponse>('/api/admin/questions', questionData);
+      setQuestions(prevQuestions => [...prevQuestions, response.data.question]);
+      
+      // Reset form
+      setNewQuestion({
+        question: '',
+        options: ['', '', '', ''],
+        correctAnswer: '',
+        timeLimit: 30,
+        category: '',
+        difficulty: 'easy'
+      });
+      
+      setSuccess('Question added successfully');
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: unknown) {
+      console.error('Error adding question:', err);
+      const apiError = err as ApiError;
+      setError(apiError.response?.data?.error || apiError.message || 'Failed to add question');
+      
+      // Clear error message after 3 seconds
+      setTimeout(() => setError(''), 3000);
+    }
+  };
 
   return (
     <Box sx={{ width: '100%' }}>

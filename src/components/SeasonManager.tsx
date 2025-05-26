@@ -68,6 +68,26 @@ interface QualifiedUser {
   completed_at: string;
 }
 
+interface ApiError {
+  response?: {
+    status: number;
+    data: {
+      message?: string;
+      error?: string;
+    };
+  };
+  message: string;
+  config?: {
+    url?: string;
+    method?: string;
+    data?: unknown;
+  };
+}
+
+interface SeasonsResponse {
+  data: Season[];
+}
+
 interface SeasonManagerProps {}
 
 const SeasonManager: React.FC<SeasonManagerProps> = () => {
@@ -107,7 +127,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
         throw new Error('No authentication token found');
       }
       
-      const response = await api.get('/admin/seasons', {
+      const response = await api.get<SeasonsResponse>('/admin/seasons', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -115,19 +135,20 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
         }
       });
       
-      setSeasons(response.data);
+      setSeasons(response.data.data);
       setError(null);
-      return response.data;
-    } catch (err: any) {
+      return response.data.data;
+    } catch (err: unknown) {
       console.error('Error fetching seasons:', {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status
+        message: (err as ApiError).message,
+        response: (err as ApiError).response?.data,
+        status: (err as ApiError).response?.status
       });
       
-      const errorMessage = err.response?.data?.message || 
-                         err.response?.data?.error || 
-                         err.message || 
+      const apiError = err as ApiError;
+      const errorMessage = apiError.response?.data?.message || 
+                         apiError.response?.data?.error || 
+                         apiError.message || 
                          'Failed to load seasons';
       
       setError(errorMessage);
@@ -256,21 +277,22 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
         setOpenDialog(false);
         setError(null);
         
-      } catch (requestError: any) {
+      } catch (requestError: unknown) {
         console.error('API Request Error:', {
-          message: requestError.message,
-          response: requestError.response?.data,
-          status: requestError.response?.status,
+          message: (requestError as ApiError).message,
+          response: (requestError as ApiError).response?.data,
+          status: (requestError as ApiError).response?.status,
           config: {
-            url: requestError.config?.url,
-            method: requestError.config?.method,
-            data: requestError.config?.data
+            url: (requestError as ApiError).config?.url,
+            method: (requestError as ApiError).config?.method,
+            data: (requestError as ApiError).config?.data
           }
         });
         
-        const errorMessage = requestError.response?.data?.message || 
-                           requestError.response?.data?.error || 
-                           requestError.message || 
+        const apiError = requestError as ApiError;
+        const errorMessage = apiError.response?.data?.message || 
+                           apiError.response?.data?.error || 
+                           apiError.message || 
                            'Failed to submit season';
         
         setError(errorMessage);
@@ -322,20 +344,21 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
       // Refresh seasons
       await fetchSeasons();
       setError(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error deleting season:', {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status,
+        message: (err as ApiError).message,
+        response: (err as ApiError).response?.data,
+        status: (err as ApiError).response?.status,
         config: {
-          url: err.config?.url,
-          method: err.config?.method
+          url: (err as ApiError).config?.url,
+          method: (err as ApiError).config?.method
         }
       });
       
-      const errorMessage = err.response?.data?.message || 
-                         err.response?.data?.error || 
-                         err.message || 
+      const apiError = err as ApiError;
+      const errorMessage = apiError.response?.data?.message || 
+                         apiError.response?.data?.error || 
+                         apiError.message || 
                          'Failed to delete season';
       
       setError(errorMessage);

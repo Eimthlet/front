@@ -30,9 +30,25 @@ interface InsightsStats {
   nonAdminUsers: NonAdminUser[];
 }
 
+interface ApiError {
+  response?: {
+    status: number;
+    data: {
+      error?: string;
+      details?: string;
+    };
+  };
+  message: string;
+}
+
+interface ErrorState {
+  message: string;
+  details?: string;
+}
+
 const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<InsightsStats | null>(null);
-  const [error, setError] = useState<{ message: string; details?: string } | null>(null);
+  const [error, setError] = useState<ErrorState | null>(null);
   const [activeSection, setActiveSection] = useState<'insights' | 'overview' | 'users' | 'seasons'>('overview');
 
   const [isLoading, setIsLoading] = useState(true);
@@ -82,21 +98,22 @@ useEffect(() => {
       };
       
       setStats(calculatedStats);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Dashboard data fetch error:', err);
 
-      const errorMessage = err.response?.data?.error || 
-        err.message || 
+      const apiError = err as ApiError;
+      const errorMessage = apiError.response?.data?.error || 
+        apiError.message || 
         'Failed to load dashboard data';
 
       setError({
         message: errorMessage,
-        details: err.response?.data?.details
+        details: apiError.response?.data?.details
       });
 
       // Handle specific error scenarios
-      if (err.response) {
-        switch (err.response.status) {
+      if (apiError.response) {
+        switch (apiError.response.status) {
           case 401:
             window.location.href = '/login';
             break;

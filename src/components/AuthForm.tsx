@@ -19,9 +19,44 @@ interface JwtPayload {
   exp?: number;
 }
 
+interface PayChanguConfig {
+  public_key: string;
+  tx_ref: string;
+  amount: number;
+  currency: string;
+  callback_url: string;
+  return_url: string;
+  customer: {
+    email: string;
+    first_name: string;
+    last_name: string;
+  };
+  customization: {
+    title: string;
+    description: string;
+    logo?: string;
+  };
+  meta: {
+    uuid: string;
+    response: string;
+  };
+}
+
+interface User {
+  id: number;
+  username: string;
+  role: string;
+}
+
+interface LoginResponse {
+  user: User;
+  token: string;
+  refreshToken: string;
+}
+
 const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
   // Wait for PayChangu script to load before calling the popup
-  function waitForPayChanguAndLaunch(config: any, setError: (msg: string) => void, setLoading: (loading: boolean) => void, retries = 10) {
+  function waitForPayChanguAndLaunch(config: PayChanguConfig, setError: (msg: string) => void, setLoading: (loading: boolean) => void, retries = 10) {
     if (window.PaychanguCheckout) {
       window.PaychanguCheckout(config);
     } else if (retries > 0) {
@@ -162,7 +197,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
 
     // Login flow
     try {
-      const response = await api.post<{ user: any; token: string; refreshToken: string }>('/auth/login', { email, password });
+      const response = await api.post<LoginResponse>('/auth/login', { email, password });
       const { user, token, refreshToken } = response.data;
       
       localStorage.setItem('token', token);
