@@ -102,15 +102,30 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       try {
         setIsLoading(true);
         const response = await api.get<QuestionsResponse>('/admin/questions');
-        setQuestions(response.data.data.questions);
+        
+        // Check if response.data exists and has a data property
+        if (response?.data?.data?.questions) {
+          setQuestions(response.data.data.questions);
+        } else if (Array.isArray(response?.data)) {
+          // Handle case where the response is directly the questions array
+          setQuestions(response.data);
+        } else {
+          console.warn('Unexpected response format:', response);
+          setQuestions([]);
+        }
+        
         setError(null);
       } catch (err: unknown) {
         console.error('Error fetching questions:', err);
         const apiError = err as ApiError;
         setError({ 
-          message: apiError.response?.data?.error || apiError.message,
+          message: apiError.response?.data?.error || 
+                 apiError.response?.data?.message || 
+                 apiError.message ||
+                 'Failed to fetch questions',
           details: apiError.response?.data?.details
         });
+        setQuestions([]); // Ensure questions is set to empty array on error
       } finally {
         setIsLoading(false);
       }
