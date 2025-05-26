@@ -14,8 +14,15 @@ import { useAuth } from './contexts/AuthContext';
 import api from './utils/api';
 import { Question } from './types';
 
-interface QuestionsResponse {
-  questions: Question[];
+interface ApiQuestion {
+  id: number;
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  explanation?: string;
+  category?: string;
+  difficulty?: string;
+  timeLimit?: number;
 }
 
 const App: React.FC = () => {
@@ -66,8 +73,16 @@ const App: React.FC = () => {
         
         // Only fetch questions if user is qualified or hasn't attempted yet
         if (!qualificationData.hasAttempted || qualificationData.isQualified) {
-          const response = await api.get<{ data: QuestionsResponse }>('/questions');
-          setQuestions(response.data.data.questions);
+          const response = await api.get<{ data: { questions: ApiQuestion[] } }>('/questions');
+
+          // Convert numeric IDs to strings
+          const convertedQuestions = response.data.data.questions.map(q => ({
+            ...q,
+            id: q.id.toString(),
+            correctAnswer: q.correctAnswer.toString()
+          }));
+
+          setQuestions(convertedQuestions);
         }
       } catch (err: any) {
         console.error('Failed to fetch data:', err);
