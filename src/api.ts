@@ -1,7 +1,67 @@
 // This file is deprecated. Please use the axios-based client in src/utils/api.ts instead.
 // This file is kept for backward compatibility only and will be removed in a future version.
 
+import axios from 'axios';
+
 const API_BASE = 'https://car-quizz.onrender.com';
+const API_TIMEOUT = 30000; // 30 seconds timeout
+
+// Create axios instance with default config
+const api = axios.create({
+  baseURL: API_BASE,
+  timeout: API_TIMEOUT,
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  xsrfCookieName: 'accessToken',
+  xsrfHeaderName: 'X-CSRF-Token'
+});
+
+// Request interceptor for logging
+api.interceptors.request.use(
+  (config) => {
+    console.log('API Request Interceptor:', {
+      url: config.url,
+      method: config.method,
+      tokenExists: !!localStorage.getItem('token'),
+      tokenLength: localStorage.getItem('token')?.length,
+      tokenFirstChars: localStorage.getItem('token')?.substring(0, 10),
+      refreshTokenExists: !!localStorage.getItem('refreshToken'),
+      headers: config.headers
+    });
+    return config;
+  },
+  (error) => {
+    console.error('API Request Error:', error);
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for logging and error handling
+api.interceptors.response.use(
+  (response) => {
+    console.log('API Response:', {
+      url: response.config.url,
+      method: response.config.method,
+      status: response.status,
+      data: response.data
+    });
+    return response;
+  },
+  (error) => {
+    console.error('API Response Error:', {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      data: error.response?.data,
+      error: error.message,
+      errorName: error.name,
+      errorMessage: error.message
+    });
+    return Promise.reject(error);
+  }
+);
 
 export interface User {
   id: number;
@@ -26,9 +86,14 @@ export async function login(email: string, password: string): Promise<AuthRespon
   try {
     const response = await fetch(`${API_BASE}/api/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Cookie': 'accessToken=; SameSite=Strict; Secure; Partitioned',
+        'Cookie': 'refreshToken=; SameSite=Strict; Secure; Partitioned'
+      },
       body: JSON.stringify({ email, password }),
-      credentials: 'include'
+      credentials: 'include',
+      signal: AbortSignal.timeout(API_TIMEOUT)
     });
     
     const data = await response.json();
@@ -39,6 +104,9 @@ export async function login(email: string, password: string): Promise<AuthRespon
     
     return data;
   } catch (error: any) {
+    if (error.name === 'AbortError') {
+      throw new Error('Request timed out. Please check your internet connection.');
+    }
     if (error.message) {
       throw new Error(error.message);
     }
@@ -124,7 +192,7 @@ export interface Question {
 
 export async function addQuestion(question: Question): Promise<Question> {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_BASE}/admin/questions`, {
+  const response = await fetch(`${API_BASE}/api/admin/questions`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -226,9 +294,4 @@ export async function fetchQuestions() {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'Failed to fetch questions');
-  }
-
-  const data = await response.json();
-  return data.questions;
-}
+    throw new Error(error.error || 'Failed to fetch questi

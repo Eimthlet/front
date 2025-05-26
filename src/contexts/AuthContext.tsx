@@ -1,6 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import { refreshToken as refreshTokenApi } from '../api';
+import { api } from '../utils/api';
+
+// Define types
+interface AuthResponse {
+  token: string;
+  refreshToken: string;
+}
+
+// Define types
+interface AuthResponse {
+  token: string;
+  refreshToken: string;
+}
 
 // Define the shape of the user
 interface User {
@@ -8,6 +20,41 @@ interface User {
   username: string;
   role: 'admin' | 'user';
   token: string;
+  refreshToken: string;
+}
+
+// Define the context type
+interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  login: (userData: User) => Promise<void>;
+  logout: () => void;
+  isAdmin: () => boolean;
+  refreshToken: () => Promise<void>;
+interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  login: (userData: User) => Promise<void>;
+  logout: () => void;
+  isAdmin: () => boolean;
+  refreshToken: () => Promise<void>;
+}
+
+// Define the shape of the user
+interface User {
+  id: number;
+  username: string;
+  role: 'admin' | 'user';
+  token: string;
+  refreshToken: string;
+}
+
+// Define JWT payload type
+interface JwtPayload {
+  id: number;
+  email: string;
+  isAdmin?: boolean;
+  exp?: number;
 }
 
 // Define the context type
@@ -35,18 +82,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('No refresh token available');
       }
 
-      const response = await refreshTokenApi(storedRefreshToken);
-      const { token, refreshToken: newRefreshToken } = response;
+      const response = await api.post<AuthResponse>('/auth/refresh-token', { refreshToken: storedRefreshToken });
+      const { data } = response;
 
-      localStorage.setItem('token', token);
-      localStorage.setItem('refreshToken', newRefreshToken);
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('refreshToken', data.refreshToken);
 
-      const decoded = jwtDecode(token) as any;
+      const decoded = jwtDecode(data.token) as any;
       setUser({
         id: decoded.id,
         username: decoded.email.split('@')[0],
         role: decoded.isAdmin ? 'admin' : 'user',
-        token
+        token: data.token,
+        refreshToken: data.refreshToken
       });
     } catch (error) {
       console.error('Token refresh failed:', error);
@@ -86,27 +134,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializeAuth();
   }, []);
 
-  const login = (userData: User) => {
-    console.log('AuthContext Login:', {
-      userId: userData.id,
-      username: userData.username,
-      role: userData.role,
-      tokenLength: userData.token.length,
-      tokenFirstChars: userData.token.substring(0, 10)
-    });
+  const login = async (userData: User): Promise<void> => {
+    try {
+      // Validate token format
+      const decoded = jwtDecode(userData.token) as any;
+      if (!decoded || !decoded.id || !decoded.email) {
+        throw new Error('Invalid token format');
+      }
 
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('token', userData.token);
-    
-    // Additional verification logging
-    const storedUser = localStorage.getItem('user');
-    const storedToken = localStorage.getItem('token');
-    console.log('Storage Verification:', {
-      userStored: !!storedUser,
-      tokenStored: !!storedToken,
-      storedTokenLength: storedToken?.length
-    });
+      console.log('AuthContext Login:', {
+        userId: userData.id,
+        username: userData.username,
+        role: userData.role,
+        tokenLength: userData.token.length,
+        tokenFirstChars: userData.token.substring(0, 10)
+      });
+
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('token', userData.token);
+      localStorage.setItem('refreshToken', userData.refreshToken);
+      
+      // Additional verification logging
+      const storedUser = localStorage.getItem('user');
+      const storedToken = localStorage.getItem('token');
+      console.log('Storage Verification:', {
+        userStored: !!storedUser,
+        tokenStored: !!storedToken,
+        storedTokenLength: storedToken?.length
+      });
+    } catch (error) {
+      console.error('Token validation failed:', error);
+      throw error;
+    }
   };
 
   const logout = () => {

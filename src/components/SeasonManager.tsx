@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Box, 
   Typography, 
@@ -35,23 +35,23 @@ import CloseIcon from '@mui/icons-material/Close';
 import api from '../utils/api';
 
 interface Season {
-  id: number;
+  id?: string | number;
   name: string;
   description: string | null;
   start_date: string;
   end_date: string;
   is_active: boolean;
-  is_qualification_round: boolean;
-  minimum_score_percentage: number;
-  created_at: string;
-  updated_at: string;
-  question_count: number;
-  attempts_count: number;
-  qualified_users_count: number;
+  is_qualification_round?: boolean;
+  minimum_score_percentage?: number;
+  created_at?: string;
+  updated_at?: string;
+  question_count?: number;
+  attempts_count?: number;
+  qualified_users_count?: number;
 }
 
 interface Question {
-  id: number;
+  id?: number;
   question_text: string;
   options: string[];
   correct_answer: string;
@@ -68,13 +68,11 @@ interface QualifiedUser {
   completed_at: string;
 }
 
-const SeasonManager: React.FC = () => {
+interface SeasonManagerProps {}
+
+const SeasonManager: React.FC<SeasonManagerProps> = () => {
+  // Consolidated state management
   const [seasons, setSeasons] = useState<Season[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  const [openDialog, setOpenDialog] = useState(false);
-  const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [currentSeason, setCurrentSeason] = useState<Partial<Season>>({
     name: '',
     description: '',
@@ -84,53 +82,69 @@ const SeasonManager: React.FC = () => {
     is_qualification_round: false,
     minimum_score_percentage: 50
   });
-  
+  const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
+  const [openDialog, setOpenDialog] = useState(false);
   const [openQuestionsDialog, setOpenQuestionsDialog] = useState(false);
+  const [selectedSeasonId, setSelectedSeasonId] = useState<number | string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [currentQuestion, setCurrentQuestion] = useState<Omit<Question, 'id'>>({
+  const [currentQuestion, setCurrentQuestion] = useState<Question>({
     question_text: '',
     options: ['', '', '', ''],
     correct_answer: ''
   });
-  
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [openQualifiedUsersDialog, setOpenQualifiedUsersDialog] = useState(false);
   const [qualifiedUsers, setQualifiedUsers] = useState<QualifiedUser[]>([]);
-  const [selectedSeasonId, setSelectedSeasonId] = useState<number | null>(null);
-  
   const [tabValue, setTabValue] = useState(0);
-  
-  // Fetch seasons
-  const fetchSeasons = async () => {
+
+  // Fetch seasons on component mount
+  const fetchSeasons = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('Fetching seasons...');
       const token = localStorage.getItem('token');
-      console.log('Using token:', token ? 'Token exists' : 'No token found');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
       
       const response = await api.get('/admin/seasons', {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
       });
       
-      console.log('Seasons response:', response.data);
-      setSeasons(response.data as Season[]);
+      setSeasons(response.data);
       setError(null);
+      return response.data;
     } catch (err: any) {
       console.error('Error fetching seasons:', {
         message: err.message,
         response: err.response?.data,
         status: err.response?.status
       });
-      setError(err.response?.data?.message || err.message || 'Failed to load seasons');
+      
+      const errorMessage = err.response?.data?.message || 
+                         err.response?.data?.error || 
+                         err.message || 
+                         'Failed to load seasons';
+      
+      setError(errorMessage);
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchSeasons();
   }, []);
+  
+  useEffect(() => {
+    fetchSeasons().catch(console.error);
+  }, [fetchSeasons]);
+  
+  // Handle tab change
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
   
   // Handle dialog open/close
   const handleOpenDialog = (mode: 'create' | 'edit', season?: Season) => {
@@ -160,97 +174,180 @@ const SeasonManager: React.FC = () => {
   };
   
   // Handle season form changes
-  const handleSeasonChange = (field: string, value: any) => {
+  const handleSeasonChange = (field: keyof Season, value: any) => {
     setCurrentSeason(prev => ({
       ...prev,
       [field]: value
     }));
   };
   
-// Handle season form submission
-const handleSubmitSeason = async () => {
-  try {
-    // Ensure required fields are present
-    if (!currentSeason.name || !currentSeason.start_date || !currentSeason.end_date) {
-      throw new Error('Name, start date, and end date are required');
-    }
+  // Handle season form submission
+  const handleSubmitSeason = async () => {
+    if (!currentSeason) return;
+    
+    try {
+      // Log the raw currentSeason for debugging
+      console.log('Raw currentSeason:', JSON.parse(JSON.stringify(currentSeason)));
+      
+      // Ensure required fields are present
+      if (!currentSeason.name) throw new Error('Season name is required');
+      if (!currentSeason.start_date) throw new Error('Start date is required');
+      if (!currentSeason.end_date) throw new Error('End date is required');
 
-    // Format dates to ISO string without milliseconds
-    const formatDate = (date: Date | string): string => {
-      const d = new Date(date);
-      return d.toISOString().split('.')[0] + 'Z';
-    };
+      // Format dates to ISO string without milliseconds
+      const formatDate = (date: Date | string): string => {
+        try {
+          const d = new Date(date);
+          if (isNaN(d.getTime())) throw new Error('Invalid date');
+          return d.toISOString().split('.')[0] + 'Z';
+        } catch (e) {
+          console.error('Error formatting date:', { date, error: e });
+          throw new Error(`Invalid date format: ${date}`);
+        }
+      };
 
-    const seasonData = {
-      name: currentSeason.name,
-      description: currentSeason.description || '',
-      start_date: formatDate(currentSeason.start_date),
-      end_date: formatDate(currentSeason.end_date),
-      is_active: Boolean(currentSeason.is_active),
-      is_qualification_round: Boolean(currentSeason.is_qualification_round),
-      minimum_score_percentage: Number(currentSeason.minimum_score_percentage) || 50
-    };
+      const seasonData = {
+        name: currentSeason.name,
+        description: currentSeason.description || '',
+        start_date: formatDate(currentSeason.start_date),
+        end_date: formatDate(currentSeason.end_date),
+        is_active: Boolean(currentSeason.is_active),
+        is_qualification_round: Boolean(currentSeason.is_qualification_round),
+        minimum_score_percentage: Number(currentSeason.minimum_score_percentage) || 50
+      };
 
-    console.log('Submitting season data:', seasonData);
-    
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('No authentication token found');
+      console.log('Submitting season data:', JSON.stringify(seasonData, null, 2));
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+      
+      let response;
+      try {
+        if (dialogMode === 'create') {
+          response = await api.post('/admin/seasons', seasonData, { 
+            headers,
+            validateStatus: (status) => status < 500 // Don't throw on 4xx errors
+          });
+          console.log('Create season response:', response);
+        } else if (currentSeason.id) {
+          response = await api.put(`/admin/seasons/${currentSeason.id}`, seasonData, { 
+            headers,
+            validateStatus: (status) => status < 500
+          });
+          console.log('Update season response:', response);
+        } else {
+          throw new Error('Cannot update season: No season ID provided');
+        }
+        
+        if (response.status >= 400) {
+          throw new Error(response.data?.message || `Request failed with status ${response.status}`);
+        }
+        
+        // Refresh seasons
+        await fetchSeasons();
+        setOpenDialog(false);
+        setError(null);
+        
+      } catch (requestError: any) {
+        console.error('API Request Error:', {
+          message: requestError.message,
+          response: requestError.response?.data,
+          status: requestError.response?.status,
+          config: {
+            url: requestError.config?.url,
+            method: requestError.config?.method,
+            data: requestError.config?.data
+          }
+        });
+        
+        const errorMessage = requestError.response?.data?.message || 
+                           requestError.response?.data?.error || 
+                           requestError.message || 
+                           'Failed to submit season';
+        
+        setError(errorMessage);
+        throw new Error(errorMessage);
+      }
+    } catch (err: any) {
+      console.error('Error in handleSubmitSeason:', {
+        name: err.name,
+        message: err.message,
+        stack: err.stack,
+        ...(err.response && {
+          response: {
+            status: err.response.status,
+            statusText: err.response.statusText,
+            data: err.response.data
+          }
+        })
+      });
+      
+      // If we haven't set an error message yet, set a generic one
+      if (!error) {
+        setError(err.message || 'An unexpected error occurred');
+      }
     }
-    
-    const headers = {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    };
-    
-    if (dialogMode === 'create') {
-      await api.post('/admin/seasons', seasonData, { headers });
-    } else if (currentSeason.id) {
-      await api.put(`/admin/seasons/${currentSeason.id}`, seasonData, { headers });
-    } else {
-      throw new Error('Cannot update season: No season ID provided');
-    }
-    
-    // Refresh seasons
-    await fetchSeasons();
-    handleCloseDialog();
-  } catch (err: any) {
-    console.error('Error submitting season:', {
-      message: err.message,
-      response: err.response?.data,
-      status: err.response?.status
-    });
-    setError(err.response?.data?.message || err.message || 'Failed to submit season');
-  }
-};
+  };
 
   // Handle season deletion
-const handleDeleteSeason = async (id: number) => {
-  if (window.confirm('Are you sure you want to delete this season? This action cannot be undone.')) {
+  const handleDeleteSeason = async (id: number | string) => {
+    if (!window.confirm('Are you sure you want to delete this season? This action cannot be undone.')) {
+      return;
+    }
+    
     try {
+      setLoading(true);
       const token = localStorage.getItem('token');
- await api.delete(`/admin/seasons/${id}`, {
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      const numId = Number(id);
+      await api.delete(`/admin/seasons/${numId}`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
       });
       
       // Refresh seasons
       await fetchSeasons();
+      setError(null);
     } catch (err: any) {
       console.error('Error deleting season:', {
         message: err.message,
         response: err.response?.data,
-        status: err.response?.status
+        status: err.response?.status,
+        config: {
+          url: err.config?.url,
+          method: err.config?.method
+        }
       });
-      setError(err.response?.data?.error || err.message || 'Failed to delete season');
+      
+      const errorMessage = err.response?.data?.message || 
+                         err.response?.data?.error || 
+                         err.message || 
+                         'Failed to delete season';
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-  }
-};
-  
-  // Handle questions dialog
-  const handleOpenQuestionsDialog = async (seasonId: number) => {
-    setSelectedSeasonId(seasonId);
+  };
+
+  // Handle opening the questions dialog
+  const handleOpenQuestionsDialog = async (seasonId: number | string) => {
+    const numSeasonId = Number(seasonId);
+    setSelectedSeasonId(numSeasonId);
     setQuestions([]);
     setCurrentQuestion({
       question_text: '',
@@ -258,7 +355,7 @@ const handleDeleteSeason = async (id: number) => {
       correct_answer: ''
     });
     try {
- const response = await api.get<Question[]>(`/seasons/${seasonId}/questions`);
+      const response = await api.get<Question[]>(`/seasons/${numSeasonId}/questions`);
       setQuestions(response.data);
       setOpenQuestionsDialog(true);
     } catch (err: any) {
@@ -266,11 +363,12 @@ const handleDeleteSeason = async (id: number) => {
       setError(err.message || 'Failed to load questions');
     }
   };
-  
+
+  // Handle questions dialog
   const handleCloseQuestionsDialog = () => {
     setOpenQuestionsDialog(false);
   };
-  
+
   // Handle question form changes
   const handleQuestionChange = (field: string, value: any) => {
     setCurrentQuestion(prev => ({
@@ -278,7 +376,7 @@ const handleDeleteSeason = async (id: number) => {
       [field]: value
     }));
   };
-  
+
   const handleOptionChange = (index: number, value: string) => {
     setCurrentQuestion(prev => {
       const newOptions = [...prev.options];
@@ -289,7 +387,7 @@ const handleDeleteSeason = async (id: number) => {
       };
     });
   };
-  
+
   // Add question to list
   const handleAddQuestion = () => {
     if (!currentQuestion.question_text || !currentQuestion.correct_answer) {
@@ -298,7 +396,7 @@ const handleDeleteSeason = async (id: number) => {
     
     const tempQuestion: Question = {
       ...currentQuestion,
-      id: Math.floor(Math.random() * -1000000) // Use negative IDs for temporary questions
+      id: questions.length + 1  // Temporary id generation
     };
     
     setQuestions(prev => [...prev, tempQuestion]);
@@ -310,18 +408,18 @@ const handleDeleteSeason = async (id: number) => {
       difficulty: undefined
     });
   };
-  
+
   // Remove question from list
   const handleRemoveQuestion = (index: number) => {
     setQuestions(prev => prev.filter((_, i) => i !== index));
   };
-  
+
   // Submit questions
   const handleSubmitQuestions = async () => {
     if (!selectedSeasonId) return;
     
     try {
- await api.post(`/seasons/${selectedSeasonId}/questions`, {
+      await api.post(`/seasons/${selectedSeasonId}/questions`, {
         questions: questions.map(q => q.id)
       });
       
@@ -332,12 +430,13 @@ const handleDeleteSeason = async (id: number) => {
       setError(err.message || 'Failed to add questions');
     }
   };
-  
+
   // Handle qualified users dialog
-  const handleOpenQualifiedUsersDialog = async (seasonId: number) => {
-    setSelectedSeasonId(seasonId);
+  const handleOpenQualifiedUsersDialog = async (seasonId: number | string) => {
+    const numSeasonId = Number(seasonId);
+    setSelectedSeasonId(numSeasonId);
     try {
- const response = await api.get<QualifiedUser[]>(`/seasons/${seasonId}/qualified-users`);
+      const response = await api.get<QualifiedUser[]>(`/seasons/${numSeasonId}/qualified-users`);
       setQualifiedUsers(response.data);
       setOpenQualifiedUsersDialog(true);
     } catch (err: any) {
@@ -345,16 +444,11 @@ const handleDeleteSeason = async (id: number) => {
       setError(err.message || 'Failed to load qualified users');
     }
   };
-  
+
   const handleCloseQualifiedUsersDialog = () => {
     setOpenQualifiedUsersDialog(false);
   };
-  
-  // Handle tab change
-  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
-  
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
@@ -362,7 +456,7 @@ const handleDeleteSeason = async (id: number) => {
       </Box>
     );
   }
-  
+
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -469,11 +563,11 @@ const handleDeleteSeason = async (id: number) => {
                         <IconButton 
                           size="small" 
                           color="error" 
-                        onClick={() => {
-  if (typeof season.id === 'number') {
-    handleDeleteSeason(season.id);
-  }
-}}
+                          onClick={() => {
+                            if (typeof season.id === 'number') {
+                              handleDeleteSeason(season.id);
+                            }
+                          }}
                         >
                           <DeleteIcon fontSize="small" />
                         </IconButton>
@@ -605,7 +699,7 @@ const handleDeleteSeason = async (id: number) => {
             
             <TextField 
               label="Question Text"
-              value={currentQuestion.question_text}
+              value={currentQuestion.question_text || ''}
               onChange={(e) => handleQuestionChange('question_text', e.target.value)}
               fullWidth
               required
@@ -628,7 +722,7 @@ const handleDeleteSeason = async (id: number) => {
             
             <TextField 
               label="Correct Answer"
-              value={currentQuestion.correct_answer}
+              value={currentQuestion.correct_answer || ''}
               onChange={(e) => handleQuestionChange('correct_answer', e.target.value)}
               fullWidth
               required

@@ -17,7 +17,8 @@ import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import LoginIcon from '@mui/icons-material/Login';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { useAuth } from '../contexts/AuthContext';
-import QuizIcon from '@mui/icons-material/Quiz';
+// Using HelpOutline icon as a fallback
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import LeaderboardIcon from '@mui/icons-material/Leaderboard';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -91,27 +92,27 @@ const Navigation: React.FC = () => {
       return null;
     }
     
-if (isAdmin()) {
-  return (
-    <>
-      <Button
-        color="inherit"
-        onClick={() => navigate('/admin')}
-        startIcon={<AdminPanelSettingsIcon />}
-        sx={{ mr: 2 }}
-      >
-        Admin
-      </Button>
-      <Button
-        color="inherit"
-        onClick={() => navigate('/dashboard')}
-        startIcon={<DashboardIcon />}
-      >
-        Dashboard
-      </Button>
-    </>
-  );
-}
+    if (isAdmin()) {
+      return (
+        <>
+          <Button
+            color="inherit"
+            onClick={() => navigate('/admin')}
+            startIcon={<AdminPanelSettingsIcon />}
+            sx={{ mr: 2 }}
+          >
+            Admin
+          </Button>
+          <Button
+            color="inherit"
+            onClick={() => navigate('/dashboard')}
+            startIcon={<DashboardIcon />}
+          >
+            Dashboard
+          </Button>
+        </>
+      );
+    }
     return null;
   };
 
@@ -146,112 +147,4 @@ if (isAdmin()) {
               <DashboardIcon sx={{ mr: 1 }} /> Dashboard
             </MenuItem>
             <MenuItem onClick={handleLogout}>
-              <PowerSettingsNewIcon sx={{ mr: 1 }} /> Logout
-            </MenuItem>
-          </>
-        ) : (
-          <>
-            <MenuItem onClick={() => handleNavigation('/quiz')}>
-              <QuizIcon sx={{ mr: 1 }} /> Quiz
-            </MenuItem>
-            <MenuItem onClick={() => handleNavigation('/leaderboard')}>
-              <LeaderboardIcon sx={{ mr: 1 }} /> Leaderboard
-            </MenuItem>
-            <MenuItem onClick={handleLogout}>
-              <PowerSettingsNewIcon sx={{ mr: 1 }} /> Logout
-            </MenuItem>
-          </>
-        )
-      ) : (
-        <>
-          <MenuItem onClick={() => handleNavigation('/')}>
-            <HomeIcon sx={{ mr: 1 }} /> Home
-          </MenuItem>
-        </>
-      )}
-    </Menu>
-  );
-
-  return (
-    <StyledAppBar position="fixed">
-      <Toolbar sx={{ 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        minHeight: { xs: '64px', sm: '70px' },
-        px: { xs: 2, sm: 3, md: 4 }
-      }}>
-        <Typography 
-          variant="h6" 
-          component="div" 
-          onClick={() => navigate('/')}
-          sx={{ 
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: { xs: '1.25rem', sm: '1.5rem' },
-            color: '#fff',
-          }}
-        >
-          Car Quiz
-        </Typography>
-
-        {isMobile ? (
-          <>
-            <IconButton
-              edge="end"
-              color="inherit"
-              aria-label="menu"
-              onClick={handleMenu}
-              sx={{ 
-                ml: 2,
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                }
-              }}
-            >
-              <MenuIcon />
-            </IconButton>
-            {renderMobileMenu()}
-          </>
-        ) : (
-          <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
-            {renderNavButtons()}
-            {user ? (
-              <Tooltip title="Logout">
-                <IconButton
-                  onClick={handleLogout}
-                  sx={{
-                    color: '#fff',
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    '&:hover': { 
-                      backgroundColor: 'rgba(255, 255, 255, 0.15)'
-                    }
-                  }}
-                >
-                  <PowerSettingsNewIcon />
-                </IconButton>
-              </Tooltip>
-            ) : (
-              <>
-                <NavButton
-                  onClick={() => navigate('/login')}
-                  startIcon={<LoginIcon />}
-                >
-                  Login
-                </NavButton>
-                <NavButton
-                  onClick={() => navigate('/register')}
-                  startIcon={<LoginIcon />}
-                >
-                  Register
-                </NavButton>
-              </>
-            )}
-          </Box>
-        )}
-      </Toolbar>
-    </StyledAppBar>
-  );
-};
-
-export default Navigation;
+              <PowerSettingsNewIcon sx={{ mr: 1 }} /
