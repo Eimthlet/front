@@ -254,11 +254,15 @@ const App: React.FC = () => {
 
             {/* Default routes */}
             <Route path="/" element={
-              user ? <Navigate to="/leaderboard" replace /> : <Navigate to="/login" replace />
+              !user ? <Navigate to="/login" replace /> :
+              isAdmin ? <Navigate to="/admin" replace /> :
+              <Navigate to="/leaderboard" replace />
             } />
             
             <Route path="*" element={
-              user ? <Navigate to="/leaderboard" replace /> : <Navigate to="/login" replace />
+              !user ? <Navigate to="/login" replace /> :
+              isAdmin ? <Navigate to="/admin" replace /> :
+              <Navigate to="/leaderboard" replace />
             } />
           </Routes>
         </Box>

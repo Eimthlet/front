@@ -121,8 +121,20 @@ const Navigation: React.FC = () => {
           </Button>
         </>
       );
+    } else {
+      return (
+        <>
+          <Button
+            color="inherit"
+            onClick={() => navigate('/leaderboard')}
+            startIcon={<LeaderboardIcon />}
+            sx={{ mr: 2 }}
+          >
+            Leaderboard
+          </Button>
+        </>
+      );
     }
-    return null;
   };
 
   const renderMobileMenu = () => (
@@ -163,9 +175,14 @@ const Navigation: React.FC = () => {
             </MenuItem>
           </>
         ) : (
-          <MenuItem onClick={handleLogout}>
-            <PowerSettingsNewIcon sx={{ mr: 1 }} /> Logout
-          </MenuItem>
+          <>
+            <MenuItem onClick={() => handleNavigation('/leaderboard')}>
+              <LeaderboardIcon sx={{ mr: 1 }} /> Leaderboard
+            </MenuItem>
+            <MenuItem onClick={handleLogout}>
+              <PowerSettingsNewIcon sx={{ mr: 1 }} /> Logout
+            </MenuItem>
+          </>
         )
       ) : (
         <MenuItem onClick={() => handleNavigation('/login')}>
