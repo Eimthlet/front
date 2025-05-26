@@ -229,8 +229,8 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     const questionData = {
       question: newQuestion.question,
       options: newQuestion.options,
-      correct_answer: newQuestion.correctAnswer,
-      time_limit: newQuestion.timeLimit,
+      correctAnswer: newQuestion.correctAnswer,  // Changed from correct_answer to correctAnswer to match server expectations
+      timeLimit: newQuestion.timeLimit,          // Changed from time_limit to timeLimit to match server expectations
       category: newQuestion.category,
       difficulty: newQuestion.difficulty,
       season_id: selectedSeasonId
@@ -375,6 +375,8 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                         newOptions[index] = e.target.value;
                         setNewQuestion({ ...newQuestion, options: newOptions });
                       }}
+                      sx={{ mb: 2 }} /* Added margin bottom for spacing between options */
+                      required={index === 0 || index === 1} /* First two options are required */
                     />
                   ))}
                 </Box>
