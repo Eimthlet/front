@@ -46,6 +46,31 @@ interface ErrorState {
   details?: string;
 }
 
+interface DashboardResponse {
+  data: {
+    averageScore: number;
+    mostPlayedGame: string;
+    leastPlayedGame: string;
+    insights: Array<{
+      id: string;
+      username: string;
+      insight: string;
+      average_score: number;
+      total_games: number;
+    }>;
+    totalUsers: number;
+    nonAdminUsers: Array<{
+      id: string;
+      username: string;
+      email: string;
+      average_score: number;
+      total_games: number;
+      highest_score: number;
+      lowest_score: number;
+    }>;
+  };
+}
+
 const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<InsightsStats | null>(null);
   const [error, setError] = useState<ErrorState | null>(null);
@@ -127,7 +152,23 @@ useEffect(() => {
     }
   };
 
+  const fetchDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get<DashboardResponse>('/admin/dashboard');
+      setStats(response.data.data);
+      setError(null);
+    } catch (err: unknown) {
+      console.error('Error fetching dashboard data:', err);
+      const apiError = err as ApiError;
+      setError({ message: apiError.response?.data?.error || apiError.message });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   fetchUserData();
+  fetchDashboardData();
 }, []);
 
   return (

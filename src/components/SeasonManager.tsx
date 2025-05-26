@@ -131,7 +131,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
     try {
       setLoading(true);
       const response = await api.get<SeasonsResponse>('/admin/seasons');
-      setSeasons(response.data);
+      setSeasons(response.data.data);
       setError(null);
     } catch (err: unknown) {
       console.error('Error fetching seasons:', err);
@@ -362,8 +362,8 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
       correct_answer: ''
     });
     try {
-      const response = await api.get<QuestionsResponse>(`/seasons/${numSeasonId}/questions`);
-      setQuestions(response.data);
+      const response = await api.get<QuestionsResponse>(`/admin/seasons/${numSeasonId}/questions`);
+      setQuestions(response.data.data);
       setOpenQuestionsDialog(true);
     } catch (err: any) {
       console.error('Error fetching season questions:', err);
@@ -443,8 +443,8 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
     const numSeasonId = Number(seasonId);
     setSelectedSeasonId(numSeasonId);
     try {
-      const response = await api.get<QualifiedUsersResponse>(`/seasons/${numSeasonId}/qualified-users`);
-      setQualifiedUsers(response.data);
+      const response = await api.get<QualifiedUsersResponse>(`/admin/seasons/${numSeasonId}/qualified-users`);
+      setQualifiedUsers(response.data.data);
       setOpenQualifiedUsersDialog(true);
     } catch (err: any) {
       console.error('Error fetching qualified users:', err);

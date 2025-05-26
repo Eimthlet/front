@@ -35,6 +35,12 @@ interface QualificationResponse {
   message: string;
 }
 
+interface QuestionsResponse {
+  data: {
+    questions: ApiQuestion[];
+  };
+}
+
 const App: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
@@ -56,15 +62,12 @@ const App: React.FC = () => {
         
         // Only fetch questions if user is qualified or hasn't attempted yet
         if (!qualificationResponse.data.hasAttempted || qualificationResponse.data.isQualified) {
-          const response = await api.get<{ data: { questions: ApiQuestion[] } }>('/questions');
-
-          // Convert numeric IDs to strings
+          const response = await api.get<QuestionsResponse>('/questions');
           const convertedQuestions = response.data.data.questions.map(q => ({
             ...q,
             id: q.id.toString(),
             correctAnswer: q.correctAnswer.toString()
           }));
-
           setQuestions(convertedQuestions);
         }
       } catch (err: any) {

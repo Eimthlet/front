@@ -32,6 +32,7 @@ interface ApiError {
     data: {
       error?: string;
       message?: string;
+      details?: string;
     };
     headers?: Record<string, string>;
   };
@@ -40,12 +41,21 @@ interface ApiError {
   stack?: string;
 }
 
+interface ErrorState {
+  message: string;
+  details?: string;
+}
+
 interface QuestionsResponse {
-  questions: Question[];
+  data: {
+    questions: Question[];
+  };
 }
 
 interface QuestionResponse {
-  question: Question;
+  data: {
+    question: Question;
+  };
 }
 
 // Define props interface
@@ -56,7 +66,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<ErrorState | null>(null);
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -90,32 +100,18 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     // Fetch questions when component mounts
     const fetchQuestions = async () => {
       try {
-        const token = localStorage.getItem('token');
-        console.log('Fetching questions with token:', {
-          exists: !!token,
-          length: token?.length,
-          firstChars: token?.substring(0, 10)
-        });
-
-        const response = await api.get<QuestionsResponse>('/questions');
-        setQuestions(response.data.questions);
-        setIsLoading(false);
+        setIsLoading(true);
+        const response = await api.get<QuestionsResponse>('/admin/questions');
+        setQuestions(response.data.data.questions);
+        setError(null);
       } catch (err: unknown) {
-        console.error('Error fetching questions:', {
-          status: (err as ApiError).response?.status,
-          statusText: (err as ApiError).response?.statusText,
-          data: (err as ApiError).response?.data,
-          headers: (err as ApiError).response?.headers
-        });
-
+        console.error('Error fetching questions:', err);
         const apiError = err as ApiError;
-        if (apiError.response?.status === 401) {
-          setError('Unauthorized: Please log in as an admin. Your session may have expired.');
-        } else if (apiError.response?.status === 403) {
-          setError('Forbidden: Admin access required. Your account does not have admin privileges.');
-        } else {
-          setError(`Failed to fetch questions: ${apiError.response?.data?.error || apiError.message}`);
-        }
+        setError({ 
+          message: apiError.response?.data?.error || apiError.message,
+          details: apiError.response?.data?.details
+        });
+      } finally {
         setIsLoading(false);
       }
     };
@@ -126,30 +122,18 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   // Delete a question
   const handleDeleteQuestion = async (questionId: string) => {
     try {
-      console.log('Attempting to delete question:', questionId);
-      await api.delete(`/api/admin/questions/${questionId}`);
+      await api.delete(`/admin/questions/${questionId}`);
       setQuestions(prevQuestions => prevQuestions.filter(q => q.id !== questionId));
       setSuccess('Question deleted successfully');
-      
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: unknown) {
-      console.error('Error deleting question:', {
-        questionId,
-        status: (err as ApiError).response?.status,
-        statusText: (err as ApiError).response?.statusText,
-        data: (err as ApiError).response?.data
-      });
-      
+      console.error('Error deleting question:', err);
       const apiError = err as ApiError;
-      if (apiError.response?.status === 401) {
-        setError('Unauthorized: Please log in again as admin');
-      } else if (apiError.response?.status === 403) {
-        setError('Forbidden: Admin access required');
-      } else {
-        setError(`Failed to delete question: ${apiError.response?.data?.error || apiError.message}`);
-      }
-      
-      setTimeout(() => setError(''), 3000);
+      setError({ 
+        message: apiError.response?.data?.error || apiError.message,
+        details: apiError.response?.data?.details
+      });
+      setTimeout(() => setError(null), 3000);
     }
   };
 
@@ -179,7 +163,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       console.log('Submitting question:', questionData);
       
       const response = await api.post<QuestionResponse>('/api/admin/questions', questionData);
-      setQuestions(prevQuestions => [...prevQuestions, response.data.question]);
+      setQuestions(prevQuestions => [...prevQuestions, response.data.data.question]);
       
       // Reset form
       setNewQuestion({
@@ -192,16 +176,15 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       });
       
       setSuccess('Question added successfully');
-      
-      // Clear success message after 3 seconds
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: unknown) {
       console.error('Error adding question:', err);
       const apiError = err as ApiError;
-      setError(apiError.response?.data?.error || apiError.message || 'Failed to add question');
-      
-      // Clear error message after 3 seconds
-      setTimeout(() => setError(''), 3000);
+      setError({ 
+        message: apiError.response?.data?.error || apiError.message || 'Failed to add question',
+        details: apiError.response?.data?.details
+      });
+      setTimeout(() => setError(null), 3000);
     }
   };
 
@@ -220,7 +203,8 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
           backgroundColor: 'rgba(255, 107, 107, 0.1)',
           color: '#ff6b6b'
         }}>
-          {error}
+          {error.message}
+          {error.details && <Typography variant="body2" sx={{ mt: 1, color: 'rgba(255, 255, 255, 0.6)' }}>{error.details}</Typography>}
         </Box>
       )}
       {success && (
