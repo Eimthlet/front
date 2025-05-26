@@ -93,29 +93,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // Check if user is authenticated by validating the token with the server
-        const response = await api.get<TokenCheckResponse>('/api/auth/check-token', { withCredentials: true });
-        
-        if (response.data.valid && response.data.user) {
-          const userData = response.data.user;
-          
-          setUser({
-            id: userData.id,
-            email: userData.email,
-            isAdmin: userData.isAdmin
-          });
-          setIsAuthenticated(true);
-          setIsAdmin(userData.isAdmin);
-        } else {
-          // Try to refresh the token if the current one is invalid
-          await refreshTokenAndUpdateUser();
-        }
+        // Don't try to check token on initial load - this can cause CORS issues
+        // Just set loading to false and let the user log in manually
+        console.log('Auth initialized - user needs to log in');
       } catch (error) {
         console.error('Auth initialization failed:', error);
-        // Cookies are handled by the browser automatically
-        setUser(null);
-        setIsAuthenticated(false);
-        setIsAdmin(false);
       } finally {
         setIsLoading(false);
       }
