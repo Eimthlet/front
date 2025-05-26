@@ -4,8 +4,9 @@
 import axios from 'axios';
 import { API_CONFIG, AUTH_CONFIG } from './config';
 
-const API_BASE = API_CONFIG.BASE_URL;
-const API_TIMEOUT = API_CONFIG.TIMEOUT; // 30 seconds timeout
+// Always use the production URL
+const API_BASE = 'https://car-quizz.onrender.com';
+const API_TIMEOUT = 30000; // 30 seconds timeout
 
 // Create axios instance with default config
 const api = axios.create({
