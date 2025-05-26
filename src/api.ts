@@ -1,4 +1,4 @@
-// This file is deprecated. Please use the axios-based client in src/utils/api.ts instead.
+// This file is deprefront end cated. Please use the axios-based client in src/utils/api.ts instead.
 // This file is kept for backward compatibility only and will be removed in a future version.
 
 import axios from 'axios';

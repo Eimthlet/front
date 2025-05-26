@@ -153,4 +153,19 @@ api.interceptors.response.use(
   }
 );
 
-export default api;
+// Helper function to ensure API prefix
+const ensureApiPrefix = (endpoint: string) => {
+  if (!endpoint.startsWith('/api/')) {
+    return `/api${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  }
+  return endpoint;
+};
+
+// Export the API instance with helper methods
+export default {
+  ...api,
+  get: (url: string, config = {}) => api.get(ensureApiPrefix(url), config),
+  post: (url: string, data = {}, config = {}) => api.post(ensureApiPrefix(url), data, config),
+  put: (url: string, data = {}, config = {}) => api.put(ensureApiPrefix(url), data, config),
+  delete: (url: string, config = {}) => api.delete(ensureApiPrefix(url), config)
+};
