@@ -172,7 +172,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
     try {
       setLoading(true);
       const response = await api.post<ResumePaymentResponse>('/api/auth/resume-payment', { 
-        tx_ref: pendingTxRef,
+        tx_ref: generateUUID(), // Generate a new transaction reference
+        original_tx_ref: pendingTxRef, // Pass the original tx_ref for reference
         email: email
       });
       
