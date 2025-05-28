@@ -216,8 +216,20 @@ api.interceptors.response.use(
                       error.message || 
                       'An unexpected error occurred';
     
+    // Log the full error response for debugging
+    console.log('Full error response:', error.response?.data);
+    
     // Create a more user-friendly error message for logging purposes
     let userFriendlyMessage = errorMessage;
+    
+    // Special handling for 403 errors
+    if (error.response?.status === 403) {
+      if (error.response?.data?.code === 'ACCOUNT_SUSPENDED') {
+        userFriendlyMessage = 'Your account has been temporarily suspended. Please contact support.';
+      } else {
+        userFriendlyMessage = 'You do not have permission to access this resource. Please check your credentials.';
+      }
+    }
     
     // Only log the technical details, don't expose them to the user
     console.error('API Error:', {

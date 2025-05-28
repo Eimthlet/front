@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
+import axios from 'axios';
 import api from '../utils/api';
-import { AUTH_CONFIG } from '../config';
+import { AUTH_CONFIG, API_CONFIG } from '../config';
 
 // Define User and AuthContextType interfaces locally
 interface User {
@@ -115,20 +116,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<void> => {
     setError(null);
     try {
-      const loginResponse = await api.post<AuthResponse>('/api/auth/login', { email, password }, { withCredentials: true });
+      console.log('Attempting login with email:', email);
+      
+      // Use axios directly to avoid interceptors for this critical request
+      const loginResponse = await axios.post<AuthResponse>(
+        `${API_CONFIG.BASE_URL}/api/auth/login`, 
+        { email, password }, 
+        { 
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      console.log('Login response:', loginResponse.data);
       
       // Store tokens in localStorage if they're in the response
       if (loginResponse.data.token) {
         localStorage.setItem('token', loginResponse.data.token);
+        console.log('Token stored in localStorage');
       }
       
       if (loginResponse.data.refreshToken) {
         localStorage.setItem('refreshToken', loginResponse.data.refreshToken);
+        console.log('Refresh token stored in localStorage');
       }
       
       // If user info is in the login response, use it directly
       if (loginResponse.data.user) {
         const userData = loginResponse.data.user;
+        console.log('User data from login response:', userData);
+        
         setUser({
           id: userData.id,
           email: userData.email,
