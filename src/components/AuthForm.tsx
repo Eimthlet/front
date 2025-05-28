@@ -195,7 +195,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
         customization: {
           title: 'Car Quiz Registration',
           description: 'Complete your registration payment',
-          logo: 'https://your-logo-url.com/logo.png' // Add your logo URL
+          logo: undefined
         },
         meta: {
           uuid: generateUUID(),
@@ -208,8 +208,13 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
         throw new Error('Invalid payment configuration');
       }
 
+      // Clear any previous error messages
+      setError('');
+
       // Launch payment popup
-      waitForPayChanguAndLaunch(config, setError, setLoading);
+      window.PaychanguCheckout?.(config);
+
+      // Show a message to the user
       setError('Please complete your payment in the popup window.');
     } catch (error) {
       console.error('Error resuming payment:', error);
@@ -235,6 +240,16 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
       setError('Please enter a valid email address');
       setLoading(false);
       return;
+    }
+
+    // Check for pending registration first
+    if (currentMode === 'register') {
+      const hasPending = await checkPendingRegistration(email);
+      if (hasPending) {
+        // Automatically resume payment if there's a pending registration
+        await resumePayment();
+        return;
+      }
     }
     
     // Password validation
