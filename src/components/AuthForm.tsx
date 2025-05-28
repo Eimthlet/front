@@ -96,7 +96,7 @@ interface ResumePaymentResponse {
   message: string;
 }
 
-const AuthForm: React.FC<AuthFormProps> = ({ mode }) => {
+const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
   // Wait for PayChangu script to load before calling the popup
   function waitForPayChanguAndLaunch(config: PayChanguConfig, setError: (msg: string) => void, setLoading: (loading: boolean) => void, retries = 10) {
     if (window.PaychanguCheckout) {
@@ -158,6 +158,12 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }) => {
 
   // Function to resume payment with existing tx_ref
   const resumePayment = async () => {
+    if (!pendingTxRef || !email) {
+      setError('Missing transaction reference or email. Please try registering again.');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await api.post<ResumePaymentResponse>('/api/auth/resume-payment', { 
@@ -165,35 +171,41 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }) => {
         email: email
       });
       
-      if (response.data.public_key && response.data.tx_ref) {
-        const config: PayChanguConfig = {
-          public_key: response.data.public_key,
-          tx_ref: response.data.tx_ref,
-          amount: response.data.amount || amount,
-          currency: PAYMENT_CONFIG.CURRENCY,
-          callback_url: PAYMENT_CONFIG.CALLBACK_URL,
-          return_url: PAYMENT_CONFIG.RETURN_URL,
-          customer: {
-            email: email,
-            first_name: username || email.split('@')[0],
-            last_name: ''
-          },
-          customization: {
-            title: 'Car Quiz Registration',
-            description: 'Complete your registration payment',
-            logo: undefined
-          },
-          meta: {
-            uuid: generateUUID(),
-            response: 'success'
-          }
-        };
-        
-        waitForPayChanguAndLaunch(config, setError, setLoading);
-      } else {
-        setError('Could not retrieve payment information');
-        setLoading(false);
+      if (!response.data.public_key || !response.data.tx_ref) {
+        throw new Error('Invalid payment information received from server');
       }
+
+      const config: PayChanguConfig = {
+        public_key: response.data.public_key,
+        tx_ref: response.data.tx_ref,
+        amount: response.data.amount || amount,
+        currency: PAYMENT_CONFIG.CURRENCY,
+        callback_url: PAYMENT_CONFIG.CALLBACK_URL,
+        return_url: PAYMENT_CONFIG.RETURN_URL,
+        customer: {
+          email: email,
+          first_name: username || email.split('@')[0],
+          last_name: ''
+        },
+        customization: {
+          title: 'Car Quiz Registration',
+          description: 'Complete your registration payment',
+          logo: undefined
+        },
+        meta: {
+          uuid: generateUUID(),
+          response: 'success'
+        }
+      };
+      
+      // Make sure we have all required fields before launching payment
+      if (!config.public_key || !config.tx_ref || !config.amount || !config.customer.email) {
+        throw new Error('Invalid payment configuration');
+      }
+
+      // Launch payment popup
+      waitForPayChanguAndLaunch(config, setError, setLoading);
+      setError('Please complete your payment in the popup window.');
     } catch (error) {
       console.error('Error resuming payment:', error);
       setError('Failed to resume payment. Please try again.');
@@ -351,11 +363,19 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }) => {
         
         // Check if this is a pending registration error
         if (apiError && (apiError.includes('pending registration') || apiError.includes('pending for this email'))) {
-          // Check for pending registration and resume payment if found
-          const hasPending = await checkPendingRegistration(email);
-          if (hasPending) {
-            await resumePayment();
-            return;
+          setLoading(true);
+          try {
+            // First check for pending registration to get the tx_ref
+            const hasPending = await checkPendingRegistration(email);
+            if (hasPending && pendingTxRef) {
+              // Now we have the tx_ref, try to resume payment
+              await resumePayment();
+              return;
+            }
+          } catch (error) {
+            console.error('Error handling pending registration:', error);
+          } finally {
+            setLoading(false);
           }
         }
         
