@@ -190,8 +190,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
         customer: {
           email: email,
           first_name: username || email.split('@')[0],
-          last_name: '',
-          phone: phone || '' // Add phone number if available
+          last_name: ''
         },
         customization: {
           title: 'Car Quiz Registration',
@@ -200,8 +199,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
         },
         meta: {
           uuid: generateUUID(),
-          response: 'success',
-          source: 'car_quiz_registration'
+          response: 'success'
         }
       };
       
