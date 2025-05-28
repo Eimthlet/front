@@ -19,7 +19,7 @@ function generateUUID() {
 }
 
 interface AuthFormProps {
-  mode?: 'login' | 'register';
+  mode: 'login' | 'register';
 }
 
 interface JwtPayload {
@@ -96,7 +96,7 @@ interface ResumePaymentResponse {
   message: string;
 }
 
-const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
+const AuthForm: React.FC<AuthFormProps> = ({ mode }) => {
   // Wait for PayChangu script to load before calling the popup
   function waitForPayChanguAndLaunch(config: PayChanguConfig, setError: (msg: string) => void, setLoading: (loading: boolean) => void, retries = 10) {
     if (window.PaychanguCheckout) {
@@ -126,7 +126,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
   const [amount, setAmount] = useState<number>(1000); // Default amount, adjust as needed
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [currentMode, setCurrentMode] = useState<'login' | 'register'>(mode as 'login' | 'register');
+  const [currentMode, setCurrentMode] = useState<'login' | 'register'>(mode);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -346,37 +346,26 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
       } catch (err: any) {
         console.error('Registration error:', err);
         
-        // Create user-friendly error message
-        let userFriendlyMessage = 'Unable to complete registration. Please try again.';
+        // Get the specific error message from the API response
+        const apiError = err.response?.data?.message || err.response?.data?.error || err.message;
         
-        if (err.response?.data?.error) {
-          const errorMessage = err.response.data.error;
-          
-          if (errorMessage.includes('Email already registered')) {
-            userFriendlyMessage = 'This email is already registered. Please use a different email or try logging in.';
-          } else if (errorMessage.includes('Username already taken')) {
-            userFriendlyMessage = 'This username is already taken. Please choose a different username.';
-          } else if (errorMessage.includes('Missing required fields')) {
-            userFriendlyMessage = 'Please fill in all required fields to complete registration.';
-          } else if (errorMessage.includes('Password must be')) {
-            userFriendlyMessage = 'Your password must be at least 8 characters long.';
-          } else if (errorMessage.includes('valid email')) {
-            userFriendlyMessage = 'Please enter a valid email address.';
-          } else if (errorMessage.includes('valid phone')) {
-            userFriendlyMessage = 'Please enter a valid phone number.';
-          } else if (errorMessage.includes('pending registration')) {
-            userFriendlyMessage = 'You already have a pending registration. Please complete payment or wait.';
-          } else {
-            // Make the first letter uppercase for better presentation
-            userFriendlyMessage = errorMessage.charAt(0).toUpperCase() + errorMessage.slice(1);
+        // Check if this is a pending registration error
+        if (apiError && (apiError.includes('pending registration') || apiError.includes('pending for this email'))) {
+          // Check for pending registration and resume payment if found
+          const hasPending = await checkPendingRegistration(email);
+          if (hasPending) {
+            await resumePayment();
+            return;
           }
-        } else if (err.message === 'Network Error') {
-          userFriendlyMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
-        } else if (err.message?.includes('timeout')) {
-          userFriendlyMessage = 'The server is taking too long to respond. Please try again later.';
         }
         
-        setError(userFriendlyMessage);
+        // Display the exact API error message if it exists
+        if (apiError) {
+          setError(apiError);
+        } else {
+          setError('Unable to complete registration. Please try again.');
+        }
+        
         setLoading(false);
       }
       return;
@@ -395,23 +384,21 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
       setTimeout(() => {
         navigate(isAdmin ? '/admin' : '/quiz', { replace: true });
       }, 500); // Small delay to ensure state is updated
-    } catch (err: unknown) {
+    } catch (err: any) {
       console.error('Authentication error:', err);
-      // No need to handle the error here as it's already handled in the AuthContext
-      // Just set loading to false
-      setLoading(false);
       
-      // If for some reason the error wasn't set in the context, set it locally
-      if (!authError) {
-        const apiError = err as ApiError;
-        let userFriendlyMessage = 'Unable to log in. Please try again.';
-        
-        if (apiError.message) {
-          userFriendlyMessage = apiError.message;
-        }
-        
-        setError(userFriendlyMessage);
+      // Get the specific error message from the API response
+      const apiError = err.response?.data?.message || err.response?.data?.error || err.message;
+      
+      // Display the exact API error message if it exists
+      if (apiError) {
+        setError(apiError);
+      } else {
+        setError('Unable to log in. Please check your credentials and try again.');
       }
+      
+      setLoading(false);
+      return;
     }
   };
 
