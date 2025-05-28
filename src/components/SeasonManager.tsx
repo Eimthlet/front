@@ -37,7 +37,6 @@ import api from '../utils/api';
 interface Season {
   id?: string | number;
   name: string;
-  description: string | null;
   start_date: string;
   end_date: string;
   is_active: boolean;
@@ -103,7 +102,6 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [currentSeason, setCurrentSeason] = useState<Partial<Season>>({
     name: '',
-    description: '',
     start_date: new Date().toISOString(),
     end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     is_active: false,
@@ -167,7 +165,6 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
     } else {
       setCurrentSeason({
         name: '',
-        description: '',
         start_date: new Date().toISOString(),
         end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         is_active: false,
@@ -215,10 +212,14 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
         }
       };
 
+      // Prepare season data
       const seasonData = {
         name: currentSeason.name,
-        startDate: formatDate(currentSeason.start_date),
-        endDate: formatDate(currentSeason.end_date)
+        start_date: formatDate(new Date(currentSeason.start_date!)),
+        end_date: formatDate(new Date(currentSeason.end_date!)),
+        is_active: currentSeason.is_active,
+        is_qualification_round: currentSeason.is_qualification_round,
+        minimum_score_percentage: currentSeason.minimum_score_percentage
       };
 
       console.log('Submitting season data:', JSON.stringify(seasonData, null, 2));
@@ -518,7 +519,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
                       {season.name}
                     </Typography>
                     <Typography variant="body2" color="textSecondary">
-                      {season.description}
+                      {/* No description field in database */}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -618,15 +619,6 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
               onChange={(e) => handleSeasonChange('name', e.target.value)}
               fullWidth
               required
-            />
-            
-            <TextField 
-              label="Description"
-              value={currentSeason.description || ''}
-              onChange={(e) => handleSeasonChange('description', e.target.value)}
-              fullWidth
-              multiline
-              rows={3}
             />
             
             <Box sx={{ display: 'flex', gap: 2 }}>
