@@ -9,6 +9,7 @@ interface User {
   id: number;
   email: string;
   isAdmin: boolean;
+  role?: string;
 }
 
 interface AuthContextType {
@@ -48,6 +49,7 @@ interface TokenCheckResponse {
     id: number;
     email: string;
     isAdmin: boolean;
+    role?: string;
   };
   error?: string;
 }
@@ -57,6 +59,7 @@ interface JwtPayload {
   id: number;
   email: string;
   isAdmin?: boolean;
+  role?: string;
   exp?: number;
 }
 
@@ -74,20 +77,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshTokenAndUpdateUser = async () => {
     try {
       // Call refresh endpoint without sending the token (it will be sent via cookies)
-      await api.post<AuthResponse>('/api/auth/refresh', {}, { withCredentials: true });
+      const refreshResponse = await api.post<AuthResponse>(
+        '/api/auth/refresh', 
+        {}, 
+        { withCredentials: true }
+      );
+      
+      console.log('Token refresh response:', refreshResponse.data);
       
       // After successful token refresh, check token validity to get user info
-      const response = await api.get<TokenCheckResponse>('/api/auth/check-token', { withCredentials: true });
+      const response = await api.get<TokenCheckResponse>('/api/auth/check-token', { 
+        withCredentials: true 
+      });
+      
+      console.log('Token check response after refresh:', response.data);
       
       if (response.data.valid && response.data.user) {
         const userData = response.data.user;
-        setUser({
+        const isAdminUser = userData.isAdmin || userData.role === 'admin';
+        
+        const userInfo = {
           id: userData.id,
           email: userData.email,
-          isAdmin: userData.isAdmin
-        });
+          isAdmin: isAdminUser,
+          role: userData.role || 'user'
+        };
+        
+        console.log('Setting user state:', userInfo);
+        
+        setUser(userInfo);
         setIsAuthenticated(true);
-        setIsAdmin(userData.isAdmin);
+        setIsAdmin(isAdminUser);
       }
     } catch (error) {
       console.error('Token refresh failed:', error);
@@ -118,19 +138,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Attempting login with email:', email);
       
+      // Clear any existing tokens
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      
       // Use axios directly to avoid interceptors for this critical request
       const loginResponse = await axios.post<AuthResponse>(
         `${API_CONFIG.BASE_URL}/api/auth/login`, 
         { email, password }, 
         { 
-          withCredentials: true,
+          withCredentials: true, // Important for cookies
           headers: {
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          timeout: 10000 // 10 second timeout
         }
       );
       
-      console.log('Login response:', loginResponse.data);
+      console.log('Login response:', {
+        status: loginResponse.status,
+        statusText: loginResponse.statusText,
+        data: loginResponse.data,
+        headers: loginResponse.headers
+      });
       
       // Store tokens in localStorage if they're in the response
       if (loginResponse.data.token) {
@@ -146,35 +177,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // If user info is in the login response, use it directly
       if (loginResponse.data.user) {
         const userData = loginResponse.data.user;
-        console.log('User data from login response:', userData);
+        const isAdminUser = Boolean(userData.isAdmin || userData.role === 'admin');
+        const userRole = userData.role || 'user';
         
-        setUser({
+        const userInfo = {
           id: userData.id,
           email: userData.email,
-          isAdmin: userData.isAdmin || userData.role === 'admin'
-        });
+          isAdmin: isAdminUser,
+          role: userRole
+        };
+        
+        console.log('User data from login response:', userInfo);
+        
+        setUser(userInfo);
         setIsAuthenticated(true);
-        setIsAdmin(userData.isAdmin || userData.role === 'admin');
+        setIsAdmin(isAdminUser);
+        
+        console.log('User state updated:', userInfo);
         return;
       }
       
       // Otherwise, check token validity to get user info
-      const response = await api.get<TokenCheckResponse>('/api/auth/check-token', { 
-        withCredentials: true,
-        headers: {
-          'Authorization': `Bearer ${loginResponse.data.token}`
+      console.log('No user data in login response, checking token validity...');
+      const response = await axios.get<TokenCheckResponse>(
+        `${API_CONFIG.BASE_URL}/api/auth/check-token`, 
+        { 
+          withCredentials: true,
+          headers: {
+            'Authorization': `Bearer ${loginResponse.data.token}`,
+            'Accept': 'application/json'
+          }
         }
-      });
+      );
+      
+      console.log('Token check response:', response.data);
       
       if (response.data.valid && response.data.user) {
         const userData = response.data.user;
-        setUser({
+        const isAdminUser = Boolean(userData.isAdmin || userData.role === 'admin');
+        const userRole = userData.role || 'user';
+        
+        const userInfo = {
           id: userData.id,
           email: userData.email,
-          isAdmin: userData.isAdmin
-        });
+          isAdmin: isAdminUser,
+          role: userRole
+        };
+        
+        console.log('User data from token check:', userInfo);
+        
+        setUser(userInfo);
         setIsAuthenticated(true);
-        setIsAdmin(userData.isAdmin);
+        setIsAdmin(isAdminUser);
+        
+        console.log('User state updated from token check:', userInfo);
       }
     } catch (error) {
       handleApiError(error, 'Login failed');
@@ -184,20 +240,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: RegisterData): Promise<void> => {
     setError(null);
     try {
-      await api.post<AuthResponse>('/api/auth/register', userData, { withCredentials: true });
+      const registerResponse = await api.post<AuthResponse>('/api/auth/register', userData, { 
+        withCredentials: true 
+      });
+      
+      console.log('Registration response:', registerResponse.data);
       
       // After successful registration, check token validity to get user info
-      const response = await api.get<TokenCheckResponse>('/api/auth/check-token', { withCredentials: true });
+      const response = await api.get<TokenCheckResponse>('/api/auth/check-token', { 
+        withCredentials: true 
+      });
       
       if (response.data.valid && response.data.user) {
         const userData = response.data.user;
-        setUser({
+        const isAdminUser = Boolean(userData.isAdmin || userData.role === 'admin');
+        const userRole = userData.role || 'user';
+        
+        const userInfo = {
           id: userData.id,
           email: userData.email,
-          isAdmin: userData.isAdmin
-        });
+          isAdmin: isAdminUser,
+          role: userRole
+        };
+        
+        console.log('User data after registration:', userInfo);
+        
+        setUser(userInfo);
         setIsAuthenticated(true);
-        setIsAdmin(userData.isAdmin);
+        setIsAdmin(isAdminUser);
       }
     } catch (error) {
       handleApiError(error, 'Registration failed');

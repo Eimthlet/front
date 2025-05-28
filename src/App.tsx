@@ -9,6 +9,7 @@ import AdminPanel from './components/AdminPanel';
 import AdminDashboard from './components/AdminDashboard';
 import UserManagement from './components/UserManagement';
 import Leaderboard from './components/Leaderboard';
+import AdminDiagnostic from './components/AdminDiagnostic';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import { useAuth } from './contexts/AuthContext';
@@ -191,12 +192,14 @@ const App: React.FC = () => {
             {/* Protected admin routes - must come first */}
             <Route path="/admin/*" element={
               <ProtectedRoute adminOnly>
-                <Routes>
-                  <Route path="" element={<AdminPanel />} />
-                  <Route path="dashboard" element={<AdminDashboard />} />
-                  <Route path="users" element={<UserManagement />} />
-                  <Route path="*" element={<Navigate to="" replace />} />
-                </Routes>
+                <Layout>
+                  <Routes>
+                    <Route path="" element={<AdminDashboard />} />
+                    <Route path="users" element={<UserManagement />} />
+                    <Route path="diagnostic" element={<AdminDiagnostic />} />
+                    <Route path="*" element={<Navigate to="" replace />} />
+                  </Routes>
+                </Layout>
               </ProtectedRoute>
             } />
 

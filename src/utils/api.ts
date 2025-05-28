@@ -60,15 +60,26 @@ const processQueue = (error: Error | null, token: string | null = null) => {
 // Add a request interceptor to include the token
 api.interceptors.request.use(
   (config) => {
-    // Set withCredentials to true to include cookies in cross-site requests
+    // Always include credentials for cross-origin requests
     config.withCredentials = true;
     
-    // Get token from localStorage and add it to the Authorization header
+    // Get token from localStorage or cookie will be used automatically
     const token = localStorage.getItem('token');
     if (token) {
-      config.headers = config.headers || {};
-      config.headers['Authorization'] = `Bearer ${token}`;
+      // Add Authorization header for all requests
+      config.headers.Authorization = `Bearer ${token}`;
+      console.log('Added Authorization header to request:', config.url);
+    } else {
+      console.log('No token found in localStorage for request:', config.url);
     }
+    
+    console.log('Request config:', {
+      url: config.url,
+      method: config.method,
+      withCredentials: config.withCredentials,
+      hasAuthHeader: !!config.headers.Authorization,
+      headers: config.headers
+    });
     
     return config;
   },
@@ -98,19 +109,48 @@ const retryRequest = async (config: any, retries = 3, delay = 1000) => {
 // Add a response interceptor to handle token refresh and errors
 api.interceptors.response.use(
   (response) => {
+    console.log('Response received:', {
+      url: response.config.url,
+      status: response.status,
+      data: response.data,
+      headers: response.headers
+    });
+    
     // Transform the response to ensure consistent data structure
     if (response.data && typeof response.data === 'object') {
       // If the response already has a data property, return as is
-      if ('data' in response.data) {
-        return response;
-      }
-      // Otherwise, wrap the response in a data property
-      response.data = { data: response.data };
+      return response;
     }
-    return response;
+    
+    // Otherwise, wrap the response data in a data property
+    return {
+      ...response,
+      data: {
+        data: response.data
+      }
+    };
   },
   async (error) => {
+    console.error('API Error:', {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      headers: error.config?.headers
+    });
+
     const originalRequest = error.config;
+    
+    // If there's no response or config, it's a network error
+    if (!error.response) {
+      console.error('Network error - no response received:', error.message);
+      return Promise.reject({
+        message: 'Network Error',
+        isNetworkError: true,
+        originalError: error
+      });
+    }
 
     // Handle timeout errors
     if (error.code === 'ECONNABORTED') {
