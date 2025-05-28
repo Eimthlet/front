@@ -121,6 +121,60 @@
   text-align: center;
   font-weight: 500;
   width: 100%;
+  background-color: rgba(231, 76, 60, 0.1);
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+.auth-error p {
+  margin: 0 0 12px 0;
+}
+
+.pending-registration {
+  background-color: rgba(39, 174, 96, 0.1);
+  border: 1px solid rgba(39, 174, 96, 0.3);
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 0.5rem;
+  text-align: center;
+  width: 100%;
+  color: #27ae60;
+}
+
+.pending-registration p {
+  margin: 0 0 12px 0;
+}
+
+.check-pending-btn,
+.resume-payment-btn {
+  background: linear-gradient(90deg, #e74c3c 0%, #c0392b 100%);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 0.22s, transform 0.18s;
+  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.2);
+}
+
+.resume-payment-btn {
+  background: linear-gradient(90deg, #27ae60 0%, #2ecc71 100%);
+  box-shadow: 0 2px 8px rgba(39, 174, 96, 0.2);
+}
+
+.check-pending-btn:hover,
+.resume-payment-btn:hover {
+  transform: scale(1.05);
+}
+
+.check-pending-btn:disabled,
+.resume-payment-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .password-input {

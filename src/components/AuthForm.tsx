@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { jwtDecode } from 'jwt-decode';
+import crypto from 'crypto';
 import { API_CONFIG, AUTH_CONFIG, PAYMENT_CONFIG } from '../config';
 import { Checkbox, FormControlLabel, Link, IconButton } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
@@ -70,6 +71,23 @@ interface LoginResponse {
   refreshToken: string;
 }
 
+interface PendingRegistrationResponse {
+  success: boolean;
+  pending: boolean;
+  tx_ref?: string;
+  email?: string;
+}
+
+interface ResumePaymentResponse {
+  success: boolean;
+  tx_ref: string;
+  public_key: string;
+  amount: number;
+  email: string;
+  phone: string;
+  message: string;
+}
+
 const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
   // Wait for PayChangu script to load before calling the popup
   function waitForPayChanguAndLaunch(config: PayChanguConfig, setError: (msg: string) => void, setLoading: (loading: boolean) => void, retries = 10) {
@@ -107,6 +125,73 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
 
   const navigate = useNavigate();
   const { login: authLogin, isAdmin, error: authError, clearError } = useAuth();
+
+  const [hasPendingRegistration, setHasPendingRegistration] = useState(false);
+  const [pendingTxRef, setPendingTxRef] = useState('');
+
+  // Function to check for pending registration and resume payment
+  const checkPendingRegistration = async (emailToCheck: string) => {
+    try {
+      setLoading(true);
+      const response = await api.post<PendingRegistrationResponse>('/api/auth/check-pending-registration', { email: emailToCheck });
+      if (response.data.pending && response.data.tx_ref) {
+        setPendingTxRef(response.data.tx_ref);
+        setHasPendingRegistration(true);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error checking pending registration:', error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to resume payment with existing tx_ref
+  const resumePayment = async () => {
+    try {
+      setLoading(true);
+      const response = await api.post<ResumePaymentResponse>('/api/auth/resume-payment', { 
+        tx_ref: pendingTxRef,
+        email: email
+      });
+      
+      if (response.data.public_key && response.data.tx_ref) {
+        const config: PayChanguConfig = {
+          public_key: response.data.public_key,
+          tx_ref: response.data.tx_ref,
+          amount: response.data.amount || amount,
+          currency: PAYMENT_CONFIG.CURRENCY,
+          callback_url: PAYMENT_CONFIG.CALLBACK_URL,
+          return_url: PAYMENT_CONFIG.RETURN_URL,
+          customer: {
+            email: email,
+            first_name: username || email.split('@')[0],
+            last_name: ''
+          },
+          customization: {
+            title: 'Car Quiz Registration',
+            description: 'Complete your registration payment',
+            logo: undefined
+          },
+          meta: {
+            uuid: crypto.randomUUID(),
+            response: 'success'
+          }
+        };
+        
+        waitForPayChanguAndLaunch(config, setError, setLoading);
+      } else {
+        setError('Could not retrieve payment information');
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error resuming payment:', error);
+      setError('Failed to resume payment. Please try again.');
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -463,7 +548,35 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode = 'login' }) => {
             <span>Already have an account? <button type="button" onClick={handleSwitchMode}>Login</button></span>
           )}
         </div>
-        {(error || authError) && <div className="auth-error">{error || authError}</div>}
+        {(error || authError) && !hasPendingRegistration && (
+          <div className="auth-error">
+            <p>{error || authError}</p>
+            {error && error.includes('already pending for this email') && (
+              <button 
+                type="button" 
+                onClick={() => checkPendingRegistration(email)}
+                disabled={loading}
+                className="check-pending-btn"
+              >
+                {loading ? 'Checking...' : 'Check Pending Registration'}
+              </button>
+            )}
+          </div>
+        )}
+        
+        {hasPendingRegistration && (
+          <div className="pending-registration">
+            <p>You have a pending registration that requires payment completion.</p>
+            <button 
+              type="button" 
+              onClick={resumePayment}
+              disabled={loading}
+              className="resume-payment-btn"
+            >
+              {loading ? 'Processing...' : 'Complete Payment'}
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );
