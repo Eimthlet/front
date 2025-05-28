@@ -60,9 +60,16 @@ const processQueue = (error: Error | null, token: string | null = null) => {
 // Add a request interceptor to include the token
 api.interceptors.request.use(
   (config) => {
-    // No need to manually add the token as it's sent automatically via cookies
     // Set withCredentials to true to include cookies in cross-site requests
     config.withCredentials = true;
+    
+    // Get token from localStorage and add it to the Authorization header
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    
     return config;
   },
   (error) => {
@@ -168,17 +175,28 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Use the refresh endpoint without sending the token (it will be sent via cookies)
+        // Get the refresh token from localStorage if available
+        const storedRefreshToken = localStorage.getItem('refreshToken');
+        
+        // Use the refresh endpoint with the token in the request body
         const response = await axios.post<RefreshTokenResponse>(
           `${API_BASE_URL}/api/auth/refresh`, 
-          {}, 
+          { refreshToken: storedRefreshToken }, 
           { withCredentials: true }
         );
         
-        // The server sets the cookies automatically, no need to store tokens
-        // Just process the queue and retry the request
-        processQueue(null, 'token-refreshed');
-        return api(originalRequest);
+        if (response.data && response.data.token) {
+          // Store the new tokens in localStorage
+          localStorage.setItem('token', response.data.token);
+          localStorage.setItem('refreshToken', response.data.refreshToken);
+          
+          // Add the token to the original request
+          originalRequest.headers['Authorization'] = `Bearer ${response.data.token}`;
+          
+          // Process the queue with the new token
+          processQueue(null, response.data.token);
+          return api(originalRequest);
+        }
         
         throw new Error('Invalid refresh token response');
       } catch (refreshError) {

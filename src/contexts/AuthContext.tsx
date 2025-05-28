@@ -32,6 +32,12 @@ interface AuthResponse {
   token: string;
   refreshToken: string;
   success?: boolean;
+  user?: {
+    id: number;
+    email: string;
+    isAdmin?: boolean;
+    role?: string;
+  };
 }
 
 interface TokenCheckResponse {
@@ -109,10 +115,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<void> => {
     setError(null);
     try {
-      await api.post<AuthResponse>('/api/auth/login', { email, password }, { withCredentials: true });
+      const loginResponse = await api.post<AuthResponse>('/api/auth/login', { email, password }, { withCredentials: true });
       
-      // After successful login, check token validity to get user info
-      const response = await api.get<TokenCheckResponse>('/api/auth/check-token', { withCredentials: true });
+      // Store tokens in localStorage if they're in the response
+      if (loginResponse.data.token) {
+        localStorage.setItem('token', loginResponse.data.token);
+      }
+      
+      if (loginResponse.data.refreshToken) {
+        localStorage.setItem('refreshToken', loginResponse.data.refreshToken);
+      }
+      
+      // If user info is in the login response, use it directly
+      if (loginResponse.data.user) {
+        const userData = loginResponse.data.user;
+        setUser({
+          id: userData.id,
+          email: userData.email,
+          isAdmin: userData.isAdmin || userData.role === 'admin'
+        });
+        setIsAuthenticated(true);
+        setIsAdmin(userData.isAdmin || userData.role === 'admin');
+        return;
+      }
+      
+      // Otherwise, check token validity to get user info
+      const response = await api.get<TokenCheckResponse>('/api/auth/check-token', { 
+        withCredentials: true,
+        headers: {
+          'Authorization': `Bearer ${loginResponse.data.token}`
+        }
+      });
       
       if (response.data.valid && response.data.user) {
         const userData = response.data.user;
