@@ -220,25 +220,22 @@ api.interceptors.response.use(
     console.log('Full error response:', error.response?.data);
     
     // Create a more user-friendly error message for logging purposes
-    let userFriendlyMessage = errorMessage;
-    
     // Special handling for 403 errors
     if (error.response?.status === 403) {
-      if (error.response?.data?.code === 'ACCOUNT_SUSPENDED') {
-        userFriendlyMessage = 'Your account has been temporarily suspended. Please contact support.';
-      } else {
-        userFriendlyMessage = 'You do not have permission to access this resource. Please check your credentials.';
-      }
+      // Use the exact error message from the server if available
+      const errorMessage = error.response.data?.error || 'You do not have permission to access this resource. Please check your credentials.';
+      return Promise.reject({
+        message: errorMessage,
+        originalError: error,
+        status: 403,
+        url: error.config.url,
+        method: error.config.method,
+        response: error.response
+      });
     }
     
-    // Only log the technical details, don't expose them to the user
-    console.error('API Error:', {
-      status: error.response?.status,
-      message: errorMessage,
-      url: originalRequest.url,
-      method: originalRequest.method,
-      response: error.response?.data
-    });
+    // Create a more user-friendly error message for logging purposes
+    let userFriendlyMessage = errorMessage;
     
     // For timeout errors
     if (error.code === 'ECONNABORTED' || errorMessage.includes('timeout')) {

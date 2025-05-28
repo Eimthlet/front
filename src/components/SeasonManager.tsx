@@ -130,7 +130,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
   const fetchSeasons = async () => {
     try {
       setLoading(true);
-      const response = await api.get<SeasonsResponse>('/admin/seasons');
+      const response = await api.get<SeasonsResponse>('/api/admin/seasons');
       setSeasons(response.data.data);
       setError(null);
     } catch (err: unknown) {
@@ -237,13 +237,13 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
       let response;
       try {
         if (dialogMode === 'create') {
-          response = await api.post('/admin/seasons', seasonData, { 
+          response = await api.post('/api/admin/seasons', seasonData, { 
             headers,
             validateStatus: (status) => status < 500 // Don't throw on 4xx errors
           });
           console.log('Create season response:', response);
         } else if (currentSeason.id) {
-          response = await api.put(`/admin/seasons/${currentSeason.id}`, seasonData, { 
+          response = await api.put(`/api/admin/seasons/${currentSeason.id}`, seasonData, { 
             headers,
             validateStatus: (status) => status < 500
           });
@@ -317,7 +317,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
       }
       
       const numId = Number(id);
-      await api.delete(`/admin/seasons/${numId}`, {
+      await api.delete(`/api/admin/seasons/${numId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -362,7 +362,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
       correct_answer: ''
     });
     try {
-      const response = await api.get<QuestionsResponse>(`/admin/seasons/${numSeasonId}/questions`);
+      const response = await api.get<QuestionsResponse>(`/api/admin/seasons/${numSeasonId}/questions`);
       setQuestions(response.data.data);
       setOpenQuestionsDialog(true);
     } catch (err: any) {
@@ -426,7 +426,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
     if (!selectedSeasonId) return;
     
     try {
-      await api.post(`/seasons/${selectedSeasonId}/questions`, {
+      await api.post(`/api/admin/seasons/${selectedSeasonId}/questions`, {
         questions: questions.map(q => q.id)
       });
       
@@ -443,7 +443,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
     const numSeasonId = Number(seasonId);
     setSelectedSeasonId(numSeasonId);
     try {
-      const response = await api.get<QualifiedUsersResponse>(`/admin/seasons/${numSeasonId}/qualified-users`);
+      const response = await api.get<QualifiedUsersResponse>(`/api/admin/seasons/${numSeasonId}/qualified-users`);
       setQualifiedUsers(response.data.data);
       setOpenQualifiedUsersDialog(true);
     } catch (err: any) {

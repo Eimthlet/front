@@ -189,7 +189,7 @@ const UserManagement: React.FC<UserManagementProps> = () => {
       setError(null);
       
       const userData = { ...editUser };
-      const response = await api.put<UserResponse>(`/admin/users/${selectedUser.id}`, userData);
+      const response = await api.put<UserResponse>(`/api/admin/users/${selectedUser.id}`, userData);
       
       // Update user in the list
       setUsers(prevUsers => 
@@ -218,7 +218,7 @@ const UserManagement: React.FC<UserManagementProps> = () => {
       setLoading(true);
       setError(null);
       
-      await api.post(`/admin/users/${selectedUser.id}/reset-password`, { newPassword });
+      await api.post(`/api/admin/users/${selectedUser.id}/reset-password`, { newPassword });
       
       setSuccess('Password reset successfully');
       setOpenPasswordDialog(false);
@@ -240,7 +240,7 @@ const UserManagement: React.FC<UserManagementProps> = () => {
       setLoading(true);
       setError(null);
       
-      await api.delete(`/admin/users/${selectedUser.id}?softDelete=true`);
+      await api.delete(`/api/admin/users/${selectedUser.id}?softDelete=true`);
       
       // Remove user from the list or update status
       setUsers(prevUsers => 

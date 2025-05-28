@@ -99,11 +99,11 @@ const AdminDashboard: React.FC = () => {
 
       try {
         // Fetch insights stats
-        const insightsResponse = await api.get<DashboardResponse>('/admin/insights-stats');
+        const insightsResponse = await api.get<DashboardResponse>('/api/admin/insights-stats');
         setStats(insightsResponse.data.data);
 
         // Fetch dashboard stats
-        const dashboardResponse = await api.get<DashboardStatsResponse>('/admin/dashboard-stats');
+        const dashboardResponse = await api.get<DashboardStatsResponse>('/api/admin/dashboard-stats');
         setDashboardStats(dashboardResponse.data);
       } catch (err: unknown) {
         console.error('Error fetching dashboard data:', err);
