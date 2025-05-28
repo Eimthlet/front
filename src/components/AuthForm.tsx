@@ -115,6 +115,11 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
       const script = document.createElement('script');
       script.src = 'https://in.paychangu.com/js/popup.js';
       script.async = true;
+      script.crossOrigin = 'anonymous';
+      script.onerror = () => {
+        console.error('Failed to load PayChangu script');
+        setError('Payment system failed to load. Please refresh and try again.');
+      };
       document.body.appendChild(script);
     }
   }, []);
@@ -185,16 +190,18 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
         customer: {
           email: email,
           first_name: username || email.split('@')[0],
-          last_name: ''
+          last_name: '',
+          phone: phone || '' // Add phone number if available
         },
         customization: {
           title: 'Car Quiz Registration',
           description: 'Complete your registration payment',
-          logo: undefined
+          logo: 'https://your-logo-url.com/logo.png' // Add your logo URL
         },
         meta: {
           uuid: generateUUID(),
-          response: 'success'
+          response: 'success',
+          source: 'car_quiz_registration'
         }
       };
       
