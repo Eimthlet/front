@@ -8,10 +8,15 @@ interface LeaderboardEntry {
   user_id: number;
   username: string;
   score: number;
+  completed_at: string;
+  questions_answered: string;
+  total_questions: string;
 }
 
 interface LeaderboardResponse {
-  users: LeaderboardEntry[];
+  leaderboard: LeaderboardEntry[];
+  userRank: number | null;
+  currentUserId: number;
 }
 
 const StyledToggleButton = styled(ToggleButton)(({ theme }) => ({
@@ -53,8 +58,18 @@ const Leaderboard: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await api.get<LeaderboardResponse>('/api/leaderboard');
-        setLeaderboard(response.data?.users || []);
+        // Get token from localStorage
+        const token = localStorage.getItem('token');
+        
+        // Make the request with the token in the Authorization header
+        const response = await api.get<LeaderboardResponse>('/api/leaderboard', {
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : ''
+          }
+        });
+        
+        console.log('Leaderboard response:', response.data);
+        setLeaderboard(response.data?.leaderboard || []);
       } catch (err: any) {
         console.error('Error fetching leaderboard:', err);
         setError(err.message || 'Failed to load leaderboard data');
