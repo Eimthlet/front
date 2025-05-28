@@ -39,13 +39,19 @@ interface QualificationResponse {
 interface QuestionsResponse {
   questions: ApiQuestion[];
   message?: string;
-  status?: 'NO_ACTIVE_SEASON' | 'NOT_QUALIFIED' | 'NO_QUESTIONS';
+  status?: 'NO_ACTIVE_SEASON' | 'NOT_QUALIFIED' | 'NO_QUESTIONS' | 'INVALID_SEASON';
+  error?: string;
   season?: {
     id: number;
     name: string;
     isQualificationRound: boolean;
     minimumScorePercentage: number;
   };
+  attemptId?: number;
+  completed?: boolean;
+  score?: number;
+  totalQuestions?: number;
+  percentageScore?: number;
 }
 
 const App: React.FC = () => {
@@ -69,26 +75,45 @@ const App: React.FC = () => {
         
         // Only fetch questions if user is qualified or hasn't attempted yet
         if (!qualificationResponse.data.hasAttempted || qualificationResponse.data.isQualified) {
-          const response = await api.get<QuestionsResponse>('/api/questions');
-          
-          // Handle season-related messages
-          if (response.data.status) {
-            // If there's a status, it means there's an issue with accessing questions
-            setError(response.data.message || 'Unable to access quiz questions');
+          try {
+            const response = await api.get<QuestionsResponse>('/api/questions');
+            
+            // Handle completed attempts (403 errors are caught in the catch block)
+            if (response.data.error && response.data.completed) {
+              setError(response.data.error);
+              setQuestions([]);
+              return;
+            }
+            
+            // Handle season-related messages
+            if (response.data.status) {
+              // If there's a status, it means there's an issue with accessing questions
+              setError(response.data.message || 'Unable to access quiz questions');
+              setQuestions([]);
+              return;
+            }
+            
+            if (response.data.questions && response.data.questions.length > 0) {
+              const convertedQuestions = response.data.questions.map(q => ({
+                ...q,
+                id: q.id.toString(),
+                correctAnswer: q.correctAnswer.toString()
+              }));
+              setQuestions(convertedQuestions);
+            } else {
+              setQuestions([]);
+              setError(response.data.message || 'No questions available');
+            }
+          } catch (apiError: any) {
+            console.error('Error fetching questions:', apiError);
+            
+            // Handle 403 Forbidden (completed attempt)
+            if (apiError.response?.status === 403) {
+              setError(apiError.response.data.error || 'You have already completed the quiz for this season.');
+            } else {
+              setError(apiError.message || 'Failed to load questions');
+            }
             setQuestions([]);
-            return;
-          }
-          
-          if (response.data.questions && response.data.questions.length > 0) {
-            const convertedQuestions = response.data.questions.map(q => ({
-              ...q,
-              id: q.id.toString(),
-              correctAnswer: q.correctAnswer.toString()
-            }));
-            setQuestions(convertedQuestions);
-          } else {
-            setQuestions([]);
-            setError(response.data.message || 'No questions available');
           }
         }
       } catch (err: any) {
