@@ -225,6 +225,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     if (token) {
       try {
+        const checkApiStatusResponse = await checkApiStatus();
+        if (!checkApiStatusResponse) {
+          throw new Error('API not ready');
+        }
+        
         const checkTokenResponse = await checkToken();
         if (checkTokenResponse.error) {
           throw new Error(checkTokenResponse.error);
@@ -276,6 +281,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       const normalizedError = handleApiError(err);
       return { error: normalizedError.message };
+    }
+  };
+
+  const checkApiStatus = async (): Promise<boolean> => {
+    try {
+      const response = await apiClient.get<{status: string}>('/auth');
+      if (response.data.status !== 'active') {
+        throw new Error('API not ready');
+      }
+      return true;
+    } catch (error) {
+      const normalizedError = handleApiError(error);
+      console.error('API status check failed:', normalizedError);
+      throw normalizedError;
     }
   };
 
