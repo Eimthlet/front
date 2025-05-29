@@ -25,3 +25,27 @@ export const verifyApiConfig = (): void => {
     console.warn('API base URL using fallback to car-quizz.onrender.com');
   }
 };
+
+export const verifyEndpoints = async (): Promise<void> => {
+  const endpoints = [
+    'auth',
+    'auth/login', 
+    'auth/register',
+    'auth/logout',
+    'auth/check-token'
+  ];
+
+  console.group('API Endpoint Verification');
+  for (const endpoint of endpoints) {
+    try {
+      const url = getApiUrl(endpoint);
+      console.log(`Verifying: ${url}`);
+      // Test OPTIONS for CORS
+      await fetch(url, { method: 'OPTIONS' });
+      console.log(`✅ ${endpoint} - CORS OK`);
+    } catch (error) {
+      console.error(`❌ ${endpoint} -`, error);
+    }
+  }
+  console.groupEnd();
+};
