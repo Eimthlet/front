@@ -82,15 +82,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<void> => {
     setError(null);
     try {
-      const response = await apiClient.post<ApiResponse<AuthResponse>>('/api/auth/login', { email, password });
-      
-      if (response.data.error) {
-        throw new Error(response.data.error);
+      // Verify login endpoint exists
+      const response = await apiClient.options('/api/auth');
+      if (!response.data?.paths?.includes('/login')) {
+        throw new Error('Login service currently unavailable');
       }
       
-      const { token, refreshToken, user: userData } = response.data.data;
+      const authResponse = await apiClient.post<ApiResponse<AuthResponse>>('/api/auth/login', { email, password });
       
-      console.log('Login response:', response.data.data);
+      if (authResponse.data.error) {
+        throw new Error(authResponse.data.error);
+      }
+      
+      const { token, refreshToken, user: userData } = authResponse.data.data;
+      
+      console.log('Login response:', authResponse.data.data);
       
       // Store tokens in localStorage
       if (token) {
@@ -118,6 +124,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('User data not found in response');
       }
     } catch (err) {
+      if (err.response?.status === 404) {
+        throw new Error('Login service currently unavailable');
+      }
       const error = handleApiError(err);
       setError(error.message);
       throw error;
@@ -128,6 +137,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: RegisterData): Promise<void> => {
     setError(null);
     try {
+      // Verify register endpoint exists
+      const response = await apiClient.options('/api/auth');
+      if (!response.data?.paths?.includes('/register')) {
+        throw new Error('Register service currently unavailable');
+      }
+      
       const response = await apiClient.post<ApiResponse<AuthResponse>>('/api/auth/register', userData);
       
       if (response.data.error) {
@@ -143,6 +158,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('User data not found in response');
       }
     } catch (err) {
+      if (err.response?.status === 404) {
+        throw new Error('Register service currently unavailable');
+      }
       const error = handleApiError(err);
       setError(error.message);
       throw error;
@@ -174,8 +192,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     if (token) {
       try {
-        const response = await apiClient.get<TokenCheckResponse>('/api/auth/check-token');
-        const data = response.data;
+        const checkTokenResponse = await checkToken();
+        if (checkTokenResponse.error) {
+          throw new Error(checkTokenResponse.error);
+        }
+        
+        const data = checkTokenResponse;
         
         if (data.error || !data.user) {
           throw new Error(data.error || 'Invalid token');
@@ -198,6 +220,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
   
+  const checkToken = async (): Promise<TokenCheckResponse> => {
+    try {
+      // First verify endpoint exists
+      const response = await apiClient.options('/api/auth');
+      if (!response.data?.paths?.includes('/check-token')) {
+        return { error: 'Authentication service unavailable' };
+      }
+      
+      const tokenResponse = await apiClient.get<TokenCheckResponse>('/api/auth/check-token');
+      return tokenResponse.data;
+    } catch (err) {
+      if (err.response?.status === 404) {
+        return { error: 'Authentication service unavailable' };
+      }
+      return { error: handleApiError(err).message };
+    }
+  };
+
   // Initialize auth state on mount
   useEffect(() => {
     initializeAuth();

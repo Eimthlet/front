@@ -7,30 +7,46 @@ interface ApiResponse<T> {
 }
 
 const apiClient = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || '/api',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
   timeout: 10000,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json'
+    'Accept': 'application/json',
+    'SameSite': 'Lax'
   }
 });
 
 // Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
+    console.debug('[API Request]', {
+      url: config.url,
+      method: config.method,
+      data: config.data,
+      headers: config.headers
+    });
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error('[API Request Error]', error);
+    return Promise.reject(error);
+  }
 );
 
 // Response interceptor
 apiClient.interceptors.response.use(
   (response) => {
+    console.debug('[API Response]', {
+      url: response.config.url,
+      status: response.status,
+      data: response.data,
+      headers: response.headers
+    });
     // Standardize successful responses
     return {
       ...response,
@@ -42,6 +58,12 @@ apiClient.interceptors.response.use(
     };
   },
   (error) => {
+    console.error('[API Response Error]', {
+      url: error.config?.url,
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
     // Enhanced error logging
     if (error.response) {
       console.error('[API ERROR]', {
