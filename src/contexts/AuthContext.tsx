@@ -66,6 +66,11 @@ interface AuthEndpointsResponse {
   paths: string[];
 }
 
+interface ApiStatusResponse {
+  status: string;
+  data?: any;
+}
+
 // Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -280,47 +285,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error: 'Authentication service unavailable' };
       }
       const normalizedError = handleApiError(err);
+      return { error: normalizedError.message };
+    }
+  };
 
-const checkToken = async (): Promise<TokenCheckResponse> => {
-  try {
-    // First verify endpoint exists
-    const response = await apiClient.get<AuthEndpointsResponse>(getApiUrl('auth'), {
-      timeout: 15000,
-      withCredentials: true,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+  const checkApiStatus = async (): Promise<boolean> => {
+    try {
+      const response = await apiClient.get<ApiStatusResponse>('/auth');
+      if (!response.data?.status || response.data.status !== 'active') {
+        console.error('API status check failed:', response.data);
+        throw new Error('API not ready');
       }
-    });
-    if (!response.data.paths.includes('/check-token')) {
-      return { error: 'Authentication service unavailable' };
+      return true;
+    } catch (error) {
+      const normalizedError = handleApiError(error);
+      console.error('API status check failed:', normalizedError);
+      throw normalizedError;
     }
-    
-    const tokenResponse = await apiClient.get<TokenCheckResponse>(getApiUrl('auth/check-token'));
-    return tokenResponse.data;
-  } catch (err) {
-    if (err.response?.status === 404) {
-      return { error: 'Authentication service unavailable' };
-    }
-    const normalizedError = handleApiError(err);
-    return { error: normalizedError.message };
-  }
-};
-
-const checkApiStatus = async (): Promise<boolean> => {
-  try {
-    const response = await apiClient.get('/auth');
-    if (!response.data?.status || response.data.status !== 'active') {
-      console.error('API status check failed:', response.data);
-      throw new Error('API not ready');
-    }
-    return true;
-  } catch (error) {
-    const normalizedError = handleApiError(error);
-    console.error('API status check failed:', normalizedError);
-    throw normalizedError;
-  }
-};
+  };
 
   // Define the context value
   const contextValue: AuthContextType = {
@@ -350,3 +332,6 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+// Export the context type for use in other files
+export type { AuthContextType };
