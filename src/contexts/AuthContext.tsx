@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
-import { handleApiError } from '../utils/apiErrorHandler';
-import { getApiUrl } from '../utils/apiUrl';
+import { getApiUrl, verifyApiConfig } from '../utils/apiUrl';
+
+// Verify API config on initialization
+verifyApiConfig();
 
 // Define User and AuthContextType interfaces locally
 interface User {
@@ -67,7 +69,7 @@ interface AuthEndpointsResponse {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Provider component
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // State management
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -88,7 +90,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       // Verify login endpoint exists
-      const response = await apiClient.get<AuthEndpointsResponse>(getApiUrl('auth'));
+      const response = await apiClient.get<AuthEndpointsResponse>(getApiUrl('auth'), {
+        timeout: 15000,
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
       if (!response.data.paths.includes('/login')) {
         throw new Error('Login service currently unavailable');
       }
@@ -258,7 +267,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkToken = async (): Promise<TokenCheckResponse> => {
     try {
       // First verify endpoint exists
-      const response = await apiClient.get<AuthEndpointsResponse>(getApiUrl('auth'));
+      const response = await apiClient.get<AuthEndpointsResponse>(getApiUrl('auth'), {
+        timeout: 15000,
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
       if (!response.data.paths.includes('/check-token')) {
         return { error: 'Authentication service unavailable' };
       }

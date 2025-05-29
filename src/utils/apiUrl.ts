@@ -1,13 +1,27 @@
 /**
- * Properly constructs API URLs to prevent duplicate path segments
- * @param endpoint API endpoint path (e.g. 'auth/register')
- * @returns Properly formatted URL
+ * Properly constructs API URLs and logs for debugging
+ */
+/**
+ * Production API URL configuration
  */
 export const getApiUrl = (endpoint: string): string => {
-  // Remove any leading/trailing slashes
+  const baseUrl = 'https://car-quizz.onrender.com/api';
   const cleanEndpoint = endpoint.replace(/^\/+|\/+$/g, '');
   
-  // The backend is hosted at https://car-quizz.onrender.com/api
-  // So we need to ensure we don't duplicate '/api'
+  if (process.env.NODE_ENV === 'development') {
+    console.debug('[API] Request to:', `${baseUrl}/${cleanEndpoint}`);
+  }
+  
+  return `${baseUrl}/${cleanEndpoint}`;
+};
+
+export const getApiUrlLocal = (endpoint: string): string => {
+  const cleanEndpoint = endpoint.replace(/^\/+|\/+$/g, '');
   return `/api/${cleanEndpoint}`;
+};
+
+export const verifyApiConfig = (): void => {
+  if (!process.env.REACT_APP_API_BASE_URL) {
+    console.warn('API base URL using fallback to car-quizz.onrender.com');
+  }
 };
