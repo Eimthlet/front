@@ -73,12 +73,12 @@ const App: React.FC = () => {
         console.log('Qualification response:', qualificationResponse);
         
         // Get the qualification data from the response
-        const qualificationData = qualificationResponse.data.data;
+        const qualificationData = qualificationResponse.data?.data;
         
         // Log the raw qualification data for debugging
         console.debug('Raw qualification data:', qualificationData);
         
-        // Check if we have the minimum required data
+        // Check if we have valid qualification data
         if (!qualificationData || typeof qualificationData !== 'object') {
           console.error('Invalid qualification response:', qualificationResponse);
           throw new Error('Invalid qualification response');
