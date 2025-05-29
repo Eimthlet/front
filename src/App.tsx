@@ -48,6 +48,8 @@ interface QualificationResponse {
   minimumRequired?: number;
   message?: string;
   qualifies_for_next_round?: boolean;
+  completed?: boolean;
+  completed_at?: string;
 }
 
 const App: React.FC = () => {
@@ -79,15 +81,22 @@ const App: React.FC = () => {
         // Type assertion to ensure TypeScript knows this is a QualificationResponse
         const typedQualificationData = qualificationData as QualificationResponse;
         
-        // Extract values with type safety
-        const hasAttempted = 'hasAttempted' in typedQualificationData ? typedQualificationData.hasAttempted : false;
-        const isQualified = ('isQualified' in typedQualificationData ? typedQualificationData.isQualified : false) || 
-                          ('qualifies_for_next_round' in typedQualificationData ? typedQualificationData.qualifies_for_next_round : false);
+        // Extract values with type safety and proper defaults
+        const hasAttempted = typedQualificationData.hasAttempted ?? false;
+        const isQualified = typedQualificationData.isQualified ?? typedQualificationData.qualifies_for_next_round ?? false;
         
+        // Set qualification state with all available data
         setQualification({
-          ...typedQualificationData,
           hasAttempted,
-          isQualified
+          isQualified,
+          score: typedQualificationData.score ?? 0,
+          totalQuestions: typedQualificationData.totalQuestions ?? 0,
+          percentageScore: typedQualificationData.percentageScore ?? '0',
+          minimumRequired: typedQualificationData.minimumRequired ?? 0,
+          message: typedQualificationData.message ?? 'No qualification data available',
+          qualifies_for_next_round: typedQualificationData.qualifies_for_next_round ?? false,
+          completed: typedQualificationData.completed ?? false,
+          completed_at: typedQualificationData.completed_at
         });
         
         // Only fetch questions if user is qualified or hasn't attempted yet

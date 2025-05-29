@@ -50,10 +50,8 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // Add SameSite and Partitioned attributes to cookies
-    if (config.withCredentials) {
-      config.headers['Set-Cookie'] = 'SameSite=None; Secure; Partitioned';
-    }
+    // Remove the attempt to set Set-Cookie header
+    delete config.headers['Set-Cookie'];
     
     return config;
   },
