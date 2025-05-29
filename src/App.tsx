@@ -47,6 +47,7 @@ interface QualificationResponse {
   percentageScore?: string;
   minimumRequired?: number;
   message?: string;
+  qualifies_for_next_round?: boolean;
 }
 
 const App: React.FC = () => {
@@ -66,10 +67,20 @@ const App: React.FC = () => {
         
         // First check qualification status
         const qualificationResponse = await api.get<ApiResponse<QualificationResponse>>('/api/qualification');
-        setQualification(qualificationResponse.data.data);
+        const qualificationData = qualificationResponse.data.data;
+        
+        // Handle both response formats
+        const hasAttempted = qualificationData.hasAttempted || false;
+        const isQualified = qualificationData.isQualified || qualificationData.qualifies_for_next_round || false;
+        
+        setQualification({
+          ...qualificationData,
+          hasAttempted,
+          isQualified
+        });
         
         // Only fetch questions if user is qualified or hasn't attempted yet
-        if (!qualificationResponse.data.data.hasAttempted || qualificationResponse.data.data.isQualified) {
+        if (!hasAttempted || isQualified) {
           try {
             const response = await api.get<ApiResponse<QuestionsResponse>>('/api/questions');
             const questions = response.data.data.questions.map(q => ({

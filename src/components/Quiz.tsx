@@ -97,7 +97,9 @@ interface QuizProps {
 }
 
 interface QualificationResponse {
-  qualifies_for_next_round: boolean;
+  hasAttempted: boolean;
+  isQualified: boolean;
+  qualifies_for_next_round?: boolean;
   message?: string;
 }
 
@@ -211,16 +213,15 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
   useEffect(() => {
     const checkQualification = async () => {
       try {
-        const response = await apiClient.get('/api/qualification');
+        const response = await apiClient.get<ApiResponse<QualificationResponse>>('/api/qualification');
+        const qualificationData = response.data.data;
         
-        // Version-agnostic response handling
-        const responseData = (response as any).data?.data || (response as any).data;
+        // Handle both response formats
+        const isQualified = qualificationData.isQualified || qualificationData.qualifies_for_next_round || false;
+        setHasQualification(isQualified);
         
-        if (typeof responseData?.qualifies_for_next_round === 'boolean') {
-          setHasQualification(responseData.qualifies_for_next_round);
-        } else {
-          console.error('Invalid qualification response:', responseData);
-          setHasQualification(false);
+        if (!isQualified && qualificationData.message) {
+          console.warn('Qualification check warning:', qualificationData.message);
         }
       } catch (err) {
         const error = handleApiError(err);
