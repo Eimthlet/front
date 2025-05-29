@@ -45,6 +45,11 @@ interface AuthResponse {
   success?: boolean;
 }
 
+interface LoginResponse {
+  data: AuthResponse;
+  error?: string;
+}
+
 interface TokenCheckResponse {
   user?: User;
   error?: string;
@@ -111,17 +116,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('Auth endpoint response:', response.data);
       
-      const authResponse = await apiClient.post<ApiResponse<AuthResponse>>(getApiUrl('auth/login'), { email, password });
+      const authResponse = await apiClient.post<LoginResponse>(getApiUrl('auth/login'), { email, password });
       
       if (authResponse.data.error) {
         throw new Error(authResponse.data.error);
       }
       
-      // Handle both response formats
-      const responseData = authResponse.data.data || authResponse.data;
-      const { token, refreshToken, user: userData } = responseData;
+      const { token, refreshToken, user: userData } = authResponse.data.data;
       
-      console.log('Login response:', responseData);
+      console.log('Login response:', authResponse.data.data);
       
       // Store tokens in localStorage
       if (token) {
