@@ -30,87 +30,84 @@ interface InsightsStats {
   nonAdminUsers: NonAdminUser[];
 }
 
+interface DashboardStats {
+  totalUsers: number;
+  totalQuizzes: number;
+  averageScore: number;
+  recentActivity: Array<{
+    id: number;
+    type: string;
+    timestamp: string;
+    details: string;
+  }>;
+}
+
+interface DashboardResponse {
+  totalUsers: number;
+  totalQuizzes: number;
+  averageScore: number;
+  recentActivity: Array<{
+    id: number;
+    type: string;
+    timestamp: string;
+    details: string;
+  }>;
+}
+
 interface ApiResponse<T> {
   data: T;
   error?: string;
 }
 
-interface DashboardResponse {
-  total_users: number;
-  active_users: number;
-  avg_score: number;
-  highest_score: number;
-  lowest_score: number;
-}
-
 interface DashboardStatsResponse {
-  seasons: number;
-  questions: number;
-  active_quizzes: number;
-}
-
-interface ApiError {
-  response?: {
-    status: number;
-    data: {
-      error?: string;
-      details?: string;
-    };
+  data: {
+    totalUsers: number;
+    totalQuizzes: number;
+    averageScore: number;
+    recentActivity: Array<{
+      id: number;
+      type: string;
+      timestamp: string;
+      details: string;
+    }>;
   };
-  message: string;
+  error?: string;
 }
 
 interface ErrorState {
   message: string;
   isError: boolean;
-  details?: string;
 }
 
 const AdminDashboard: React.FC = () => {
-  const [stats, setStats] = useState<InsightsStats | null>(null);
-  const [dashboardStats, setDashboardStats] = useState<DashboardStatsResponse | null>(null);
-  const [error, setError] = useState<ErrorState | null>(null);
-  const [activeSection, setActiveSection] = useState<'insights' | 'overview' | 'users' | 'seasons'>('overview');
-  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalUsers: 0,
+    totalQuizzes: 0,
+    averageScore: 0,
+    recentActivity: []
+  });
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        // Fetch insights stats
-        const insightsRes = await apiClient.get<ApiResponse<DashboardResponse>>('/api/admin/insights-stats');
-        if (insightsRes.data.error) {
-          throw new Error(insightsRes.data.error);
-        }
-        setStats({
-          averageScore: insightsRes.data.data.avg_score,
-          mostPlayedGame: '',
-          leastPlayedGame: '',
-          insights: [],
-          totalUsers: insightsRes.data.data.total_users,
-          nonAdminUsers: []
-        });
-
-        // Fetch dashboard stats
-        const dashRes = await apiClient.get<ApiResponse<DashboardStatsResponse>>('/api/admin/dashboard-stats');
-        if (dashRes.data.error) {
-          throw new Error(dashRes.data.error);
-        }
-        setDashboardStats(dashRes.data.data);
-      } catch (err: any) {
-        setError({
-          message: err.message || 'Failed to load dashboard data',
-          isError: true
-        });
-      } finally {
-        setIsLoading(false);
+  const fetchDashboardData = async () => {
+    try {
+      // Fetch insights stats
+      const insightsRes = await apiClient.get<ApiResponse<DashboardResponse>>('/api/admin/insights-stats');
+      
+      if (insightsRes.error) {
+        throw new Error(insightsRes.error);
       }
-    };
-
-    fetchData();
-  }, []);
+      
+      setStats({
+        totalUsers: insightsRes.data.totalUsers,
+        totalQuizzes: insightsRes.data.totalQuizzes,
+        averageScore: insightsRes.data.averageScore,
+        recentActivity: insightsRes.data.recentActivity
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch dashboard data');
+    }
+  };
 
   return (
     <div className="admin-dashboard">
@@ -119,64 +116,41 @@ const AdminDashboard: React.FC = () => {
           <h1 className="dashboard-title">Admin Dashboard</h1>
         </div>
 
-        {isLoading ? (
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-            <p>Loading dashboard...</p>
-          </div>
-        ) : error ? (
+        {error && (
           <div className="error-message">
             <h3>Error Loading Dashboard</h3>
-            <p>{error.message}</p>
-            {error.details && <p className="error-details">{error.details}</p>}
+            <p>{error}</p>
             <button onClick={() => window.location.reload()}>Retry</button>
           </div>
-        ) : !stats || !dashboardStats ? (
-          <div className="no-data-message">
-            <p>No dashboard data available</p>
-          </div>
-        ) : (
-          <div className="dashboard-content">
-            <div className="stats-overview">
-              <h2>Overview</h2>
-              <div className="stats-grid">
-                <div className="stat-card">
-                  <h3>Total Users</h3>
-                  <p>{stats.totalUsers}</p>
-                </div>
-                <div className="stat-card">
-                  <h3>Average Score</h3>
-                  <p>{stats.averageScore}%</p>
-                </div>
-                <div className="stat-card">
-                  <h3>Most Played Game</h3>
-                  <p>{stats.mostPlayedGame}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="top-players">
-              <h2>Top Players</h2>
-              <div className="players-list">
-                {/* Add top players data here */}
-              </div>
-            </div>
-
-            <div className="recent-activity">
-              <h2>Recent Activity</h2>
-              <div className="activity-list">
-                {/* Add recent activity data here */}
-              </div>
-            </div>
-
-            <div className="user-insights">
-              <h2>User Insights</h2>
-              <div className="insights-list">
-                {/* Add user insights data here */}
-              </div>
-            </div>
-          </div>
         )}
+
+        <div className="stats-grid">
+          <div className="stat-card">
+            <h3>Total Users</h3>
+            <p>{stats.totalUsers}</p>
+          </div>
+          <div className="stat-card">
+            <h3>Total Quizzes</h3>
+            <p>{stats.totalQuizzes}</p>
+          </div>
+          <div className="stat-card">
+            <h3>Average Score</h3>
+            <p>{stats.averageScore}%</p>
+          </div>
+        </div>
+
+        <div className="recent-activity">
+          <h2>Recent Activity</h2>
+          <div className="activity-list">
+            {stats.recentActivity.map(activity => (
+              <div key={activity.id} className="activity-item">
+                <span className="activity-type">{activity.type}</span>
+                <span className="activity-time">{new Date(activity.timestamp).toLocaleString()}</span>
+                <p className="activity-details">{activity.details}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
