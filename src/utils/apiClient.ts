@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getApiUrl } from './apiUrl';
+import { handleApiError } from './apiErrorHandler';
 
 interface ApiResponse<T> {
   data: T;
