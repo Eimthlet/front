@@ -28,7 +28,7 @@ interface TokenResponse {
 
 const apiClient = axios.create({
   baseURL: getApiUrl(''),
-  timeout: 30000, // Increased timeout to 30s
+  timeout: 30000,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -50,7 +50,7 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // Remove the attempt to set Set-Cookie header
+    // Remove any attempt to set cookie headers
     delete config.headers['Set-Cookie'];
     
     return config;
@@ -85,7 +85,7 @@ apiClient.interceptors.response.use(
     }
 
     // Standardize successful responses
-    return {
+    const standardizedResponse = {
       ...response,
       data: {
         data: response.data,
@@ -93,6 +93,11 @@ apiClient.interceptors.response.use(
         headers: response.headers
       }
     };
+
+    // Log the standardized response for debugging
+    console.debug('[Standardized Response]', standardizedResponse);
+
+    return standardizedResponse;
   },
   async (error) => {
     console.error('[API Response Error]', {

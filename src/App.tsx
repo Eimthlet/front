@@ -75,18 +75,22 @@ const App: React.FC = () => {
         const qualificationData = qualificationResponse.data?.data || qualificationResponse.data;
         
         if (!qualificationData) {
+          console.error('Invalid qualification response:', qualificationResponse);
           throw new Error('Invalid qualification response');
         }
         
         // Type assertion to ensure TypeScript knows this is a QualificationResponse
         const typedQualificationData = qualificationData as QualificationResponse;
         
+        // Log the typed data for debugging
+        console.debug('Typed qualification data:', typedQualificationData);
+        
         // Extract values with type safety and proper defaults
         const hasAttempted = typedQualificationData.hasAttempted ?? false;
         const isQualified = typedQualificationData.isQualified ?? typedQualificationData.qualifies_for_next_round ?? false;
         
         // Set qualification state with all available data
-        setQualification({
+        const qualificationState = {
           hasAttempted,
           isQualified,
           score: typedQualificationData.score ?? 0,
@@ -97,7 +101,12 @@ const App: React.FC = () => {
           qualifies_for_next_round: typedQualificationData.qualifies_for_next_round ?? false,
           completed: typedQualificationData.completed ?? false,
           completed_at: typedQualificationData.completed_at
-        });
+        };
+        
+        // Log the qualification state for debugging
+        console.debug('Setting qualification state:', qualificationState);
+        
+        setQualification(qualificationState);
         
         // Only fetch questions if user is qualified or hasn't attempted yet
         if (!hasAttempted || isQualified) {
