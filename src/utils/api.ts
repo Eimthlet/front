@@ -186,7 +186,9 @@ api.interceptors.response.use(
       }
 
       return Promise.reject({
-      }
+        message: 'Network error after multiple attempts. Please check your internet connection and try again.',
+        originalError: error
+      });
     }
 
     // Handle other errors

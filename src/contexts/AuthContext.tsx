@@ -1,8 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
-import axios from 'axios';
-import api from '../utils/api';
-import { AUTH_CONFIG, API_CONFIG } from '../config';
+import { apiClient, ApiResponse } from '../utils/apiNew';
 
 // Define User and AuthContextType interfaces locally
 interface User {
@@ -68,71 +67,22 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Provider component
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  // State management
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const refreshTokenAndUpdateUser = async () => {
-    try {
-      // Call refresh endpoint without sending the token (it will be sent via cookies)
-      const refreshResponse = await api.post<AuthResponse>(
-        '/api/auth/refresh', 
-        {}, 
-        { withCredentials: true }
-      );
-      
-      console.log('Token refresh response:', refreshResponse.data);
-      
-      // After successful token refresh, check token validity to get user info
-      const response = await api.get<TokenCheckResponse>('/api/auth/check-token', { 
-        withCredentials: true 
-      });
-      
-      console.log('Token check response after refresh:', response.data);
-      
-      if (response.data.valid && response.data.user) {
-        const userData = response.data.user;
-        const isAdminUser = userData.isAdmin || userData.role === 'admin';
-        
-        const userInfo = {
-          id: userData.id,
-          email: userData.email,
-          isAdmin: isAdminUser,
-          role: userData.role || 'user'
-        };
-        
-        console.log('Setting user state:', userInfo);
-        
-        setUser(userInfo);
-        setIsAuthenticated(true);
-        setIsAdmin(isAdminUser);
-      }
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      setUser(null);
-      setIsAuthenticated(false);
-      setIsAdmin(false);
-    }
-  };
-
-  useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        // Don't try to check token on initial load - this can cause CORS issues
-        // Just set loading to false and let the user log in manually
-        console.log('Auth initialized - user needs to log in');
-      } catch (error) {
-        console.error('Auth initialization failed:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeAuth();
+  
+  // Navigation
+  const navigate = useNavigate();
+  
+  // Clear error function
+  const clearError = useCallback(() => {
+    setError(null);
   }, []);
-
+  
+  // Login function
   const login = async (email: string, password: string): Promise<void> => {
     setError(null);
     try {
@@ -142,221 +92,188 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
       
-      // Use axios directly to avoid interceptors for this critical request
-      const loginResponse = await axios.post<AuthResponse>(
-        `${API_CONFIG.BASE_URL}/api/auth/login`, 
-        { email, password }, 
-        { 
-          withCredentials: true, // Important for cookies
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          timeout: 10000 // 10 second timeout
-        }
-      );
+      // Use apiClient for login
+      const loginResponse = await apiClient.post<AuthResponse>('/api/auth/login', { email, password });
       
-      console.log('Login response:', {
-        status: loginResponse.status,
-        statusText: loginResponse.statusText,
-        data: loginResponse.data,
-        headers: loginResponse.headers
-      });
-      
-      // Store tokens in localStorage if they're in the response
-      if (loginResponse.data.token) {
-        localStorage.setItem('token', loginResponse.data.token);
-        console.log('Token stored in localStorage');
+      if (loginResponse.error) {
+        throw new Error(loginResponse.error);
       }
       
-      if (loginResponse.data.refreshToken) {
+      console.log('Login response:', loginResponse.data);
+      
+      // Store tokens in localStorage
+      if (loginResponse.data?.token) {
+        localStorage.setItem('token', loginResponse.data.token);
+        console.log('Token stored in localStorage');
+        
+        // Set the auth token in the API client
+        apiClient.setAuthToken(loginResponse.data.token);
+      }
+      
+      if (loginResponse.data?.refreshToken) {
         localStorage.setItem('refreshToken', loginResponse.data.refreshToken);
         console.log('Refresh token stored in localStorage');
       }
       
-      // If user info is in the login response, use it directly
-      if (loginResponse.data.user) {
-        const userData = loginResponse.data.user;
+      // Get user info after successful login
+      const userResponse = await apiClient.get<TokenCheckResponse>('/api/auth/check-token');
+      
+      if (userResponse.error) {
+        throw new Error(userResponse.error);
+      }
+      
+      if (userResponse.data?.user) {
+        const userData = userResponse.data.user;
         const isAdminUser = Boolean(userData.isAdmin || userData.role === 'admin');
-        const userRole = userData.role || 'user';
         
-        const userInfo = {
+        const userInfo: User = {
           id: userData.id,
           email: userData.email,
           isAdmin: isAdminUser,
-          role: userRole
+          role: userData.role || 'user'
         };
         
-        console.log('User data from login response:', userInfo);
+        console.log('User data from check-token:', userInfo);
         
         setUser(userInfo);
         setIsAuthenticated(true);
         setIsAdmin(isAdminUser);
         
-        console.log('User state updated:', userInfo);
-        return;
+        // Navigate to home or dashboard after successful login
+        navigate('/');
+      }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      let errorMessage = 'Login failed. Please try again.';
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       
-      // Otherwise, check token validity to get user info
-      console.log('No user data in login response, checking token validity...');
-      const response = await axios.get<TokenCheckResponse>(
-        `${API_CONFIG.BASE_URL}/api/auth/check-token`, 
-        { 
-          withCredentials: true,
-          headers: {
-            'Authorization': `Bearer ${loginResponse.data.token}`,
-            'Accept': 'application/json'
-          }
-        }
-      );
-      
-      console.log('Token check response:', response.data);
-      
-      if (response.data.valid && response.data.user) {
-        const userData = response.data.user;
-        const isAdminUser = Boolean(userData.isAdmin || userData.role === 'admin');
-        const userRole = userData.role || 'user';
-        
-        const userInfo = {
-          id: userData.id,
-          email: userData.email,
-          isAdmin: isAdminUser,
-          role: userRole
-        };
-        
-        console.log('User data from token check:', userInfo);
-        
-        setUser(userInfo);
-        setIsAuthenticated(true);
-        setIsAdmin(isAdminUser);
-        
-        console.log('User state updated from token check:', userInfo);
-      }
-    } catch (error) {
-      handleApiError(error, 'Login failed');
+      setError(errorMessage);
+      throw error;
     }
   };
-
+  
+  // Register function
   const register = async (userData: RegisterData): Promise<void> => {
     setError(null);
     try {
-      const registerResponse = await api.post<AuthResponse>('/api/auth/register', userData, { 
-        withCredentials: true 
-      });
-      
-      console.log('Registration response:', registerResponse.data);
-      
-      // After successful registration, check token validity to get user info
-      const response = await api.get<TokenCheckResponse>('/api/auth/check-token', { 
-        withCredentials: true 
-      });
-      
-      if (response.data.valid && response.data.user) {
-        const userData = response.data.user;
-        const isAdminUser = Boolean(userData.isAdmin || userData.role === 'admin');
-        const userRole = userData.role || 'user';
-        
-        const userInfo = {
-          id: userData.id,
-          email: userData.email,
-          isAdmin: isAdminUser,
-          role: userRole
-        };
-        
-        console.log('User data after registration:', userInfo);
-        
-        setUser(userInfo);
-        setIsAuthenticated(true);
-        setIsAdmin(isAdminUser);
+      const response = await apiClient.post<AuthResponse>('/api/auth/register', userData);
+      if (response.error) {
+        throw new Error(response.error);
       }
-    } catch (error) {
-      handleApiError(error, 'Registration failed');
+      // After successful registration, log the user in
+      await login(userData.email, userData.password);
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
+      throw error;
     }
   };
-
+  
+  // Logout function
   const logout = async (): Promise<void> => {
-    setError(null);
     try {
-      await api.post('/api/auth/logout', {}, { withCredentials: true });
-      setUser(null);
-      setIsAuthenticated(false);
-      setIsAdmin(false);
+      await apiClient.post('/api/auth/logout');
     } catch (error) {
-      // Even if the server call fails, we still want to clear the local state
       console.error('Logout error:', error);
+    } finally {
+      // Clear user state and tokens regardless of API call success
       setUser(null);
       setIsAuthenticated(false);
       setIsAdmin(false);
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      navigate('/login');
     }
   };
-
-  const clearError = () => {
-    setError(null);
-  };
-
-  const handleApiError = (error: any, defaultMessage: string) => {
-    console.error(defaultMessage, error);
-    
-    // Extract the error message from the API response if available
-    let userFriendlyMessage = defaultMessage;
-    
-    // Check if the error is from our updated API format
-    if (error.message && typeof error.message === 'string') {
-      userFriendlyMessage = error.message;
-    }
-    
-    // If there's a response with error data, prioritize that
-    if (error.response?.data?.error) {
-      userFriendlyMessage = error.response.data.error;
-    }
-    
-    // For specific error codes, provide even more user-friendly messages
-    if (error.response?.data?.code) {
-      const errorCode = error.response.data.code;
-      
-      switch(errorCode) {
-        case 'INVALID_CREDENTIALS':
-          userFriendlyMessage = 'The email or password you entered is incorrect. Please try again.';
-          break;
-        case 'TOKEN_EXPIRED':
-          userFriendlyMessage = 'Your session has expired. Please log in again.';
-          break;
-        case 'INVALID_TOKEN':
-          userFriendlyMessage = 'Your session is invalid. Please log in again.';
-          break;
-        case 'ACCOUNT_SUSPENDED':
-          userFriendlyMessage = 'Your account has been temporarily suspended. Please contact support.';
-          break;
+  
+  // Initialize auth state
+  const initializeAuth = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setIsLoading(false);
+        return;
       }
+      
+      // Set the token in the API client
+      apiClient.setAuthToken(token);
+      
+      // Check if token is valid and get user info
+      const response = await apiClient.get<TokenCheckResponse>('/api/auth/check-token');
+      
+      if (response.error || !response.data?.valid || !response.data.user) {
+        throw new Error(response.error || 'Invalid token');
+      }
+      
+      const userData = response.data.user;
+      const isAdminUser = Boolean(userData.isAdmin || userData.role === 'admin');
+      
+      setUser({
+        id: userData.id,
+        email: userData.email,
+        isAdmin: isAdminUser,
+        role: userData.role || 'user'
+      });
+      
+      setIsAuthenticated(true);
+      setIsAdmin(isAdminUser);
+      
+    } catch (error) {
+      console.error('Auth initialization error:', error);
+      // Clear invalid tokens
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      setUser(null);
+      setIsAuthenticated(false);
+      setIsAdmin(false);
+    } finally {
+      setIsLoading(false);
     }
-    
-    setError(userFriendlyMessage);
+  }, []);
+  
+  // Initialize auth state on mount
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
+
+  // Define the context value
+  const contextValue: AuthContextType = {
+    user,
+    isAuthenticated,
+    isAdmin,
+    isLoading,
+    login,
+    register,
+    logout,
+    error,
+    clearError,
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated,
-        isAdmin,
-        isLoading,
-        login,
-        register,
-        logout,
-        error,
-        clearError
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 // Custom hook to use the auth context
-export function useAuth() {
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+};
