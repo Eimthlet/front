@@ -17,6 +17,8 @@ import {
   loadQuizSession,
   clearQuizSession
 } from '../utils/session';
+import apiClient from '../utils/apiClient'; 
+import { handleApiError } from '../utils/apiErrorHandler'; 
 
 // Types for Quiz component
 export interface Question {
@@ -92,6 +94,17 @@ const ActionButton = styled(Button)(({ theme }) => ({
 interface QuizProps {
   questions: Question[];
   onComplete: (score: number) => void;
+}
+
+interface QualificationResponse {
+  qualifies_for_next_round: boolean;
+  message?: string;
+}
+
+interface ApiResponse<T> {
+  data: T;
+  status?: number;
+  headers?: any;
 }
 
 const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
@@ -192,9 +205,51 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
     return () => {};
   }, [onComplete, shuffledQuestions, validQuestions.length, user]);
 
-  // Early return if no valid questions or no user
-  if (validQuestions.length === 0 || !user) {
-    return null;
+  // Qualification check
+  const [hasQualification, setHasQualification] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkQualification = async () => {
+      try {
+        const response = await apiClient.get('/api/qualification');
+        
+        // Version-agnostic response handling
+        const responseData = (response as any).data?.data || (response as any).data;
+        
+        if (typeof responseData?.qualifies_for_next_round === 'boolean') {
+          setHasQualification(responseData.qualifies_for_next_round);
+        } else {
+          console.error('Invalid qualification response:', responseData);
+          setHasQualification(false);
+        }
+      } catch (err) {
+        const error = handleApiError(err);
+        console.error('Qualification check failed:', error);
+        setHasQualification(false);
+      }
+    };
+
+    if (user) {
+      checkQualification();
+    }
+  }, [user]);
+
+  if (hasQualification === null) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Typography variant="h6">Checking qualification status...</Typography>
+      </Box>
+    );
+  }
+
+  if (hasQualification === false) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Typography variant="h6" color="error">
+          You don't qualify for this quiz round yet.
+        </Typography>
+      </Box>
+    );
   }
 
   // Answer handling

@@ -7,12 +7,13 @@ interface ApiResponse<T> {
 }
 
 const apiClient = axios.create({
-  baseURL: process.env.REACT_APP_API_BASE_URL,
+  baseURL: process.env.REACT_APP_API_URL || '/api',
   timeout: 10000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
-  },
-  withCredentials: true
+    'Accept': 'application/json'
+  }
 });
 
 // Request interceptor
@@ -30,19 +31,14 @@ apiClient.interceptors.request.use(
 // Response interceptor
 apiClient.interceptors.response.use(
   (response) => {
-    // Validate response structure
-    if (process.env.NODE_ENV === 'development' && !response.data) {
-      console.warn('[API WARNING] Empty response.data', {
-        url: response.config.url,
-        response
-      });
-    }
-    
     // Standardize successful responses
-    const data = response.data as ApiResponse<any>;
     return {
       ...response,
-      data: data.data || data
+      data: {
+        data: response.data, // Actual response data
+        status: response.status,
+        headers: response.headers
+      }
     };
   },
   (error) => {
@@ -58,7 +54,9 @@ apiClient.interceptors.response.use(
       console.error('[API NETWORK ERROR]', error);
     }
     
-    return Promise.reject(handleApiError(error));
+    // Process and standardize errors
+    const processedError = handleApiError(error);
+    return Promise.reject(processedError);
   }
 );
 

@@ -11,20 +11,6 @@ type AxiosErrorType = Error & {
   code?: string;
 };
 
-type ApiError = {
-  response?: {
-    status?: number;
-    data?: {
-      error?: string;
-      message?: string;
-      details?: any;
-    };
-  };
-  message?: string;
-  code?: string;
-  isAxiosError?: boolean;
-};
-
 export function handleApiError(error: unknown): Error {
   // Handle standard Error objects
   if (error instanceof Error) {
@@ -32,10 +18,13 @@ export function handleApiError(error: unknown): Error {
     const axiosError = error as AxiosErrorType;
     
     if (axiosError.isAxiosError) {
+      // Handle standardized error responses
+      const errorData = axiosError.response?.data?.data || axiosError.response?.data;
       return new Error(
-        (axiosError.response?.data as any)?.error || 
-        (axiosError.response?.data as any)?.message || 
-        axiosError.message
+        errorData?.error || 
+        errorData?.message || 
+        axiosError.message ||
+        'An unknown API error occurred'
       );
     }
     return new Error(error.message);
@@ -43,22 +32,23 @@ export function handleApiError(error: unknown): Error {
 
   // Handle plain objects with error info
   if (typeof error === 'object' && error !== null) {
-    const err = error as ApiError;
+    const err = error as Record<string, any>;
     
     // Network errors (no response)
     if (!err.response) {
       return new Error(err.message || 'Network error - please check your connection');
     }
 
-    const { status, data } = err.response;
+    const errorData = err.response.data?.data || err.response.data;
+    const status = err.response.status;
     
     // Standard error responses
-    if (data?.error) {
-      return new Error(data.error);
+    if (errorData?.error) {
+      return new Error(errorData.error);
     }
     
-    if (data?.message) {
-      return new Error(data.message);
+    if (errorData?.message) {
+      return new Error(errorData.message);
     }
     
     // HTTP status code based errors
