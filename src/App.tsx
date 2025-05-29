@@ -19,9 +19,10 @@ import { Question } from './types';
 interface ApiResponse<T> {
   data: T;
   error?: string;
-  completed?: boolean;
-  status?: number;
   message?: string;
+  status?: number;
+  headers?: any;
+  completed?: boolean;
 }
 
 interface ApiQuestion {
@@ -71,8 +72,8 @@ const App: React.FC = () => {
         const qualificationResponse = await api.get<ApiResponse<QualificationResponse>>('/api/qualification');
         console.log('Qualification response:', qualificationResponse);
         
-        // Get the qualification data directly from the response
-        const qualificationData = qualificationResponse.data as unknown as QualificationResponse;
+        // Get the qualification data from the response
+        const qualificationData = qualificationResponse.data.data;
         
         // Log the raw qualification data for debugging
         console.debug('Raw qualification data:', qualificationData);
@@ -113,21 +114,21 @@ const App: React.FC = () => {
         if (!hasAttempted || isQualified) {
           try {
             const response = await api.get<ApiResponse<QuestionsResponse>>('/api/questions');
-            const questions = response.data?.data?.questions || [];
+            const questions = response.data.data?.questions || [];
             setQuestions(questions.map(q => ({
               ...q,
               id: q.id.toString() // Convert id to string if needed
             })));
             
             // Handle completed attempts (403 errors are caught in the catch block)
-            if (response.data?.error && response.data?.completed) {
+            if (response.data.error && response.data.completed) {
               setError(response.data.error);
               setQuestions([]);
               return;
             }
             
             // Handle season-related messages
-            if (response.data?.status) {
+            if (response.data.status) {
               // If there's a status, it means there's an issue with accessing questions
               setError(response.data.message || 'Unable to access quiz questions');
               setQuestions([]);
@@ -160,11 +161,8 @@ const App: React.FC = () => {
       }
     };
 
-    // Only fetch data if user is logged in
-    if (user) {
-      validateAndFetchData();
-    }
-  }, [user, navigate]);
+    validateAndFetchData();
+  }, [navigate]);
 
   const handleQuizComplete = async (score: number) => {
     try {
