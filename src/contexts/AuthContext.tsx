@@ -141,19 +141,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: RegisterData): Promise<void> => {
     setError(null);
     try {
-      // Verify register endpoint exists - use correct base URL
-      const response = await apiClient.get<AuthEndpointsResponse>('/auth', { 
+      // Use correct endpoint path without duplicate /api
+      const response = await apiClient.get<AuthEndpointsResponse>('auth', {
         timeout: 15000,
-        withCredentials: true
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
       });
       
-      if (!response.data.paths.includes('/register')) {
+      if (!response.data.paths.includes('register')) {
         throw new Error('Registration service is currently unavailable');
       }
       
-      const registerResponse = await apiClient.post<ApiResponse<AuthResponse>>('/auth/register', userData, { 
+      const registerResponse = await apiClient.post<ApiResponse<AuthResponse>>('auth/register', userData, {
         timeout: 15000,
-        withCredentials: true
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
       });
       
       if (registerResponse.data.error) {
@@ -178,6 +186,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errorMessage = 'Request timed out. Please check your connection and try again.';
       } else if (error.code === 'ERR_NETWORK') {
         errorMessage = 'Cannot connect to the server. Please check your internet connection.';
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Authentication failed. Please check your credentials.';
       } else if (error.message) {
         errorMessage = error.message;
       }
