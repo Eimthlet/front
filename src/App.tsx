@@ -120,21 +120,21 @@ const App: React.FC = () => {
         if (!hasAttempted || isQualified) {
           try {
             const response = await api.get<ApiResponse<QuestionsResponse>>('/api/questions');
-            const questions = response.data.data?.questions || [];
+            const questions = response.data?.data?.questions || [];
             setQuestions(questions.map(q => ({
               ...q,
               id: q.id.toString() // Convert id to string if needed
             })));
             
             // Handle completed attempts (403 errors are caught in the catch block)
-            if (response.data.error && response.data.completed) {
+            if (response.data?.error && response.data?.completed) {
               setError(response.data.error);
               setQuestions([]);
               return;
             }
             
             // Handle season-related messages
-            if (response.data.status) {
+            if (response.data?.status) {
               // If there's a status, it means there's an issue with accessing questions
               setError(response.data.message || 'Unable to access quiz questions');
               setQuestions([]);
@@ -168,7 +168,7 @@ const App: React.FC = () => {
     };
 
     validateAndFetchData();
-  }, [navigate]);
+  }, [navigate, user]);
 
   const handleQuizComplete = async (score: number) => {
     try {
