@@ -5,7 +5,9 @@
  * Production API URL configuration (minimal version)
  */
 export const getApiUrl = (endpoint: string): string => {
-  return `https://car-quizz.onrender.com/api/${endpoint.replace(/^\/+|\/+$/g, '')}`;
+  // Remove duplicate '/api' prefix since backend routes already include it
+  const cleanEndpoint = endpoint.replace(/^\/+|\/+$/g, '');
+  return `https://car-quizz.onrender.com/${cleanEndpoint}`;
 };
 
 export const getApiUrlLocal = (endpoint: string): string => {
