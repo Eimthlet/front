@@ -45,6 +45,8 @@ apiClient.interceptors.request.use(
       data: config.data,
       headers: config.headers
     });
+
+    // Add token to request if available
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

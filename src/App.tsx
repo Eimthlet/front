@@ -74,7 +74,11 @@ const App: React.FC = () => {
         // Handle both response formats
         const qualificationData = qualificationResponse.data?.data || qualificationResponse.data;
         
-        if (!qualificationData) {
+        // Log the raw qualification data for debugging
+        console.debug('Raw qualification data:', qualificationData);
+        
+        // Check if we have the minimum required data
+        if (!qualificationData || typeof qualificationData !== 'object') {
           console.error('Invalid qualification response:', qualificationResponse);
           throw new Error('Invalid qualification response');
         }
@@ -86,20 +90,20 @@ const App: React.FC = () => {
         console.debug('Typed qualification data:', typedQualificationData);
         
         // Extract values with type safety and proper defaults
-        const hasAttempted = typedQualificationData.hasAttempted ?? false;
-        const isQualified = typedQualificationData.isQualified ?? typedQualificationData.qualifies_for_next_round ?? false;
+        const hasAttempted = Boolean(typedQualificationData.hasAttempted);
+        const isQualified = Boolean(typedQualificationData.isQualified || typedQualificationData.qualifies_for_next_round);
         
         // Set qualification state with all available data
         const qualificationState = {
           hasAttempted,
           isQualified,
-          score: typedQualificationData.score ?? 0,
-          totalQuestions: typedQualificationData.totalQuestions ?? 0,
-          percentageScore: typedQualificationData.percentageScore ?? '0',
-          minimumRequired: typedQualificationData.minimumRequired ?? 0,
-          message: typedQualificationData.message ?? 'No qualification data available',
-          qualifies_for_next_round: typedQualificationData.qualifies_for_next_round ?? false,
-          completed: typedQualificationData.completed ?? false,
+          score: Number(typedQualificationData.score) || 0,
+          totalQuestions: Number(typedQualificationData.totalQuestions) || 0,
+          percentageScore: String(typedQualificationData.percentageScore || '0'),
+          minimumRequired: Number(typedQualificationData.minimumRequired) || 0,
+          message: String(typedQualificationData.message || 'No qualification data available'),
+          qualifies_for_next_round: Boolean(typedQualificationData.qualifies_for_next_round),
+          completed: Boolean(typedQualificationData.completed),
           completed_at: typedQualificationData.completed_at
         };
         
