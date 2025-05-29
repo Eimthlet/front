@@ -63,7 +63,9 @@ interface ApiResponse<T> {
 }
 
 interface AuthEndpointsResponse {
-  paths: string[];
+  paths?: string[];
+  status?: string;
+  data?: any;
 }
 
 interface ApiStatusResponse {
@@ -104,7 +106,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           'Accept': 'application/json'
         }
       });
-      if (!response.data.paths.includes('/login')) {
+
+      // Check if the API is ready
+      if (!response.data?.status || response.data.status !== 'active') {
+        throw new Error('Authentication service currently unavailable');
+      }
+
+      // If paths is undefined, we'll assume the login endpoint is available
+      // since we're getting a successful response from the auth endpoint
+      const hasLoginEndpoint = !response.data.paths || response.data.paths.includes('/login');
+      if (!hasLoginEndpoint) {
         throw new Error('Login service currently unavailable');
       }
       
@@ -163,8 +174,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           'Accept': 'application/json'
         }
       });
+
+      // Check if the API is ready
+      if (!response.data?.status || response.data.status !== 'active') {
+        throw new Error('Authentication service currently unavailable');
+      }
       
-      if (!response.data.paths.includes('register')) {
+      // If paths is undefined, we'll assume the register endpoint is available
+      // since we're getting a successful response from the auth endpoint
+      const hasRegisterEndpoint = !response.data.paths || response.data.paths.includes('register');
+      if (!hasRegisterEndpoint) {
         throw new Error('Registration service is currently unavailable');
       }
       
@@ -274,7 +293,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           'Accept': 'application/json'
         }
       });
-      if (!response.data.paths.includes('/check-token')) {
+
+      // Check if the API is ready
+      if (!response.data?.status || response.data.status !== 'active') {
+        return { error: 'Authentication service unavailable' };
+      }
+
+      // If paths is undefined, we'll assume the check-token endpoint is available
+      // since we're getting a successful response from the auth endpoint
+      const hasCheckTokenEndpoint = !response.data.paths || response.data.paths.includes('/check-token');
+      if (!hasCheckTokenEndpoint) {
         return { error: 'Authentication service unavailable' };
       }
       
