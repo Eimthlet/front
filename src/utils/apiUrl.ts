@@ -2,21 +2,25 @@
  * Properly constructs API URLs and logs for debugging
  */
 /**
- * Production API URL configuration (minimal version)
+ * Production API URL configuration
  */
 export const getApiUrl = (endpoint: string): string => {
-  // Remove duplicate '/api' prefix since backend routes already include it
+  const baseUrl = 'https://car-quizz.onrender.com';
   const cleanEndpoint = endpoint.replace(/^\/+|\/+$/g, '');
-  return `https://car-quizz.onrender.com/${cleanEndpoint}`;
+  return `${baseUrl}/api/${cleanEndpoint}`;
 };
 
+// For local development if needed
 export const getApiUrlLocal = (endpoint: string): string => {
+  const baseUrl = 'http://localhost:5000';
   const cleanEndpoint = endpoint.replace(/^\/+|\/+$/g, '');
-  return `/api/${cleanEndpoint}`;
+  return `${baseUrl}/api/${cleanEndpoint}`;
 };
 
 export const verifyApiConfig = (): void => {
-  console.log('API Base URL:', getApiUrl(''));
+  if (process.env.NODE_ENV === 'development') {
+    console.log('API Base URL:', getApiUrl(''));
+  }
 };
 
 export const verifyEndpoints = async (): Promise<void> => {
