@@ -21,6 +21,11 @@ interface TokenCheckResponse {
   };
 }
 
+interface TokenResponse {
+  token: string;
+  refreshToken?: string;
+}
+
 const apiClient = axios.create({
   baseURL: getApiUrl(''),
   timeout: 30000, // Increased timeout to 30s
@@ -67,11 +72,25 @@ apiClient.interceptors.response.use(
       data: response.data,
       headers: response.headers
     });
+
+    // Handle empty responses
+    if (!response.data) {
+      console.warn('[API Warning] Empty response received');
+      return {
+        ...response,
+        data: {
+          data: null,
+          status: response.status,
+          headers: response.headers
+        }
+      };
+    }
+
     // Standardize successful responses
     return {
       ...response,
       data: {
-        data: response.data, // Actual response data
+        data: response.data,
         status: response.status,
         headers: response.headers
       }
@@ -84,6 +103,7 @@ apiClient.interceptors.response.use(
       data: error.response?.data,
       message: error.message
     });
+
     // Enhanced error logging
     if (error.response) {
       console.error('[API ERROR]', {
@@ -110,16 +130,21 @@ apiClient.interceptors.response.use(
           throw new Error('No refresh token available');
         }
         
-        const response = await apiClient.post(getApiUrl('auth/refresh'), {
+        const response = await apiClient.post<TokenResponse>(getApiUrl('auth/refresh'), {
           refreshToken
         });
         
         const { token } = response.data;
+        if (!token) {
+          throw new Error('No token received from refresh');
+        }
+
         localStorage.setItem('token', token);
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         
         return apiClient(originalRequest);
       } catch (refreshError) {
+        console.error('[Token Refresh Error]', refreshError);
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
         window.location.href = '/login';

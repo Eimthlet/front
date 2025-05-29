@@ -76,11 +76,16 @@ const App: React.FC = () => {
           throw new Error('Invalid qualification response');
         }
         
-        const hasAttempted = qualificationData.hasAttempted || false;
-        const isQualified = qualificationData.isQualified || qualificationData.qualifies_for_next_round || false;
+        // Type assertion to ensure TypeScript knows this is a QualificationResponse
+        const typedQualificationData = qualificationData as QualificationResponse;
+        
+        // Extract values with type safety
+        const hasAttempted = 'hasAttempted' in typedQualificationData ? typedQualificationData.hasAttempted : false;
+        const isQualified = ('isQualified' in typedQualificationData ? typedQualificationData.isQualified : false) || 
+                          ('qualifies_for_next_round' in typedQualificationData ? typedQualificationData.qualifies_for_next_round : false);
         
         setQualification({
-          ...qualificationData,
+          ...typedQualificationData,
           hasAttempted,
           isQualified
         });
