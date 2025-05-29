@@ -71,8 +71,8 @@ const App: React.FC = () => {
         const qualificationResponse = await api.get<ApiResponse<QualificationResponse>>('/api/qualification');
         console.log('Qualification response:', qualificationResponse);
         
-        // Handle both response formats
-        const qualificationData = qualificationResponse.data?.data || qualificationResponse.data;
+        // Get the qualification data directly from the response
+        const qualificationData = qualificationResponse.data as unknown as QualificationResponse;
         
         // Log the raw qualification data for debugging
         console.debug('Raw qualification data:', qualificationData);
@@ -83,28 +83,25 @@ const App: React.FC = () => {
           throw new Error('Invalid qualification response');
         }
         
-        // Type assertion to ensure TypeScript knows this is a QualificationResponse
-        const typedQualificationData = qualificationData as QualificationResponse;
-        
         // Log the typed data for debugging
-        console.debug('Typed qualification data:', typedQualificationData);
+        console.debug('Typed qualification data:', qualificationData);
         
         // Extract values with type safety and proper defaults
-        const hasAttempted = Boolean(typedQualificationData.hasAttempted);
-        const isQualified = Boolean(typedQualificationData.isQualified || typedQualificationData.qualifies_for_next_round);
+        const hasAttempted = Boolean(qualificationData.hasAttempted);
+        const isQualified = Boolean(qualificationData.isQualified || qualificationData.qualifies_for_next_round);
         
         // Set qualification state with all available data
         const qualificationState = {
           hasAttempted,
           isQualified,
-          score: Number(typedQualificationData.score) || 0,
-          totalQuestions: Number(typedQualificationData.totalQuestions) || 0,
-          percentageScore: String(typedQualificationData.percentageScore || '0'),
-          minimumRequired: Number(typedQualificationData.minimumRequired) || 0,
-          message: String(typedQualificationData.message || 'No qualification data available'),
-          qualifies_for_next_round: Boolean(typedQualificationData.qualifies_for_next_round),
-          completed: Boolean(typedQualificationData.completed),
-          completed_at: typedQualificationData.completed_at
+          score: Number(qualificationData.score) || 0,
+          totalQuestions: Number(qualificationData.totalQuestions) || 0,
+          percentageScore: String(qualificationData.percentageScore || '0'),
+          minimumRequired: Number(qualificationData.minimumRequired) || 0,
+          message: String(qualificationData.message || 'No qualification data available'),
+          qualifies_for_next_round: Boolean(qualificationData.qualifies_for_next_round),
+          completed: Boolean(qualificationData.completed),
+          completed_at: qualificationData.completed_at
         };
         
         // Log the qualification state for debugging

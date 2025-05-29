@@ -89,11 +89,7 @@ apiClient.interceptors.response.use(
     // Standardize successful responses
     const standardizedResponse = {
       ...response,
-      data: {
-        data: response.data,
-        status: response.status,
-        headers: response.headers
-      }
+      data: response.data // Don't wrap the data again since it's already in the correct format
     };
 
     // Log the standardized response for debugging
