@@ -116,19 +116,9 @@ api.interceptors.response.use(
       headers: response.headers
     });
     
-    // Transform the response to ensure consistent data structure
-    if (response.data && typeof response.data === 'object') {
-      // If the response already has a data property, return as is
-      return response;
-    }
-    
-    // Otherwise, wrap the response data in a data property
-    return {
-      ...response,
-      data: {
-        data: response.data
-      }
-    };
+    // Return the response as is, don't modify the structure
+    // The components expect the response data directly, not wrapped in a data property
+    return response;
   },
   async (error) => {
     console.error('API Error:', {
