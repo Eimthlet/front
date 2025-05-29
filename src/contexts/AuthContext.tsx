@@ -42,6 +42,7 @@ interface AuthResponse {
     isAdmin: boolean;
     role?: string;
   };
+  success?: boolean;
 }
 
 interface TokenCheckResponse {
@@ -109,10 +110,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       console.log('Auth endpoint response:', response.data);
-
-      // If we get a 200 response, consider the API ready
-      // We'll proceed with the login attempt regardless of the response structure
-      // since we're getting a successful response from the auth endpoint
       
       const authResponse = await apiClient.post<ApiResponse<AuthResponse>>(getApiUrl('auth/login'), { email, password });
       
@@ -120,9 +117,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error(authResponse.data.error);
       }
       
-      const { token, refreshToken, user: userData } = authResponse.data.data;
+      // Handle both response formats
+      const responseData = authResponse.data.data || authResponse.data;
+      const { token, refreshToken, user: userData } = responseData;
       
-      console.log('Login response:', authResponse.data.data);
+      console.log('Login response:', responseData);
       
       // Store tokens in localStorage
       if (token) {
@@ -136,16 +135,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Set user state
       if (userData) {
-        setUser({
+        const user = {
           id: userData.id,
           email,
-          isAdmin: userData.isAdmin || false,
+          isAdmin: userData.isAdmin || userData.role === 'admin' || false,
           role: userData.role
-        });
+        };
         
+        setUser(user);
         setIsAuthenticated(true);
-        setIsAdmin(userData.isAdmin || false);
-        navigate('/');
+        setIsAdmin(user.isAdmin);
+        
+        // Navigate based on user role
+        if (user.isAdmin) {
+          navigate('/admin');
+        } else {
+          navigate('/quiz');
+        }
       } else {
         throw new Error('User data not found in response');
       }
