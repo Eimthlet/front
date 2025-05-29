@@ -44,6 +44,12 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Add SameSite and Partitioned attributes to cookies
+    if (config.withCredentials) {
+      config.headers['Set-Cookie'] = 'SameSite=None; Secure; Partitioned';
+    }
+    
     return config;
   },
   (error) => {
@@ -71,7 +77,7 @@ apiClient.interceptors.response.use(
       }
     };
   },
-  (error) => {
+  async (error) => {
     console.error('[API Response Error]', {
       url: error.config?.url,
       status: error.response?.status,
@@ -92,6 +98,35 @@ apiClient.interceptors.response.use(
     
     // Process and standardize errors
     const processedError = handleApiError(error);
+    
+    const originalRequest = error.config;
+    
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) {
+          throw new Error('No refresh token available');
+        }
+        
+        const response = await apiClient.post(getApiUrl('auth/refresh'), {
+          refreshToken
+        });
+        
+        const { token } = response.data;
+        localStorage.setItem('token', token);
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+    
     return Promise.reject(processedError);
   }
 );

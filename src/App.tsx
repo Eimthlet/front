@@ -67,9 +67,15 @@ const App: React.FC = () => {
         
         // First check qualification status
         const qualificationResponse = await api.get<ApiResponse<QualificationResponse>>('/api/qualification');
-        const qualificationData = qualificationResponse.data.data;
+        console.log('Qualification response:', qualificationResponse);
         
         // Handle both response formats
+        const qualificationData = qualificationResponse.data?.data || qualificationResponse.data;
+        
+        if (!qualificationData) {
+          throw new Error('Invalid qualification response');
+        }
+        
         const hasAttempted = qualificationData.hasAttempted || false;
         const isQualified = qualificationData.isQualified || qualificationData.qualifies_for_next_round || false;
         
@@ -83,21 +89,21 @@ const App: React.FC = () => {
         if (!hasAttempted || isQualified) {
           try {
             const response = await api.get<ApiResponse<QuestionsResponse>>('/api/questions');
-            const questions = response.data.data.questions.map(q => ({
+            const questions = response.data?.data?.questions || [];
+            setQuestions(questions.map(q => ({
               ...q,
               id: q.id.toString() // Convert id to string if needed
-            }));
-            setQuestions(questions || []);
+            })));
             
             // Handle completed attempts (403 errors are caught in the catch block)
-            if (response.data.error && response.data.completed) {
+            if (response.data?.error && response.data?.completed) {
               setError(response.data.error);
               setQuestions([]);
               return;
             }
             
             // Handle season-related messages
-            if (response.data.status) {
+            if (response.data?.status) {
               // If there's a status, it means there's an issue with accessing questions
               setError(response.data.message || 'Unable to access quiz questions');
               setQuestions([]);
