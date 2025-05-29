@@ -1,4 +1,15 @@
-import type { AxiosError } from 'axios';
+import axios from 'axios';
+
+// Version-agnostic axios error type
+type AxiosErrorType = Error & {
+  isAxiosError: boolean;
+  response?: {
+    status?: number;
+    data?: any;
+  };
+  config?: any;
+  code?: string;
+};
 
 type ApiError = {
   response?: {
@@ -18,7 +29,7 @@ export function handleApiError(error: unknown): Error {
   // Handle standard Error objects
   if (error instanceof Error) {
     // Check for axios error structure
-    const axiosError = error as AxiosError;
+    const axiosError = error as AxiosErrorType;
     
     if (axiosError.isAxiosError) {
       return new Error(
