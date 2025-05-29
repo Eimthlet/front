@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
 import { handleApiError } from '../utils/apiErrorHandler';
+import { getApiUrl } from '../utils/apiUrl';
 
 // Define User and AuthContextType interfaces locally
 interface User {
@@ -87,12 +88,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       // Verify login endpoint exists
-      const response = await apiClient.get<AuthEndpointsResponse>('/api/auth');
+      const response = await apiClient.get<AuthEndpointsResponse>(getApiUrl('auth'));
       if (!response.data.paths.includes('/login')) {
         throw new Error('Login service currently unavailable');
       }
       
-      const authResponse = await apiClient.post<ApiResponse<AuthResponse>>('/api/auth/login', { email, password });
+      const authResponse = await apiClient.post<ApiResponse<AuthResponse>>(getApiUrl('auth/login'), { email, password });
       
       if (authResponse.data.error) {
         throw new Error(authResponse.data.error);
@@ -141,8 +142,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: RegisterData): Promise<void> => {
     setError(null);
     try {
-      // Use correct endpoint path without duplicate /api
-      const response = await apiClient.get<AuthEndpointsResponse>('auth', {
+      // Use properly constructed API URL
+      const response = await apiClient.get<AuthEndpointsResponse>(getApiUrl('auth'), {
         timeout: 15000,
         withCredentials: true,
         headers: {
@@ -155,14 +156,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Registration service is currently unavailable');
       }
       
-      const registerResponse = await apiClient.post<ApiResponse<AuthResponse>>('auth/register', userData, {
-        timeout: 15000,
-        withCredentials: true,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+      const registerResponse = await apiClient.post<ApiResponse<AuthResponse>>(
+        getApiUrl('auth/register'), 
+        userData, 
+        {
+          timeout: 15000,
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
         }
-      });
+      );
       
       if (registerResponse.data.error) {
         throw new Error(registerResponse.data.error);
@@ -181,6 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         navigate('/');
       }
     } catch (error: any) {
+      console.error('Registration error:', error);
       let errorMessage = 'Registration failed';
       if (error.code === 'ECONNABORTED') {
         errorMessage = 'Request timed out. Please check your connection and try again.';
@@ -199,7 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Logout function
   const logout = async (): Promise<void> => {
     try {
-      await apiClient.post('/api/auth/logout');
+      await apiClient.post(getApiUrl('auth/logout'));
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -252,12 +258,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkToken = async (): Promise<TokenCheckResponse> => {
     try {
       // First verify endpoint exists
-      const response = await apiClient.get<AuthEndpointsResponse>('/api/auth');
+      const response = await apiClient.get<AuthEndpointsResponse>(getApiUrl('auth'));
       if (!response.data.paths.includes('/check-token')) {
         return { error: 'Authentication service unavailable' };
       }
       
-      const tokenResponse = await apiClient.get<TokenCheckResponse>('/api/auth/check-token');
+      const tokenResponse = await apiClient.get<TokenCheckResponse>(getApiUrl('auth/check-token'));
       return tokenResponse.data;
     } catch (err) {
       if (err.response?.status === 404) {
