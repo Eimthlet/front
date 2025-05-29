@@ -108,18 +108,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      // If we get a 200 response, consider the API ready
-      // Only check status if it's explicitly set to something other than 'active'
-      if (response.data?.status && response.data.status !== 'active') {
-        throw new Error('Authentication service currently unavailable');
-      }
+      console.log('Auth endpoint response:', response.data);
 
-      // If paths is undefined, we'll assume the login endpoint is available
+      // If we get a 200 response, consider the API ready
+      // We'll proceed with the login attempt regardless of the response structure
       // since we're getting a successful response from the auth endpoint
-      const hasLoginEndpoint = !response.data.paths || response.data.paths.includes('/login');
-      if (!hasLoginEndpoint) {
-        throw new Error('Login service currently unavailable');
-      }
       
       const authResponse = await apiClient.post<ApiResponse<AuthResponse>>(getApiUrl('auth/login'), { email, password });
       
@@ -157,6 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('User data not found in response');
       }
     } catch (error: any) {
+      console.error('Login error details:', error);
       const normalizedError = handleApiError(error);
       setError(normalizedError.message);
       throw normalizedError;
@@ -177,18 +171,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
+      console.log('Auth endpoint response:', response.data);
+
       // If we get a 200 response, consider the API ready
-      // Only check status if it's explicitly set to something other than 'active'
-      if (response.data?.status && response.data.status !== 'active') {
-        throw new Error('Authentication service currently unavailable');
-      }
-      
-      // If paths is undefined, we'll assume the register endpoint is available
+      // We'll proceed with the registration attempt regardless of the response structure
       // since we're getting a successful response from the auth endpoint
-      const hasRegisterEndpoint = !response.data.paths || response.data.paths.includes('register');
-      if (!hasRegisterEndpoint) {
-        throw new Error('Registration service is currently unavailable');
-      }
       
       const registerResponse = await apiClient.post<ApiResponse<AuthResponse>>(
         getApiUrl('auth/register'), 
@@ -220,7 +207,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         navigate('/');
       }
     } catch (error: any) {
-      console.error('Registration error:', error);
+      console.error('Registration error details:', error);
       const normalizedError = handleApiError(error);
       setError(normalizedError.message);
       throw normalizedError;
@@ -297,22 +284,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      // If we get a 200 response, consider the API ready
-      // Only check status if it's explicitly set to something other than 'active'
-      if (response.data?.status && response.data.status !== 'active') {
-        return { error: 'Authentication service unavailable' };
-      }
+      console.log('Auth endpoint response:', response.data);
 
-      // If paths is undefined, we'll assume the check-token endpoint is available
+      // If we get a 200 response, consider the API ready
+      // We'll proceed with the token check regardless of the response structure
       // since we're getting a successful response from the auth endpoint
-      const hasCheckTokenEndpoint = !response.data.paths || response.data.paths.includes('/check-token');
-      if (!hasCheckTokenEndpoint) {
-        return { error: 'Authentication service unavailable' };
-      }
       
       const tokenResponse = await apiClient.get<TokenCheckResponse>(getApiUrl('auth/check-token'));
       return tokenResponse.data;
     } catch (err) {
+      console.error('Token check error details:', err);
       if (err.response?.status === 404) {
         return { error: 'Authentication service unavailable' };
       }
