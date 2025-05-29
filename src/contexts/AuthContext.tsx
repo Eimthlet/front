@@ -142,12 +142,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       // Verify register endpoint exists
-      const response = await apiClient.get<AuthEndpointsResponse>('/api/auth');
+      const response = await apiClient.get<AuthEndpointsResponse>('/api/auth', { timeout: 15000 });
       if (!response.data.paths.includes('/register')) {
-        throw new Error('Register service currently unavailable');
+        throw new Error('Registration service is currently unavailable');
       }
       
-      const registerResponse = await apiClient.post<ApiResponse<AuthResponse>>('/api/auth/register', userData);
+      const registerResponse = await apiClient.post<ApiResponse<AuthResponse>>('/api/auth/register', userData, { timeout: 15000 });
       
       if (registerResponse.data.error) {
         throw new Error(registerResponse.data.error);
@@ -157,16 +157,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (registeredUser) {
         // After successful registration, log the user in
-        await login(userData.email, userData.password);
-      } else {
-        throw new Error('User data not found in response');
+        localStorage.setItem('token', token);
+        if (refreshToken) {
+          localStorage.setItem('refreshToken', refreshToken);
+        }
+        setUser(registeredUser);
+        setIsAuthenticated(true);
+        setIsAdmin(registeredUser.isAdmin);
+        navigate('/');
       }
-    } catch (err) {
-      if (err.response?.status === 404) {
-        throw new Error('Register service currently unavailable');
+    } catch (error: any) {
+      let errorMessage = 'Registration failed';
+      if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Request timed out. Please check your connection and try again.';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
-      const error = handleApiError(err);
-      setError(error.message);
+      setError(errorMessage);
       throw error;
     }
   };
