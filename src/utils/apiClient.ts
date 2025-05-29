@@ -1,33 +1,15 @@
 import axios from 'axios';
-import { getApiUrl } from './apiUrl';
-import { handleApiError } from './apiErrorHandler';
 
+// Define types for API responses
 interface ApiResponse<T> {
   data: T;
   error?: string;
+  message?: string;
 }
 
-interface AuthEndpointsResponse {
-  status: string;
-  endpoints: string[];
-}
-
-interface TokenCheckResponse {
-  error?: string;
-  user?: {
-    id: number;
-    email: string;
-    isAdmin: boolean;
-  };
-}
-
-interface TokenResponse {
-  token: string;
-  refreshToken?: string;
-}
-
+// Create a custom Axios instance
 const apiClient = axios.create({
-  baseURL: getApiUrl(''),
+  baseURL: 'https://car-quizz.onrender.com',
   timeout: 30000,
   withCredentials: true,
   headers: {
@@ -39,26 +21,14 @@ const apiClient = axios.create({
 // Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
-    console.debug('[API Request]', {
-      url: config.url,
-      method: config.method,
-      data: config.data,
-      headers: config.headers
-    });
-
     // Add token to request if available
     const token = localStorage.getItem('token');
-    if (token) {
+    if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    // Remove any attempt to set cookie headers
-    delete config.headers['Set-Cookie'];
-    
     return config;
   },
   (error) => {
-    console.error('[API Request Error]', error);
     return Promise.reject(error);
   }
 );
@@ -66,95 +36,47 @@ apiClient.interceptors.request.use(
 // Response interceptor
 apiClient.interceptors.response.use(
   (response) => {
-    console.debug('[API Response]', {
-      url: response.config.url,
-      status: response.status,
-      data: response.data,
-      headers: response.headers
-    });
-
-    // Handle empty responses
-    if (!response.data) {
-      console.warn('[API Warning] Empty response received');
-      return {
-        ...response,
-        data: {
-          data: null,
-          status: response.status,
-          headers: response.headers
-        }
-      };
-    }
-
-    // Standardize successful responses
-    const standardizedResponse = {
-      ...response,
-      data: response.data // Don't wrap the data again since it's already in the correct format
-    };
-
-    // Log the standardized response for debugging
-    console.debug('[Standardized Response]', standardizedResponse);
-
-    return standardizedResponse;
+    // Return the response data directly
+    return response;
   },
-  async (error) => {
-    console.error('[API Response Error]', {
-      url: error.config?.url,
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message
-    });
-
-    // Enhanced error logging
+  (error) => {
+    // Handle errors
     if (error.response) {
-      console.error('[API ERROR]', {
-        url: error.config.url,
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      return Promise.reject({
+        message: error.response.data?.message || error.response.data?.error || 'An error occurred',
         status: error.response.status,
-        data: error.response.data,
-        headers: error.response.headers
+        data: error.response.data
+      });
+    } else if (error.request) {
+      // The request was made but no response was received
+      return Promise.reject({
+        message: 'No response received from server',
+        isNetworkError: true
       });
     } else {
-      console.error('[API NETWORK ERROR]', error);
+      // Something happened in setting up the request that triggered an Error
+      return Promise.reject({
+        message: error.message || 'An error occurred while setting up the request'
+      });
     }
-    
-    // Process and standardize errors
-    const processedError = handleApiError(error);
-    
-    const originalRequest = error.config;
-    
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      
-      try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) {
-          throw new Error('No refresh token available');
-        }
-        
-        const response = await apiClient.post<TokenResponse>(getApiUrl('auth/refresh'), {
-          refreshToken
-        });
-        
-        const { token } = response.data;
-        if (!token) {
-          throw new Error('No token received from refresh');
-        }
-
-        localStorage.setItem('token', token);
-        apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        
-        return apiClient(originalRequest);
-      } catch (refreshError) {
-        console.error('[Token Refresh Error]', refreshError);
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
-      }
-    }
-    
-    return Promise.reject(processedError);
   }
 );
 
-export default apiClient;
+// Create typed API methods
+const api = {
+  get: <T>(url: string, config = {}) => 
+    apiClient.get<ApiResponse<T>>(url, config).then(response => response.data.data),
+  
+  post: <T>(url: string, data = {}, config = {}) => 
+    apiClient.post<ApiResponse<T>>(url, data, config).then(response => response.data.data),
+  
+  put: <T>(url: string, data = {}, config = {}) => 
+    apiClient.put<ApiResponse<T>>(url, data, config).then(response => response.data.data),
+  
+  delete: <T>(url: string, config = {}) => 
+    apiClient.delete<ApiResponse<T>>(url, config).then(response => response.data.data)
+};
+
+export default api;

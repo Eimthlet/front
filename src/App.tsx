@@ -13,32 +13,8 @@ import AdminDiagnostic from './components/AdminDiagnostic';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import { useAuth } from './contexts/AuthContext';
-import api from './utils/api';
+import api from './utils/apiClient';
 import { Question } from './types';
-
-interface ApiResponse<T> {
-  data: T;
-  error?: string;
-  message?: string;
-  status?: number;
-  headers?: any;
-  completed?: boolean;
-}
-
-interface ApiQuestion {
-  id: number;
-  question: string;
-  options: string[];
-  correctAnswer: number;
-  explanation?: string;
-  category?: string;
-  difficulty?: string;
-  timeLimit?: number;
-}
-
-interface QuestionsResponse {
-  questions: Question[];
-}
 
 interface QualificationResponse {
   hasAttempted: boolean;
@@ -51,6 +27,10 @@ interface QualificationResponse {
   qualifies_for_next_round?: boolean;
   completed?: boolean;
   completed_at?: string;
+}
+
+interface QuestionsResponse {
+  questions: Question[];
 }
 
 const App: React.FC = () => {
@@ -75,18 +55,18 @@ const App: React.FC = () => {
         }
         
         // First check qualification status
-        const qualificationResponse = await api.get<ApiResponse<QualificationResponse>>('/api/qualification');
-        console.log('Qualification response:', qualificationResponse);
+        const response = await api.get<{ data: QualificationResponse }>('/api/qualification');
+        console.log('Qualification response:', response);
         
         // Get the qualification data from the response
-        const qualificationData = qualificationResponse.data?.data;
+        const qualificationData = response.data;
         
         // Log the raw qualification data for debugging
         console.debug('Raw qualification data:', qualificationData);
         
         // Check if we have valid qualification data
         if (!qualificationData || typeof qualificationData !== 'object') {
-          console.error('Invalid qualification response:', qualificationResponse);
+          console.error('Invalid qualification response:', response);
           throw new Error('Invalid qualification response');
         }
         
@@ -98,7 +78,7 @@ const App: React.FC = () => {
         const isQualified = Boolean(qualificationData.isQualified || qualificationData.qualifies_for_next_round);
         
         // Set qualification state with all available data
-        const qualificationState = {
+        const qualificationState: QualificationResponse = {
           hasAttempted,
           isQualified,
           score: Number(qualificationData.score) || 0,
@@ -119,36 +99,15 @@ const App: React.FC = () => {
         // Only fetch questions if user is qualified or hasn't attempted yet
         if (!hasAttempted || isQualified) {
           try {
-            const response = await api.get<ApiResponse<QuestionsResponse>>('/api/questions');
-            const questions = response.data?.data?.questions || [];
+            const response = await api.get<{ data: QuestionsResponse }>('/api/questions');
+            const questions = response.data.questions || [];
             setQuestions(questions.map(q => ({
               ...q,
               id: q.id.toString() // Convert id to string if needed
             })));
-            
-            // Handle completed attempts (403 errors are caught in the catch block)
-            if (response.data?.error && response.data?.completed) {
-              setError(response.data.error);
-              setQuestions([]);
-              return;
-            }
-            
-            // Handle season-related messages
-            if (response.data?.status) {
-              // If there's a status, it means there's an issue with accessing questions
-              setError(response.data.message || 'Unable to access quiz questions');
-              setQuestions([]);
-              return;
-            }
           } catch (apiError: any) {
             console.error('Error fetching questions:', apiError);
-            
-            // Handle 403 Forbidden (completed attempt)
-            if (apiError.response?.status === 403) {
-              setError(apiError.response.data.error || 'You have already completed the quiz for this season.');
-            } else {
-              setError(apiError.message || 'Failed to load questions');
-            }
+            setError(apiError.message || 'Failed to load questions');
             setQuestions([]);
           }
         }
@@ -157,7 +116,7 @@ const App: React.FC = () => {
         setError(err.message || 'Failed to load data');
         
         // If unauthorized, clear tokens and redirect to login
-        if (err.response?.status === 401) {
+        if (err.status === 401) {
           localStorage.removeItem('token');
           localStorage.removeItem('refreshToken');
           navigate('/login');
