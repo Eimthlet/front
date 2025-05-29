@@ -1,19 +1,29 @@
-import { AxiosError } from 'axios';
+import axios from 'axios';
 
 export interface ApiError {
   message: string;
   status?: number;
-  details?: any;
+  code?: string;
 }
 
 export const handleApiError = (error: unknown): ApiError => {
+  // Handle standard Error objects
   if (error instanceof Error) {
-    if ('response' in error) {
-      const axiosError = error as AxiosError;
+    // Check for axios error structure
+    const axiosError = error as {
+      isAxiosError?: boolean;
+      response?: {
+        status?: number;
+        data?: any;
+      };
+      code?: string;
+    };
+    
+    if (axiosError.isAxiosError) {
       return {
-        message: (axiosError.response?.data as any)?.error || axiosError.message,
+        message: (axiosError.response?.data as any)?.error || error.message,
         status: axiosError.response?.status,
-        details: (axiosError.response?.data as any)?.details
+        code: axiosError.code
       };
     }
     return { message: error.message };
