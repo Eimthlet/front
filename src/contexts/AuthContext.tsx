@@ -141,13 +141,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: RegisterData): Promise<void> => {
     setError(null);
     try {
-      // Verify register endpoint exists
-      const response = await apiClient.get<AuthEndpointsResponse>('/api/auth', { timeout: 15000 });
+      // Verify register endpoint exists - use correct base URL
+      const response = await apiClient.get<AuthEndpointsResponse>('/auth', { 
+        timeout: 15000,
+        withCredentials: true
+      });
+      
       if (!response.data.paths.includes('/register')) {
         throw new Error('Registration service is currently unavailable');
       }
       
-      const registerResponse = await apiClient.post<ApiResponse<AuthResponse>>('/api/auth/register', userData, { timeout: 15000 });
+      const registerResponse = await apiClient.post<ApiResponse<AuthResponse>>('/auth/register', userData, { 
+        timeout: 15000,
+        withCredentials: true
+      });
       
       if (registerResponse.data.error) {
         throw new Error(registerResponse.data.error);
@@ -156,7 +163,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { token, refreshToken, user: registeredUser } = registerResponse.data.data;
       
       if (registeredUser) {
-        // After successful registration, log the user in
         localStorage.setItem('token', token);
         if (refreshToken) {
           localStorage.setItem('refreshToken', refreshToken);
@@ -170,6 +176,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let errorMessage = 'Registration failed';
       if (error.code === 'ECONNABORTED') {
         errorMessage = 'Request timed out. Please check your connection and try again.';
+      } else if (error.code === 'ERR_NETWORK') {
+        errorMessage = 'Cannot connect to the server. Please check your internet connection.';
       } else if (error.message) {
         errorMessage = error.message;
       }
