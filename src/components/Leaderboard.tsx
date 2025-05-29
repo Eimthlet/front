@@ -71,16 +71,10 @@ const Leaderboard: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const token = localStorage.getItem('token');
       
-      const response = await api.get<LeaderboardResponse>('/api/leaderboard', {
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : ''
-        }
-      });
-      
+      const response = await api.get<LeaderboardEntry[]>('/api/leaderboard');
       console.log('Leaderboard response:', response.data);
-      setLeaderboard(response.data.data.leaderboard || []);
+      setLeaderboard(response.data || []);
     } catch (err: any) {
       console.error('Error fetching leaderboard:', err);
       setError(err.message || 'Failed to load leaderboard data');

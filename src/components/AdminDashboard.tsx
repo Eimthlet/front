@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiClient } from '../utils/apiNew';
+import apiClient from '../utils/apiClient';
 import './AdminDashboard.css';
 import SeasonManager from './SeasonManager';
 
@@ -30,6 +30,25 @@ interface InsightsStats {
   nonAdminUsers: NonAdminUser[];
 }
 
+interface ApiResponse<T> {
+  data: T;
+  error?: string;
+}
+
+interface DashboardResponse {
+  total_users: number;
+  active_users: number;
+  avg_score: number;
+  highest_score: number;
+  lowest_score: number;
+}
+
+interface DashboardStatsResponse {
+  seasons: number;
+  questions: number;
+  active_quizzes: number;
+}
+
 interface ApiError {
   response?: {
     status: number;
@@ -43,46 +62,8 @@ interface ApiError {
 
 interface ErrorState {
   message: string;
+  isError: boolean;
   details?: string;
-}
-
-interface DashboardResponse {
-  data: {
-    averageScore: number;
-    mostPlayedGame: string;
-    leastPlayedGame: string;
-    insights: Array<{
-      id: string;
-      username: string;
-      insight: string;
-      average_score: number;
-      total_games: number;
-    }>;
-    totalUsers: number;
-    nonAdminUsers: Array<{
-      id: string;
-      username: string;
-      email: string;
-      average_score: number;
-      total_games: number;
-      highest_score: number;
-      lowest_score: number;
-    }>;
-  };
-}
-
-interface DashboardStatsResponse {
-  totalUsers: number;
-  topPlayers: Array<{
-    username: string;
-    highest_score: number;
-    games_played: number;
-  }>;
-  recentActivity: Array<{
-    username: string;
-    score: number;
-    created_at: string;
-  }>;
 }
 
 const AdminDashboard: React.FC = () => {
@@ -99,24 +80,29 @@ const AdminDashboard: React.FC = () => {
 
       try {
         // Fetch insights stats
-        const insightsRes = await apiClient.get<DashboardResponse>('/api/admin/insights-stats');
-        if (insightsRes.data && (insightsRes.data as any).data) {
-          setStats((insightsRes.data as any).data);
-        } else {
-          throw new Error(insightsRes.error || 'Unexpected response structure for insights-stats');
+        const insightsRes = await apiClient.get<ApiResponse<DashboardResponse>>('/api/admin/insights-stats');
+        if (insightsRes.data.error) {
+          throw new Error(insightsRes.data.error);
         }
+        setStats({
+          averageScore: insightsRes.data.data.avg_score,
+          mostPlayedGame: '',
+          leastPlayedGame: '',
+          insights: [],
+          totalUsers: insightsRes.data.data.total_users,
+          nonAdminUsers: []
+        });
 
         // Fetch dashboard stats
-        const dashRes = await apiClient.get<DashboardStatsResponse>('/api/admin/dashboard-stats');
-        if (dashRes.data) {
-          setDashboardStats(dashRes.data);
-        } else {
-          throw new Error(dashRes.error || 'Unexpected response structure for dashboard-stats');
+        const dashRes = await apiClient.get<ApiResponse<DashboardStatsResponse>>('/api/admin/dashboard-stats');
+        if (dashRes.data.error) {
+          throw new Error(dashRes.data.error);
         }
+        setDashboardStats(dashRes.data.data);
       } catch (err: any) {
         setError({
           message: err.message || 'Failed to load dashboard data',
-          details: err.details
+          isError: true
         });
       } finally {
         setIsLoading(false);
@@ -156,7 +142,7 @@ const AdminDashboard: React.FC = () => {
               <div className="stats-grid">
                 <div className="stat-card">
                   <h3>Total Users</h3>
-                  <p>{dashboardStats.totalUsers}</p>
+                  <p>{stats.totalUsers}</p>
                 </div>
                 <div className="stat-card">
                   <h3>Average Score</h3>
@@ -172,39 +158,21 @@ const AdminDashboard: React.FC = () => {
             <div className="top-players">
               <h2>Top Players</h2>
               <div className="players-list">
-                {dashboardStats.topPlayers.map((player, index) => (
-                  <div key={index} className="player-card">
-                    <h3>{player.username}</h3>
-                    <p>Highest Score: {player.highest_score}</p>
-                    <p>Games Played: {player.games_played}</p>
-                  </div>
-                ))}
+                {/* Add top players data here */}
               </div>
             </div>
 
             <div className="recent-activity">
               <h2>Recent Activity</h2>
               <div className="activity-list">
-                {dashboardStats.recentActivity.map((activity, index) => (
-                  <div key={index} className="activity-card">
-                    <p>{activity.username} scored {activity.score}%</p>
-                    <small>{new Date(activity.created_at).toLocaleString()}</small>
-                  </div>
-                ))}
+                {/* Add recent activity data here */}
               </div>
             </div>
 
             <div className="user-insights">
               <h2>User Insights</h2>
               <div className="insights-list">
-                {stats.insights.map((insight) => (
-                  <div key={insight.id} className="insight-card">
-                    <h3>{insight.username}</h3>
-                    <p>{insight.insight}</p>
-                    <p>Average Score: {insight.average_score}%</p>
-                    <p>Total Games: {insight.total_games}</p>
-                  </div>
-                ))}
+                {/* Add user insights data here */}
               </div>
             </div>
           </div>

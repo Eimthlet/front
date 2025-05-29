@@ -1,11 +1,10 @@
 import axios from 'axios';
 import { handleApiError } from './apiErrorHandler';
 
-type AuthResponse = {
-  token: string;
-  refreshToken?: string;
+interface ApiResponse<T> {
+  data: T;
   error?: string;
-};
+}
 
 const apiClient = axios.create({
   baseURL: process.env.REACT_APP_API_BASE_URL,
@@ -25,52 +24,42 @@ apiClient.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 // Response interceptor
 apiClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    
-    // If error is not 401 or we're already refreshing, reject
-    if (error.response?.status !== 401 || originalRequest._retry) {
-      return Promise.reject(error);
+  (response) => {
+    // Validate response structure
+    if (process.env.NODE_ENV === 'development' && !response.data) {
+      console.warn('[API WARNING] Empty response.data', {
+        url: response.config.url,
+        response
+      });
     }
-
-    originalRequest._retry = true;
     
-    try {
-      const refreshToken = localStorage.getItem('refreshToken');
-      if (!refreshToken) throw new Error('No refresh token');
-      
-      const { data } = await axios.post<AuthResponse>(
-        `${process.env.REACT_APP_API_BASE_URL}/api/auth/refresh`,
-        { refreshToken }
-      );
-      
-      if (data.error) throw new Error(data.error);
-      
-      localStorage.setItem('token', data.token);
-      if (data.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken);
-      }
-      
-      originalRequest.headers.Authorization = `Bearer ${data.token}`;
-      return apiClient(originalRequest);
-    } catch (refreshError) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      return Promise.reject(refreshError);
+    // Standardize successful responses
+    const data = response.data as ApiResponse<any>;
+    return {
+      ...response,
+      data: data.data || data
+    };
+  },
+  (error) => {
+    // Enhanced error logging
+    if (error.response) {
+      console.error('[API ERROR]', {
+        url: error.config.url,
+        status: error.response.status,
+        data: error.response.data,
+        headers: error.response.headers
+      });
+    } else {
+      console.error('[API NETWORK ERROR]', error);
     }
+    
+    return Promise.reject(handleApiError(error));
   }
 );
-
-export const setAuthToken = (token: string) => {
-  apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-};
 
 export default apiClient;
