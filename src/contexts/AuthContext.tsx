@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
 import { getApiUrl, verifyApiConfig } from '../utils/apiUrl';
+import { handleApiError } from '../utils/apiErrorHandler';
 
 // Verify API config on initialization
 verifyApiConfig();
@@ -137,13 +138,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         throw new Error('User data not found in response');
       }
-    } catch (err) {
-      if (err.response?.status === 404) {
-        throw new Error('Login service currently unavailable');
-      }
-      const error = handleApiError(err);
-      setError(error.message);
-      throw error;
+    } catch (error: any) {
+      const normalizedError = handleApiError(error);
+      setError(normalizedError.message);
+      throw normalizedError;
     }
   };
   
@@ -196,18 +194,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error: any) {
       console.error('Registration error:', error);
-      let errorMessage = 'Registration failed';
-      if (error.code === 'ECONNABORTED') {
-        errorMessage = 'Request timed out. Please check your connection and try again.';
-      } else if (error.code === 'ERR_NETWORK') {
-        errorMessage = 'Cannot connect to the server. Please check your internet connection.';
-      } else if (error.response?.status === 401) {
-        errorMessage = 'Authentication failed. Please check your credentials.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      setError(errorMessage);
-      throw error;
+      const normalizedError = handleApiError(error);
+      setError(normalizedError.message);
+      throw normalizedError;
     }
   };
   
@@ -285,7 +274,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (err.response?.status === 404) {
         return { error: 'Authentication service unavailable' };
       }
-      return { error: handleApiError(err).message };
+      const normalizedError = handleApiError(err);
+      return { error: normalizedError.message };
     }
   };
 
