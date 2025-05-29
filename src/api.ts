@@ -282,7 +282,7 @@ export async function saveProgress(userId: number, score: number, total: number)
   return response.json();
 }
 
-export async function fetchQuestions() {
+export async function fetchQuestions(): Promise<{data: {questions: Question[]}}> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token');
 
@@ -299,5 +299,13 @@ export async function fetchQuestions() {
     throw new Error(error.error || 'Failed to fetch questions');
   }
 
-  return response.json();
+  const data = await response.json();
+  return {
+    data: {
+      questions: data.questions.map((q: any) => ({
+        ...q,
+        id: q.id.toString()
+      }))
+    }
+  };
 }

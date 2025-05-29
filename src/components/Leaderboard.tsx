@@ -1,8 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, ToggleButton, ToggleButtonGroup, Box, CircularProgress } from '@mui/material';
+import { Typography, ToggleButton, ToggleButtonGroup, Box, CircularProgress, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../utils/api';
+
+interface LeaderboardEntry {
+  id: number;
+  username: string;
+  score: number;
+  rank: number;
+  avatar?: string;
+}
+
+interface LeaderboardResponse {
+  data: {
+    leaderboard: LeaderboardEntry[];
+  };
+}
 
 interface LeaderboardEntry {
   user_id: number;
@@ -53,33 +67,31 @@ const Leaderboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchLeaderboard = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        // Get token from localStorage
-        const token = localStorage.getItem('token');
-        
-        // Make the request with the token in the Authorization header
-        const response = await api.get<LeaderboardResponse>('/api/leaderboard', {
-          headers: {
-            'Authorization': token ? `Bearer ${token}` : ''
-          }
-        });
-        
-        console.log('Leaderboard response:', response.data);
-        setLeaderboard(response.data?.leaderboard || []);
-      } catch (err: any) {
-        console.error('Error fetching leaderboard:', err);
-        setError(err.message || 'Failed to load leaderboard data');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchLeaderboard = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const token = localStorage.getItem('token');
+      
+      const response = await api.get<LeaderboardResponse>('/api/leaderboard', {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      });
+      
+      console.log('Leaderboard response:', response.data);
+      setLeaderboard(response.data.data.leaderboard || []);
+    } catch (err: any) {
+      console.error('Error fetching leaderboard:', err);
+      setError(err.message || 'Failed to load leaderboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchLeaderboard();
-  }, [timeRange]);
+  }, []);
 
   if (loading) {
     return (

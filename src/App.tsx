@@ -16,6 +16,14 @@ import { useAuth } from './contexts/AuthContext';
 import api from './utils/api';
 import { Question } from './types';
 
+interface ApiResponse<T> {
+  data: T;
+  error?: string;
+  completed?: boolean;
+  status?: number;
+  message?: string;
+}
+
 interface ApiQuestion {
   id: number;
   question: string;
@@ -27,32 +35,18 @@ interface ApiQuestion {
   timeLimit?: number;
 }
 
+interface QuestionsResponse {
+  questions: Question[];
+}
+
 interface QualificationResponse {
   hasAttempted: boolean;
   isQualified: boolean;
   score?: number;
   totalQuestions?: number;
-  percentageScore?: string; // Changed from number to string
+  percentageScore?: string;
   minimumRequired?: number;
-  message: string;
-}
-
-interface QuestionsResponse {
-  questions: ApiQuestion[];
   message?: string;
-  status?: 'NO_ACTIVE_SEASON' | 'NOT_QUALIFIED' | 'NO_QUESTIONS' | 'INVALID_SEASON';
-  error?: string;
-  season?: {
-    id: number;
-    name: string;
-    isQualificationRound: boolean;
-    minimumScorePercentage: number;
-  };
-  attemptId?: number;
-  completed?: boolean;
-  score?: number;
-  totalQuestions?: number;
-  percentageScore?: number;
 }
 
 const App: React.FC = () => {
@@ -71,13 +65,18 @@ const App: React.FC = () => {
         setError(null);
         
         // First check qualification status
-        const qualificationResponse = await api.get<QualificationResponse>('/api/qualification');
-        setQualification(qualificationResponse.data);
+        const qualificationResponse = await api.get<ApiResponse<QualificationResponse>>('/api/qualification');
+        setQualification(qualificationResponse.data.data);
         
         // Only fetch questions if user is qualified or hasn't attempted yet
-        if (!qualificationResponse.data.hasAttempted || qualificationResponse.data.isQualified) {
+        if (!qualificationResponse.data.data.hasAttempted || qualificationResponse.data.data.isQualified) {
           try {
-            const response = await api.get<QuestionsResponse>('/api/questions');
+            const response = await api.get<ApiResponse<QuestionsResponse>>('/api/questions');
+            const questions = response.data.data.questions.map(q => ({
+              ...q,
+              id: q.id.toString() // Convert id to string if needed
+            }));
+            setQuestions(questions || []);
             
             // Handle completed attempts (403 errors are caught in the catch block)
             if (response.data.error && response.data.completed) {
@@ -92,18 +91,6 @@ const App: React.FC = () => {
               setError(response.data.message || 'Unable to access quiz questions');
               setQuestions([]);
               return;
-            }
-            
-            if (response.data.questions && response.data.questions.length > 0) {
-              const convertedQuestions = response.data.questions.map(q => ({
-                ...q,
-                id: q.id.toString(),
-                correctAnswer: q.correctAnswer.toString()
-              }));
-              setQuestions(convertedQuestions);
-            } else {
-              setQuestions([]);
-              setError(response.data.message || 'No questions available');
             }
           } catch (apiError: any) {
             console.error('Error fetching questions:', apiError);
@@ -225,15 +212,14 @@ const App: React.FC = () => {
                         Quiz Access Restricted
                       </Typography>
                       <Typography variant="h6" sx={{ color: 'rgba(255, 255, 255, 0.8)', mb: 3 }}>
-                        {qualification.message}
+                        You have already attempted the quiz for this season.
                       </Typography>
                       <Box sx={{ background: 'rgba(0,0,0,0.2)', p: 3, borderRadius: 2, maxWidth: '500px', mx: 'auto' }}>
                         <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 2 }}>
-                          Your Score: {qualification.score} / {qualification.totalQuestions} 
-                          ({parseFloat(qualification.percentageScore || '0').toFixed(2)}%)
+                          Your Score: {qualification.score}
                         </Typography>
                         <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                          Required Score: {qualification.minimumRequired} / {qualification.totalQuestions} (50%)
+                          Required Score: {qualification.minimumRequired}
                         </Typography>
                       </Box>
                       <Button 
