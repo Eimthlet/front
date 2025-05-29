@@ -68,6 +68,12 @@ const App: React.FC = () => {
         setLoading(true);
         setError(null);
         
+        // Only check qualification if user is logged in
+        if (!user) {
+          setLoading(false);
+          return;
+        }
+        
         // First check qualification status
         const qualificationResponse = await api.get<ApiResponse<QualificationResponse>>('/api/qualification');
         console.log('Qualification response:', qualificationResponse);
