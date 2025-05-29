@@ -66,6 +66,7 @@ interface AuthEndpointsResponse {
   paths?: string[];
   status?: string;
   data?: any;
+  message?: string;
 }
 
 interface ApiStatusResponse {
@@ -107,8 +108,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      // Check if the API is ready
-      if (!response.data?.status || response.data.status !== 'active') {
+      // If we get a 200 response, consider the API ready
+      // Only check status if it's explicitly set to something other than 'active'
+      if (response.data?.status && response.data.status !== 'active') {
         throw new Error('Authentication service currently unavailable');
       }
 
@@ -175,8 +177,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      // Check if the API is ready
-      if (!response.data?.status || response.data.status !== 'active') {
+      // If we get a 200 response, consider the API ready
+      // Only check status if it's explicitly set to something other than 'active'
+      if (response.data?.status && response.data.status !== 'active') {
         throw new Error('Authentication service currently unavailable');
       }
       
@@ -294,8 +297,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      // Check if the API is ready
-      if (!response.data?.status || response.data.status !== 'active') {
+      // If we get a 200 response, consider the API ready
+      // Only check status if it's explicitly set to something other than 'active'
+      if (response.data?.status && response.data.status !== 'active') {
         return { error: 'Authentication service unavailable' };
       }
 
