@@ -186,57 +186,6 @@ api.interceptors.response.use(
       }
 
       return Promise.reject({
-        message: 'Network error. Please check your internet connection and try again.',
-        originalError: error
-      });
-    }
-
-    if (error.response.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        }).then(token => {
-          originalRequest.headers['Authorization'] = `Bearer ${token}`;
-          return api(originalRequest);
-        }).catch(err => Promise.reject(err));
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        // Get the refresh token from localStorage if available
-        const storedRefreshToken = localStorage.getItem('refreshToken');
-        
-        // Use the refresh endpoint with the token in the request body
-        const response = await axios.post<RefreshTokenResponse>(
-          `${API_BASE_URL}/api/auth/refresh`, 
-          { refreshToken: storedRefreshToken }, 
-          { withCredentials: true }
-        );
-        
-        if (response.data && response.data.token) {
-          // Store the new tokens in localStorage
-          localStorage.setItem('token', response.data.token);
-          localStorage.setItem('refreshToken', response.data.refreshToken);
-          
-          // Add the token to the original request
-          originalRequest.headers['Authorization'] = `Bearer ${response.data.token}`;
-          
-          // Process the queue with the new token
-          processQueue(null, response.data.token);
-          return api(originalRequest);
-        }
-        
-        throw new Error('Invalid refresh token response');
-      } catch (refreshError) {
-        processQueue(refreshError as Error, null);
-        // No need to remove tokens from localStorage as we're using cookies
-        // The server will handle invalidating the cookies
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
       }
     }
 

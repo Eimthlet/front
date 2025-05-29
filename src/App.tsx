@@ -32,7 +32,7 @@ interface QualificationResponse {
   isQualified: boolean;
   score?: number;
   totalQuestions?: number;
-  percentageScore?: number;
+  percentageScore?: string; // Changed from number to string
   minimumRequired?: number;
   message: string;
 }
@@ -229,7 +229,8 @@ const App: React.FC = () => {
                       </Typography>
                       <Box sx={{ background: 'rgba(0,0,0,0.2)', p: 3, borderRadius: 2, maxWidth: '500px', mx: 'auto' }}>
                         <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 2 }}>
-                          Your Score: {qualification.score} / {qualification.totalQuestions} ({qualification.percentageScore}%)
+                          Your Score: {qualification.score} / {qualification.totalQuestions} 
+                          ({parseFloat(qualification.percentageScore || '0').toFixed(2)}%)
                         </Typography>
                         <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
                           Required Score: {qualification.minimumRequired} / {qualification.totalQuestions} (50%)

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../utils/api';
+import { apiClient } from '../utils/apiNew';
 import './AdminDashboard.css';
 import SeasonManager from './SeasonManager';
 
@@ -99,18 +99,24 @@ const AdminDashboard: React.FC = () => {
 
       try {
         // Fetch insights stats
-        const insightsResponse = await api.get<DashboardResponse>('/api/admin/insights-stats');
-        setStats(insightsResponse.data.data);
+        const insightsRes = await apiClient.get<DashboardResponse>('/api/admin/insights-stats');
+        if (insightsRes.data && (insightsRes.data as any).data) {
+          setStats((insightsRes.data as any).data);
+        } else {
+          throw new Error(insightsRes.error || 'Unexpected response structure for insights-stats');
+        }
 
         // Fetch dashboard stats
-        const dashboardResponse = await api.get<DashboardStatsResponse>('/api/admin/dashboard-stats');
-        setDashboardStats(dashboardResponse.data);
-      } catch (err: unknown) {
-        console.error('Error fetching dashboard data:', err);
-        const apiError = err as ApiError;
-        setError({ 
-          message: apiError.response?.data?.error || apiError.message,
-          details: apiError.response?.data?.details
+        const dashRes = await apiClient.get<DashboardStatsResponse>('/api/admin/dashboard-stats');
+        if (dashRes.data) {
+          setDashboardStats(dashRes.data);
+        } else {
+          throw new Error(dashRes.error || 'Unexpected response structure for dashboard-stats');
+        }
+      } catch (err: any) {
+        setError({
+          message: err.message || 'Failed to load dashboard data',
+          details: err.details
         });
       } finally {
         setIsLoading(false);
