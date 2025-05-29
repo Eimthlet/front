@@ -7,9 +7,23 @@ interface ApiResponse<T> {
   error?: string;
 }
 
+interface AuthEndpointsResponse {
+  status: string;
+  endpoints: string[];
+}
+
+interface TokenCheckResponse {
+  error?: string;
+  user?: {
+    id: number;
+    email: string;
+    isAdmin: boolean;
+  };
+}
+
 const apiClient = axios.create({
   baseURL: getApiUrl(''),
-  timeout: 15000,
+  timeout: 30000, // Increased timeout to 30s
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
