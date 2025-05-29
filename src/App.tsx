@@ -58,8 +58,9 @@ const App: React.FC = () => {
         const response = await api.get<{ data: QualificationResponse }>('/api/qualification');
         console.log('Qualification response:', response);
         
-        // Get the qualification data from the response
-        const qualificationData = response.data;
+        // Extract the qualification data from the response
+        // It could be either directly in the response or nested in a data property
+        const qualificationData = 'data' in response ? response.data : response;
         
         // Log the raw qualification data for debugging
         console.debug('Raw qualification data:', qualificationData);
@@ -73,22 +74,27 @@ const App: React.FC = () => {
         // Log the typed data for debugging
         console.debug('Typed qualification data:', qualificationData);
         
+        // Ensure we have a QualificationResponse object by checking for data property
+        const qualificationResponseData = 'data' in qualificationData ? 
+          (qualificationData as { data: QualificationResponse }).data : 
+          qualificationData as QualificationResponse;
+        
         // Extract values with type safety and proper defaults
-        const hasAttempted = Boolean(qualificationData.hasAttempted);
-        const isQualified = Boolean(qualificationData.isQualified || qualificationData.qualifies_for_next_round);
+        const hasAttempted = Boolean(qualificationResponseData.hasAttempted);
+        const isQualified = Boolean(qualificationResponseData.isQualified || qualificationResponseData.qualifies_for_next_round);
         
         // Set qualification state with all available data
         const qualificationState: QualificationResponse = {
           hasAttempted,
           isQualified,
-          score: Number(qualificationData.score) || 0,
-          totalQuestions: Number(qualificationData.totalQuestions) || 0,
-          percentageScore: String(qualificationData.percentageScore || '0'),
-          minimumRequired: Number(qualificationData.minimumRequired) || 0,
-          message: String(qualificationData.message || 'No qualification data available'),
-          qualifies_for_next_round: Boolean(qualificationData.qualifies_for_next_round),
-          completed: Boolean(qualificationData.completed),
-          completed_at: qualificationData.completed_at
+          score: Number(qualificationResponseData.score) || 0,
+          totalQuestions: Number(qualificationResponseData.totalQuestions) || 0,
+          percentageScore: String(qualificationResponseData.percentageScore || '0'),
+          minimumRequired: Number(qualificationResponseData.minimumRequired) || 0,
+          message: String(qualificationResponseData.message || 'No qualification data available'),
+          qualifies_for_next_round: Boolean(qualificationResponseData.qualifies_for_next_round),
+          completed: Boolean(qualificationResponseData.completed),
+          completed_at: qualificationResponseData.completed_at
         };
         
         // Log the qualification state for debugging
@@ -100,8 +106,16 @@ const App: React.FC = () => {
         if (!hasAttempted || isQualified) {
           try {
             const response = await api.get<{ data: QuestionsResponse }>('/api/questions');
-            const questions = response.data.questions || [];
-            setQuestions(questions.map(q => ({
+            
+            // Handle different response structures
+            const questionsData = 'data' in response ? 
+              (response as { data: QuestionsResponse }).data : 
+              response as QuestionsResponse;
+            
+            // Extract questions array with proper type checking
+            const questionsList = questionsData.questions || [];
+            
+            setQuestions(questionsList.map(q => ({
               ...q,
               id: q.id.toString() // Convert id to string if needed
             })));

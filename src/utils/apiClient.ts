@@ -7,9 +7,25 @@ interface ApiResponse<T> {
   message?: string;
 }
 
+// Determine the API base URL based on the environment
+const getBaseUrl = () => {
+  // Use environment variable if available
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  // In local development, use localhost
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:5001';
+  }
+  
+  // Default to production URL
+  return 'https://car-quizz.onrender.com';
+};
+
 // Create a custom Axios instance
 const apiClient = axios.create({
-  baseURL: 'https://car-quizz.onrender.com',
+  baseURL: getBaseUrl(),
   timeout: 30000,
   withCredentials: true,
   headers: {
@@ -67,16 +83,60 @@ apiClient.interceptors.response.use(
 // Create typed API methods
 const api = {
   get: <T>(url: string, config = {}) => 
-    apiClient.get<ApiResponse<T>>(url, config).then(response => response.data.data),
+    apiClient.get<ApiResponse<T>>(url, config).then(response => {
+      // Handle different response structures
+      if (response.data && typeof response.data === 'object') {
+        // If response already has a data property, return that
+        if ('data' in response.data) {
+          return response.data.data;
+        }
+        // Otherwise return the whole response data
+        return response.data;
+      }
+      return response.data;
+    }),
   
   post: <T>(url: string, data = {}, config = {}) => 
-    apiClient.post<ApiResponse<T>>(url, data, config).then(response => response.data.data),
+    apiClient.post<ApiResponse<T>>(url, data, config).then(response => {
+      // Handle different response structures
+      if (response.data && typeof response.data === 'object') {
+        // If response already has a data property, return that
+        if ('data' in response.data) {
+          return response.data.data;
+        }
+        // Otherwise return the whole response data
+        return response.data;
+      }
+      return response.data;
+    }),
   
   put: <T>(url: string, data = {}, config = {}) => 
-    apiClient.put<ApiResponse<T>>(url, data, config).then(response => response.data.data),
+    apiClient.put<ApiResponse<T>>(url, data, config).then(response => {
+      // Handle different response structures
+      if (response.data && typeof response.data === 'object') {
+        // If response already has a data property, return that
+        if ('data' in response.data) {
+          return response.data.data;
+        }
+        // Otherwise return the whole response data
+        return response.data;
+      }
+      return response.data;
+    }),
   
   delete: <T>(url: string, config = {}) => 
-    apiClient.delete<ApiResponse<T>>(url, config).then(response => response.data.data)
+    apiClient.delete<ApiResponse<T>>(url, config).then(response => {
+      // Handle different response structures
+      if (response.data && typeof response.data === 'object') {
+        // If response already has a data property, return that
+        if ('data' in response.data) {
+          return response.data.data;
+        }
+        // Otherwise return the whole response data
+        return response.data;
+      }
+      return response.data;
+    })
 };
 
 export default api;
