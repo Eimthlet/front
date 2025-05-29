@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { handleApiError } from './apiErrorHandler';
+import { getApiUrl } from './apiUrl';
 
 interface ApiResponse<T> {
   data: T;
@@ -7,13 +7,12 @@ interface ApiResponse<T> {
 }
 
 const apiClient = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
-  timeout: 10000,
+  baseURL: getApiUrl(''),
+  timeout: 15000,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'SameSite': 'Lax'
+    'Accept': 'application/json'
   }
 });
 
