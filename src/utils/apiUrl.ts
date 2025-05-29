@@ -2,17 +2,10 @@
  * Properly constructs API URLs and logs for debugging
  */
 /**
- * Production API URL configuration
+ * Production API URL configuration (minimal version)
  */
 export const getApiUrl = (endpoint: string): string => {
-  const baseUrl = 'https://car-quizz.onrender.com/api';
-  const cleanEndpoint = endpoint.replace(/^\/+|\/+$/g, '');
-  
-  if (process.env.NODE_ENV === 'development') {
-    console.debug('[API] Request to:', `${baseUrl}/${cleanEndpoint}`);
-  }
-  
-  return `${baseUrl}/${cleanEndpoint}`;
+  return `https://car-quizz.onrender.com/api/${endpoint.replace(/^\/+|\/+$/g, '')}`;
 };
 
 export const getApiUrlLocal = (endpoint: string): string => {
@@ -21,9 +14,7 @@ export const getApiUrlLocal = (endpoint: string): string => {
 };
 
 export const verifyApiConfig = (): void => {
-  if (!process.env.REACT_APP_API_BASE_URL) {
-    console.warn('API base URL using fallback to car-quizz.onrender.com');
-  }
+  console.log('API Base URL:', getApiUrl(''));
 };
 
 export const verifyEndpoints = async (): Promise<void> => {
