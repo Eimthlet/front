@@ -38,7 +38,6 @@ interface AuthResponse {
     isAdmin: boolean;
     role?: string;
   };
-  error?: string;
 }
 
 interface TokenCheckResponse {
@@ -46,13 +45,17 @@ interface TokenCheckResponse {
   error?: string;
 }
 
-// Define JWT payload type
 interface JwtPayload {
   id: number;
   email: string;
   isAdmin?: boolean;
   role?: string;
   exp?: number;
+}
+
+interface ApiResponse<T> {
+  data: T;
+  error?: string;
 }
 
 // Create the context
@@ -79,39 +82,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<void> => {
     setError(null);
     try {
-      const response = await apiClient.post<AuthResponse>('/api/auth/login', { email, password });
-      const data = response.data;
+      const response = await apiClient.post<ApiResponse<AuthResponse>>('/api/auth/login', { email, password });
       
-      console.log('Login response:', data);
-      
-      // Store tokens in localStorage
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-        apiClient.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+      if (response.data.error) {
+        throw new Error(response.data.error);
       }
       
-      if (data.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken);
+      const { token, refreshToken, user: userData } = response.data.data;
+      
+      console.log('Login response:', response.data.data);
+      
+      // Store tokens in localStorage
+      if (token) {
+        localStorage.setItem('token', token);
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      }
+      
+      if (refreshToken) {
+        localStorage.setItem('refreshToken', refreshToken);
       }
       
       // Set user state
-      if (data.user) {
+      if (userData) {
         setUser({
-          id: data.user.id,
+          id: userData.id,
           email,
-          isAdmin: data.user.isAdmin || false,
-          role: data.user.role
+          isAdmin: userData.isAdmin || false,
+          role: userData.role
         });
         
         setIsAuthenticated(true);
-        setIsAdmin(data.user.isAdmin || false);
+        setIsAdmin(userData.isAdmin || false);
         navigate('/');
       } else {
         throw new Error('User data not found in response');
       }
-    } catch (error) {
-      const apiError = handleApiError(error);
-      setError(apiError.message);
+    } catch (err) {
+      const error = handleApiError(err);
+      setError(error.message);
       throw error;
     }
   };
@@ -120,18 +128,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: RegisterData): Promise<void> => {
     setError(null);
     try {
-      const response = await apiClient.post<AuthResponse>('/api/auth/register', userData);
-      const data = response.data;
+      const response = await apiClient.post<ApiResponse<AuthResponse>>('/api/auth/register', userData);
       
-      if (data.error) {
-        throw new Error(data.error);
+      if (response.data.error) {
+        throw new Error(response.data.error);
       }
       
-      // After successful registration, log the user in
-      await login(userData.email, userData.password);
-    } catch (error) {
-      const apiError = handleApiError(error);
-      setError(apiError.message);
+      const { token, refreshToken, user: registeredUser } = response.data.data;
+      
+      if (registeredUser) {
+        // After successful registration, log the user in
+        await login(userData.email, userData.password);
+      } else {
+        throw new Error('User data not found in response');
+      }
+    } catch (err) {
+      const error = handleApiError(err);
+      setError(error.message);
       throw error;
     }
   };
