@@ -58,6 +58,10 @@ interface ApiResponse<T> {
   error?: string;
 }
 
+interface AuthEndpointsResponse {
+  paths: string[];
+}
+
 // Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -83,8 +87,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       // Verify login endpoint exists
-      const response = await apiClient.options('/api/auth');
-      if (!response.data?.paths?.includes('/login')) {
+      const response = await apiClient.get<AuthEndpointsResponse>('/api/auth');
+      if (!response.data.paths.includes('/login')) {
         throw new Error('Login service currently unavailable');
       }
       
@@ -138,18 +142,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       // Verify register endpoint exists
-      const response = await apiClient.options('/api/auth');
-      if (!response.data?.paths?.includes('/register')) {
+      const response = await apiClient.get<AuthEndpointsResponse>('/api/auth');
+      if (!response.data.paths.includes('/register')) {
         throw new Error('Register service currently unavailable');
       }
       
-      const response = await apiClient.post<ApiResponse<AuthResponse>>('/api/auth/register', userData);
+      const registerResponse = await apiClient.post<ApiResponse<AuthResponse>>('/api/auth/register', userData);
       
-      if (response.data.error) {
-        throw new Error(response.data.error);
+      if (registerResponse.data.error) {
+        throw new Error(registerResponse.data.error);
       }
       
-      const { token, refreshToken, user: registeredUser } = response.data.data;
+      const { token, refreshToken, user: registeredUser } = registerResponse.data.data;
       
       if (registeredUser) {
         // After successful registration, log the user in
@@ -223,8 +227,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkToken = async (): Promise<TokenCheckResponse> => {
     try {
       // First verify endpoint exists
-      const response = await apiClient.options('/api/auth');
-      if (!response.data?.paths?.includes('/check-token')) {
+      const response = await apiClient.get<AuthEndpointsResponse>('/api/auth');
+      if (!response.data.paths.includes('/check-token')) {
         return { error: 'Authentication service unavailable' };
       }
       
