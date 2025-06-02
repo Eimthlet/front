@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
+import { AdminDiagnostic } from './AdminDiagnostic';
 import SeasonManagement from './SeasonManagement';
 import {
   Box,

@@ -1,7 +1,7 @@
 /* eslint-disable */
 // @ts-nocheck
 import * as React from 'react';
-import apiClient from '../utils/apiClient';
+import apiClient from '../utils/apiClient.ts';
 import './AdminDashboard.css';
 import SeasonManager from './SeasonManager';
 

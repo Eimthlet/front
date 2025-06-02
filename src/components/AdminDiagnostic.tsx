@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+const useState = React.useState;
+const useEffect = React.useEffect;
+type ComponentType = React.FunctionComponent;
 import { Box, Typography, Button, Paper, Alert, CircularProgress, Divider } from '@mui/material';
 import { checkAdminStatus, fixAdminToken } from '../utils/checkAdmin';
 import api from '../utils/api';
 
-const AdminDiagnostic: React.FC = () => {
+const AdminDiagnostic: ComponentType = () => {
   const [loading, setLoading] = useState(false);
   const [adminStatus, setAdminStatus] = useState<any>(null);
   const [fixResult, setFixResult] = useState<any>(null);
