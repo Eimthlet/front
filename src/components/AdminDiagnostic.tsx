@@ -1,10 +1,11 @@
 import React from 'react';
-const useState = React.useState;
-const useEffect = React.useEffect;
-type ComponentType = React.FunctionComponent;
 import { Box, Typography, Button, Paper, Alert, CircularProgress, Divider } from '@mui/material';
 import { checkAdminStatus, fixAdminToken } from '../utils/checkAdmin';
 import api from '../utils/api';
+
+const useState = React.useState;
+const useEffect = React.useEffect;
+type ComponentType = React.FunctionComponent;
 
 const AdminDiagnostic: ComponentType = () => {
   const [loading, setLoading] = useState(false);
