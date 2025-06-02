@@ -1,8 +1,9 @@
-import express from "express";
-import cors from "cors";
-import path from "path";
-import dotenv from "dotenv";
-import { createProxyMiddleware } from "http-proxy-middleware";
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
+const dotenv = require("dotenv");
+const { createProxyMiddleware } = require("http-proxy-middleware");
+const fetch = require("node-fetch");
 
 // Load environment variables
 dotenv.config();
