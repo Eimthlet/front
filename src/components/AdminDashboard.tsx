@@ -1,10 +1,11 @@
 /* eslint-disable */
 // @ts-nocheck
-import React from 'react';
-import { useState, useEffect } from 'react';
+import * as React from 'react';
 import apiClient from '../utils/apiClient';
 import './AdminDashboard.css';
 import SeasonManager from './SeasonManager';
+
+const { useState, useEffect } = React;
 
 // Remove any leftover fragments
 

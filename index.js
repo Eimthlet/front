@@ -1,9 +1,14 @@
-const express = require("express");
-const cors = require("cors");
-const path = require("path");
-const dotenv = require("dotenv");
-const { createProxyMiddleware } = require("http-proxy-middleware");
-const fetch = require("node-fetch");
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+import { createProxyMiddleware } from 'http-proxy-middleware';
+import fetch from 'node-fetch';
+
+// ES modules fix for __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables
 dotenv.config();
