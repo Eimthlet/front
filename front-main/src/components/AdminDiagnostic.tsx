@@ -70,7 +70,7 @@ const AdminDiagnostic: React.FC = () => {
     setLoading(true);
     try {
       // Test a simple admin endpoint
-      const result = await api.get('/api/admin/users');
+      const result = await api.get('/admin/users');
       setApiTest({
         success: true,
         message: 'Successfully connected to admin endpoint',
