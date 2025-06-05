@@ -15,40 +15,28 @@ interface User {
   role?: string;
 }
 
-interface AuthContextType {
+interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (userData: RegisterData) => Promise<void>;
-  logout: () => Promise<void>;
+  loading: boolean;
   error: string | null;
-  clearError: () => void;
 }
 
-interface RegisterData {
-  email: string;
-  password: string;
+// Represents the structure if the API client wraps the response (e.g., Axios default)
+interface WrappedLoginResponse {
+  data: ActualLoginPayload; // The actual payload is nested
+  error?: string; 
 }
 
-// Define types
-interface AuthResponse {
-  token: string;
+// Represents the actual payload structure from the backend API for a login attempt
+// This is the primary type we expect after unwrapping/identifying the core response.
+interface ActualLoginPayload {
+  success: boolean; // 'success' is mandatory for a valid payload
+  token: string;    // 'token' is mandatory for a successful login payload
   refreshToken?: string;
-  user?: {
-    id: number;
-    email: string;
-    isAdmin: boolean;
-    role?: string;
-  };
-  success?: boolean;
-  error?: string;
-}
-
-interface LoginResponse {
-  data: AuthResponse;
-  error?: string;
+  user: User;       // 'user' object is mandatory for a successful login payload
+  error?: string;   // 'error' might be present if success is false
 }
 
 interface TokenCheckResponse {
@@ -83,8 +71,22 @@ interface ApiStatusResponse {
   data?: any;
 }
 
+// Combined type for the context value, including state and action dispatchers
+interface AuthContextValue extends AuthState {
+  login: (email: string, password: string) => Promise<void>;
+  register: (userData: RegisterData) => Promise<void>;
+  logout: () => Promise<void>;
+  clearError: () => void;
+}
+
+interface RegisterData {
+  email: string;
+  password: string;
+  // Add other fields like username, firstName, lastName if your registration form collects them
+}
+
 // Create the context
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 // Provider component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -119,89 +121,95 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('Auth endpoint response:', response);
       
-      const authResponse = await api.post<LoginResponse>(getApiUrl('auth/login'), { email, password });
+      // Type the initial API response as 'any' to allow for flexible structural checks without TypeScript errors.
+      // LoginResponse should be the type of the actual payload (e.g., { success: boolean; token: string; ... })
+      const authResponse: any = await api.post(getApiUrl('auth/login'), { email, password });
       
-      // authResponse is LoginResponse (type {data: ActualPayload}) | ApiResponse<LoginResponse (type {data: ActualPayload})>
-      // This means authResponse can be {data: ActualPayload} or {data: {data: ActualPayload}}
+      let actualLoginPayload: ActualLoginPayload | undefined = undefined; 
 
-      // Handle cases where authResponse itself might indicate an error (e.g. network error from apiClient)
-      if (!authResponse.data && (authResponse as ApiResponse<any>).error) {
-        throw new Error(`Login request failed: ${(authResponse as ApiResponse<any>).error}`);
-      }
-      if (!authResponse.data) {
-        // This case implies authResponse is LoginResponse (type {data: ActualPayload}) but .data is missing,
-        // or authResponse is ApiResponse but its .data (which would be LoginResponse type) is missing.
-        // Or authResponse is ActualPayload directly but without a 'token' (caught later).
-        // This check is for a malformed outer structure.
-        console.error('Login response is missing the primary data field or has unexpected structure:', authResponse);
-        throw new Error('Login response structure is invalid.');
+      // Check for a specific API client error structure first.
+      // This example assumes an error object like { error: string } without typical payload fields.
+      if (authResponse && typeof authResponse.error === 'string' &&
+          authResponse.success === undefined && authResponse.token === undefined && authResponse.data === undefined) {
+          throw new Error(`Login request failed due to API client error: ${authResponse.error}`);
       }
 
-      const firstLevelData = authResponse.data; // Type: ActualPayload | WrapperResponseType
-      let actualLoginPayload: any; // Define as specific type e.g. ActualPayload later
+      // Scenario 1: authResponse is the LoginResponse payload itself (most likely based on logs)
+      if (authResponse && typeof authResponse.token === 'string' && typeof authResponse.success === 'boolean') {
+          actualLoginPayload = authResponse as ActualLoginPayload;
+      }
+      // Scenario 2: authResponse is { data: LoginResponse } (e.g., standard Axios wrapper)
+      else if (authResponse && authResponse.data &&
+               typeof authResponse.data.token === 'string' && typeof authResponse.data.success === 'boolean') {
+          actualLoginPayload = authResponse.data as ActualLoginPayload;
+      }
+      // Scenario 3: authResponse is { data: { data: LoginResponse } } (doubly wrapped)
+      else if (authResponse && authResponse.data && authResponse.data.data &&
+               typeof authResponse.data.data.token === 'string' && typeof authResponse.data.data.success === 'boolean') {
+          actualLoginPayload = authResponse.data.data as ActualLoginPayload;
+      }
 
-      // If firstLevelData has its own 'data' property, it's the WrapperResponseType.
-      // And firstLevelData.data should be the ActualPayload.
-      if (firstLevelData && 'data' in firstLevelData && firstLevelData.data !== undefined) {
-        actualLoginPayload = firstLevelData.data; 
-      } else if (firstLevelData && 'token' in firstLevelData) {
-        // Otherwise, if firstLevelData has 'token', it's likely the ActualPayload itself.
-        actualLoginPayload = firstLevelData;
-      } else {
-        console.error('Could not extract actual login payload from response structure:', authResponse, firstLevelData);
-        throw new Error('Login response data is in an unexpected format or essential data is missing.');
+      // If no structure matched and payload wasn't identified
+      if (!actualLoginPayload) {
+        // Use the original authResponse in the error log as it holds the raw structure received.
+        console.error('Login response is in an unrecognized structure or essential data is missing:', authResponse);
+        throw new Error('Login response structure is invalid. Could not identify payload.');
       }
-      
-      // Now, actualLoginPayload is expected to be the ActualPayload object { success, token, user, error }
-      if (!actualLoginPayload || typeof actualLoginPayload.success === 'undefined' || typeof actualLoginPayload.token === 'undefined') {
-        console.error('Extracted payload is invalid or missing essential fields:', actualLoginPayload);
-        throw new Error('Login failed: Extracted payload is invalid.');
+
+      // Now, actualLoginPayload is typed as ActualLoginPayload | undefined.
+
+      // Check if a valid payload was extracted. 
+      // If actualLoginPayload is undefined here, it means none of the scenarios matched.
+      if (!actualLoginPayload) {
+        // This error was already thrown by the scenario checks, but as a safeguard:
+        console.error('Critical: actualLoginPayload is undefined after structural checks. Original response:', authResponse);
+        throw new Error('Login failed: Payload could not be identified or is fundamentally malformed.');
       }
+
+      // At this point, actualLoginPayload is guaranteed to be of type ActualLoginPayload.
+      // TypeScript should now correctly infer types for .success, .token, .user etc.
 
       if (actualLoginPayload.success === false) {
+        // If success is false, there should be an error message from the server.
         throw new Error(actualLoginPayload.error || 'Login failed due to an unspecified server error.');
       }
 
-      // This check is technically redundant if the one above passes, but good for clarity.
-      if (!actualLoginPayload.token) {
-        console.error('Token is missing in the extracted login response payload:', actualLoginPayload);
-        throw new Error('Login failed: Authentication token not found in response.');
+      // If success is true, token and user must be present as per ActualLoginPayload definition.
+      // The check for token presence is still good practice before using it.
+      if (!actualLoginPayload.token || !actualLoginPayload.user) {
+        console.error('Token or user data is missing in the successfully extracted login response payload:', actualLoginPayload);
+        throw new Error('Login failed: Essential data (token/user) not found in an otherwise successful response.');
       }
 
-      const { token, refreshToken, user: userData } = actualLoginPayload;
+      // Destructure from the correctly typed actualLoginPayload
+      const { token, refreshToken, user: userDataFromPayload } = actualLoginPayload;
       
-      console.log('Login response:', authResponse);
+      console.log('Login successful. Tokens and user data processed.');
       
       // Store tokens in localStorage
-      if (token) {
-        localStorage.setItem('token', token);
-      }
-      
+      localStorage.setItem('token', token);
       if (refreshToken) {
         localStorage.setItem('refreshToken', refreshToken);
       }
       
-      // Set user state
-      if (userData) {
-        const user = {
-          id: userData.id,
-          email,
-          isAdmin: userData.isAdmin || userData.role === 'admin' || false,
-          role: userData.role
-        };
-        
-        setUser(user);
-        setIsAuthenticated(true);
-        setIsAdmin(user.isAdmin);
-        
-        // Navigate based on user role
-        if (user.isAdmin) {
-          navigate('/admin');
-        } else {
-          navigate('/quiz');
-        }
+      // Set user state using userDataFromPayload
+      // Ensure the user object created for context matches the User interface
+      const authenticatedUser: User = {
+        id: userDataFromPayload.id,
+        email: userDataFromPayload.email, // Use email from payload
+        isAdmin: userDataFromPayload.isAdmin || userDataFromPayload.role === 'admin' || false,
+        role: userDataFromPayload.role
+      };
+      
+      setUser(authenticatedUser);
+      setIsAuthenticated(true);
+      setIsAdmin(authenticatedUser.isAdmin);
+      
+      // Navigate based on user role
+      if (authenticatedUser.isAdmin) {
+        navigate('/admin');
       } else {
-        throw new Error('User data not found in response');
+        navigate('/quiz');
       }
     } catch (error: any) {
       console.error('Login error details:', error);
@@ -227,7 +235,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('Auth endpoint response:', response);
 
-      const registerResponse = await api.post<LoginResponse>(
+      // Type the initial API response as 'any' for flexibility
+      const registerResponse: any = await api.post<any>(
         getApiUrl('auth/register'), 
         userData, 
         {
@@ -240,36 +249,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       );
 
-      // registerResponse is LoginResponse (type {data: ActualPayload}) | ApiResponse<LoginResponse (type {data: ActualPayload})>
+      let actualRegisterPayload: ActualLoginPayload | undefined = undefined;
 
-      if (!registerResponse.data && (registerResponse as ApiResponse<any>).error) {
-        throw new Error(`Registration request failed: ${(registerResponse as ApiResponse<any>).error}`);
-      }
-      if (!registerResponse.data) {
-        console.error('Register response is missing the primary data field or has unexpected structure:', registerResponse);
-        throw new Error('Register response structure is invalid.');
+      // Check for a specific API client error structure first.
+      if (registerResponse && typeof registerResponse.error === 'string' &&
+          registerResponse.success === undefined && registerResponse.token === undefined && registerResponse.data === undefined) {
+          throw new Error(`Registration request failed due to API client error: ${registerResponse.error}`);
       }
 
-      const firstLevelData = registerResponse.data; // Type: ActualPayload | WrapperResponseType
-      let actualRegisterPayload: any; // Define as specific type e.g. ActualPayload later
+      // Scenario 1: registerResponse is the ActualLoginPayload itself
+      if (registerResponse && typeof registerResponse.token === 'string' && typeof registerResponse.success === 'boolean') {
+          actualRegisterPayload = registerResponse as ActualLoginPayload;
+      }
+      // Scenario 2: registerResponse is { data: ActualLoginPayload }
+      else if (registerResponse && registerResponse.data &&
+               typeof registerResponse.data.token === 'string' && typeof registerResponse.data.success === 'boolean') {
+          actualRegisterPayload = registerResponse.data as ActualLoginPayload;
+      }
+      // Scenario 3: registerResponse is { data: { data: ActualLoginPayload } } (doubly wrapped)
+      else if (registerResponse && registerResponse.data && registerResponse.data.data &&
+               typeof registerResponse.data.data.token === 'string' && typeof registerResponse.data.data.success === 'boolean') {
+          actualRegisterPayload = registerResponse.data.data as ActualLoginPayload;
+      }
 
-      // If firstLevelData has its own 'data' property, it's the WrapperResponseType.
-      if (firstLevelData && 'data' in firstLevelData && firstLevelData.data !== undefined) {
-        actualRegisterPayload = firstLevelData.data;
-      } else if (firstLevelData && 'token' in firstLevelData) {
-        // Otherwise, if firstLevelData has 'token', it's likely the ActualPayload itself.
-        actualRegisterPayload = firstLevelData;
-      } else {
-        console.error('Could not extract actual register payload from response structure:', registerResponse, firstLevelData);
+      // If no structure matched and payload wasn't identified
+      if (!actualRegisterPayload) {
+        console.error('Could not extract actual register payload from response structure:', registerResponse);
         throw new Error('Register response data is in an unexpected format or essential data is missing.');
       }
 
-      // Now, actualRegisterPayload is expected to be the ActualPayload object { success, token, user, error }
-      if (!actualRegisterPayload || typeof actualRegisterPayload.success === 'undefined' || typeof actualRegisterPayload.token === 'undefined') {
-        console.error('Extracted payload is invalid or missing essential fields:', actualRegisterPayload);
-        throw new Error('Registration failed: Extracted payload is invalid.');
-      }
-
+      // At this point, actualRegisterPayload is guaranteed to be of type ActualLoginPayload.
+      // Proceed with checks on the identified payload.
       if (actualRegisterPayload.success === false) {
         throw new Error(actualRegisterPayload.error || 'Registration failed due to an unspecified server error.');
       }
@@ -422,7 +432,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       isAuthenticated,
       isAdmin,
-      isLoading,
+      loading: isLoading, // Map isLoading state to loading context value
       login,
       register,
       logout,
@@ -435,7 +445,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 // Custom hook for using the auth context
-export const useAuth = (): AuthContextType => {
+export const useAuth = (): AuthContextValue => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
@@ -444,4 +454,4 @@ export const useAuth = (): AuthContextType => {
 };
 
 // Export the context type for use in other files
-export type { AuthContextType };
+export type { AuthContextValue };

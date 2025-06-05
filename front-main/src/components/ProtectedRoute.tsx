@@ -12,11 +12,11 @@ export default function ProtectedRoute({
   children, 
   adminOnly = false 
 }: ProtectedRouteProps) {
-  const { user, isLoading } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
 
   // Show loading state while checking authentication
-  if (isLoading) {
+  if (loading) {
     return (
       <Box sx={{ 
         display: 'flex', 

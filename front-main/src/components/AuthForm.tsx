@@ -67,17 +67,6 @@ interface ApiError {
   stack?: string;
 }
 
-interface User {
-  id: number;
-  username: string;
-  role: string;
-}
-
-interface LoginResponse {
-  user: User;
-  token: string;
-  refreshToken: string;
-}
 
 interface PendingRegistrationResponse {
   success: boolean;
