@@ -5,20 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import api from '../utils/api';
 
 interface LeaderboardEntry {
-  id: number;
-  username: string;
-  score: number;
-  rank: number;
-  avatar?: string;
-}
-
-interface LeaderboardResponse {
-  data: {
-    leaderboard: LeaderboardEntry[];
-  };
-}
-
-interface LeaderboardEntry {
   user_id: number;
   username: string;
   score: number;
@@ -72,9 +58,9 @@ const Leaderboard: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      const response = await api.get<LeaderboardEntry[]>('/api/leaderboard');
+      const response = await api.get<LeaderboardResponse>('/api/leaderboard');
       console.log('Leaderboard response:', response.data);
-      setLeaderboard(response.data || []);
+      setLeaderboard(response.data.leaderboard || []);
     } catch (err: any) {
       console.error('Error fetching leaderboard:', err);
       setError(err.message || 'Failed to load leaderboard data');
