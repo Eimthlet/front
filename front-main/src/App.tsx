@@ -105,7 +105,7 @@ const App: React.FC = () => {
         // Only fetch questions if user is qualified or hasn't attempted yet
         if (!hasAttempted || isQualified) {
           try {
-            const response = await api.get<{ data: QuestionsResponse }>('/api/questions');
+            const response = await api.get<{ data: QuestionsResponse }>('/questions');
             
             // Handle different response structures
             const questionsData = 'data' in response ? 
