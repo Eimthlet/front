@@ -213,7 +213,7 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
   useEffect(() => {
     const checkQualification = async () => {
       try {
-        const response = await apiClient.get<ApiResponse<QualificationResponse>>('/api/qualification');
+        const response = await apiClient.get<ApiResponse<QualificationResponse>>('/qualification');
         const responseDataUnion = response.data; // This can be QualificationResponse or ApiResponse<QualificationResponse>
         // We need to ensure qualificationData is the actual QualificationResponse
         const qualificationData = 

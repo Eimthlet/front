@@ -55,7 +55,7 @@ const App: React.FC = () => {
         }
         
         // First check qualification status
-        const response = await api.get<{ data: QualificationResponse }>('/api/qualification');
+        const response = await api.get<{ data: QualificationResponse }>('/qualification');
         console.log('Qualification response:', response);
         
         // Extract the qualification data from the response
