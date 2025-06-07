@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Define types for API responses
-interface ApiResponse<T> {
+export interface ApiResponse<T> {
   data: T;
   error?: string;
   message?: string;

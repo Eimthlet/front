@@ -13,7 +13,7 @@ import AdminDiagnostic from './components/AdminDiagnostic';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import { useAuth } from './contexts/AuthContext';
-import api from './utils/apiClient';
+import apiClient, { ApiResponse } from './utils/apiClient';
 import { Question } from './types';
 
 interface QualificationResponse {
@@ -53,14 +53,40 @@ const App: React.FC = () => {
           return;
         }
         
-        // FIX: The backend now sends a clean, direct response. No more guesswork.
-        const qualificationData = await api.get<QualificationResponse>('/qualification');
+        // The response will be of type AxiosResponse<QualificationResponse | ApiResponse<QualificationResponse>>
+        const response = await apiClient.get<QualificationResponse | ApiResponse<QualificationResponse>>('/qualification');
+        
+        // Handle both response formats
+        const responseData = response.data;
+        let qualificationData: QualificationResponse;
+        
+        // Type guard to check if the response is a direct QualificationResponse
+        const isDirectResponse = (data: any): data is QualificationResponse => {
+          return data && typeof data === 'object' && 
+                 ('isQualified' in data || 'qualifies_for_next_round' in data);
+        };
+        
+        // Type guard to check if the response is an ApiResponse
+        const isApiResponse = (data: any): data is ApiResponse<QualificationResponse> => {
+          return data && typeof data === 'object' && 'data' in data;
+        };
+        
+        if (isDirectResponse(responseData)) {
+          // Direct QualificationResponse
+          qualificationData = responseData as QualificationResponse;
+        } else if (isApiResponse(responseData)) {
+          // Wrapped in ApiResponse
+          qualificationData = responseData.data;
+        } else {
+          throw new Error('Unexpected response format from qualification endpoint');
+        }
+        
         setQualification(qualificationData);
         
         // Only fetch questions if user is qualified or hasn't attempted yet
         if (!qualificationData.hasAttempted || qualificationData.isQualified) {
           try {
-            const questionsResponse = await api.get<QuestionsResponse>('/questions');
+            const questionsResponse = await apiClient.get<QuestionsResponse>('/questions');
             setQuestions(questionsResponse.questions || []);
           } catch (apiError: any) {
             console.error('Error fetching questions:', apiError);
@@ -88,7 +114,7 @@ const App: React.FC = () => {
 
   const handleQuizComplete = async (score: number) => {
     try {
-      await api.post('/progress', { 
+      await apiClient.post('/progress', { 
         userId: user?.id, 
         score, 
         total: questions.length 

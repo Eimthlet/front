@@ -32,7 +32,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
-import api from '../utils/api';
+import apiClient from '../utils/apiClient';
 
 interface Season {
   id?: string | number;
@@ -128,7 +128,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
   const fetchSeasons = async () => {
     try {
       setLoading(true);
-      const response = await api.get<SeasonsResponse>('/api/admin/seasons');
+      const response = await apiClient.get<SeasonsResponse>('/api/admin/seasons');
       setSeasons(response.data.data);
       setError(null);
     } catch (err: unknown) {
@@ -238,13 +238,13 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
       let response;
       try {
         if (dialogMode === 'create') {
-          response = await api.post('/api/admin/seasons', seasonData, { 
+          response = await apiClient.post('/api/admin/seasons', seasonData, { 
             headers,
             validateStatus: (status) => status < 500 // Don't throw on 4xx errors
           });
           console.log('Create season response:', response);
         } else if (currentSeason.id) {
-          response = await api.put(`/api/admin/seasons/${currentSeason.id}`, seasonData, { 
+          response = await apiClient.put(`/api/admin/seasons/${currentSeason.id}`, seasonData, { 
             headers,
             validateStatus: (status) => status < 500
           });
@@ -318,7 +318,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
       }
       
       const numId = Number(id);
-      await api.delete(`/api/admin/seasons/${numId}`, {
+      await apiClient.delete(`/api/admin/seasons/${numId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -363,7 +363,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
       correct_answer: ''
     });
     try {
-      const response = await api.get<QuestionsResponse>(`/api/admin/seasons/${numSeasonId}/questions`);
+      const response = await apiClient.get<QuestionsResponse>(`/api/admin/seasons/${numSeasonId}/questions`);
       setQuestions(response.data.data);
       setOpenQuestionsDialog(true);
     } catch (err: any) {
@@ -427,7 +427,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
     if (!selectedSeasonId) return;
     
     try {
-      await api.post(`/api/admin/seasons/${selectedSeasonId}/questions`, {
+      await apiClient.post(`/api/admin/seasons/${selectedSeasonId}/questions`, {
         questions: questions.map(q => q.id)
       });
       
@@ -444,7 +444,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
     const numSeasonId = Number(seasonId);
     setSelectedSeasonId(numSeasonId);
     try {
-      const response = await api.get<QualifiedUsersResponse>(`/api/admin/seasons/${numSeasonId}/qualified-users`);
+      const response = await apiClient.get<QualifiedUsersResponse>(`/api/admin/seasons/${numSeasonId}/qualified-users`);
       setQualifiedUsers(response.data.data);
       setOpenQualifiedUsersDialog(true);
     } catch (err: any) {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Button, Paper, Alert, CircularProgress, Divider } from '@mui/material';
 import { checkAdminStatus, fixAdminToken } from '../utils/checkAdmin';
-import api from '../utils/api';
+import apiClient from '../utils/apiClient';
 
 const AdminDiagnostic: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -70,7 +70,7 @@ const AdminDiagnostic: React.FC = () => {
     setLoading(true);
     try {
       // Test a simple admin endpoint
-      const result = await api.get('/admin/users');
+      const result = await apiClient.get('/admin/users');
       setApiTest({
         success: true,
         message: 'Successfully connected to admin endpoint',

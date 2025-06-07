@@ -1,25 +1,22 @@
 // This file is deprecated. Please use the axios-based client in src/utils/api.ts instead.
-// This file is kept for backward compatibility only and will be removed in a future version.
+// This file is deprecated and should not be used in new code.
+// Please use apiClient.ts instead.
 
 import axios from 'axios';
-import { API_CONFIG, AUTH_CONFIG } from './config';
-
-// Always use the production URL
-const API_BASE = 'https://car-quizz.onrender.com';
-const API_TIMEOUT = 30000; // 30 seconds timeout
+import { API_CONFIG } from '../config';
 
 // Create axios instance with default config
 export const api = axios.create({
-  baseURL: API_BASE,
-  timeout: API_TIMEOUT,
+  baseURL: API_CONFIG.BASE_URL,
+  timeout: API_CONFIG.TIMEOUT,
   headers: {
-    'Content-Type': 'application/json',
+    ...API_CONFIG.HEADERS,
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Credentials': 'true'
   },
+  withCredentials: API_CONFIG.WITH_CREDENTIALS,
   xsrfCookieName: 'accessToken',
-  xsrfHeaderName: 'X-CSRF-Token',
-  withCredentials: true
+  xsrfHeaderName: 'X-CSRF-Token'
 });
 
 // Request interceptor for logging
@@ -88,14 +85,14 @@ export interface AuthResponse {
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
   try {
-    const response = await fetch(`${API_BASE}/api/auth/login`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ email, password }),
       credentials: 'include',
-      signal: AbortSignal.timeout(API_TIMEOUT)
+      signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
     });
     
     const data = await response.json();
@@ -116,13 +113,20 @@ export async function login(email: string, password: string): Promise<AuthRespon
   }
 }
 
-export async function register(username: string, email: string, password: string, phone: string, amount: number): Promise<any> {
+export async function register(userData: {
+  username: string;
+  email: string;
+  password: string;
+  phone: string;
+  amount: number;
+}): Promise<{ token: string; user: User }> {
   try {
-    const response = await fetch(`${API_BASE}/api/auth/register`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email, password, phone, amount }),
-      credentials: 'include'
+      body: JSON.stringify(userData),
+      credentials: 'include',
+      signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
     });
     
     const data = await response.json();
@@ -133,6 +137,9 @@ export async function register(username: string, email: string, password: string
     
     return data;
   } catch (error: any) {
+    if (error.name === 'AbortError') {
+      throw new Error('Request timed out. Please check your internet connection.');
+    }
     if (error.message) {
       throw new Error(error.message);
     }
@@ -142,11 +149,12 @@ export async function register(username: string, email: string, password: string
 
 export async function refreshToken(refreshToken: string): Promise<AuthResponse> {
   try {
-    const response = await fetch(`${API_BASE}/api/auth/refresh-token`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/auth/refresh-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
-      credentials: 'include'
+      credentials: 'include',
+      signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
     });
     
     const data = await response.json();
@@ -157,6 +165,9 @@ export async function refreshToken(refreshToken: string): Promise<AuthResponse> 
     
     return data;
   } catch (error: any) {
+    if (error.name === 'AbortError') {
+      throw new Error('Request timed out. Please check your internet connection.');
+    }
     if (error.message) {
       throw new Error(error.message);
     }
@@ -166,11 +177,12 @@ export async function refreshToken(refreshToken: string): Promise<AuthResponse> 
 
 export async function fetchAdminData(endpoint: string) {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_BASE}/api/admin/${endpoint}`, {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/${endpoint}`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
-    }
+    },
+    signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
   });
 
   if (!response.ok) {
@@ -194,13 +206,14 @@ export interface Question {
 
 export async function addQuestion(question: Question): Promise<Question> {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_BASE}/api/admin/questions`, {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/questions`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(question)
+    body: JSON.stringify(question),
+    signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
   });
 
   if (!response.ok) {
@@ -213,13 +226,14 @@ export async function addQuestion(question: Question): Promise<Question> {
 
 export async function editQuestion(question: Question): Promise<Question> {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_BASE}/api/admin/questions/${question.id}`, {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/questions/${question.id}`, {
     method: 'PUT',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(question)
+    body: JSON.stringify(question),
+    signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
   });
 
   if (!response.ok) {
@@ -232,12 +246,13 @@ export async function editQuestion(question: Question): Promise<Question> {
 
 export async function deleteQuestion(questionId: string): Promise<void> {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_BASE}/api/admin/questions/${questionId}`, {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/questions/${questionId}`, {
     method: 'DELETE',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
-    }
+    },
+    signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
   });
 
   if (!response.ok) {
@@ -248,11 +263,12 @@ export async function deleteQuestion(questionId: string): Promise<void> {
 
 export async function fetchAllQuestions(): Promise<Question[]> {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_BASE}/api/admin/questions`, {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/questions`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
-    }
+    },
+    signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
   });
 
   if (!response.ok) {
@@ -264,14 +280,15 @@ export async function fetchAllQuestions(): Promise<Question[]> {
 }
 
 export async function saveProgress(userId: number, score: number, total: number) {
-  const response = await fetch(`${API_BASE}/api/progress`, {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/api/progress`, {
     method: 'POST',
     headers: { 
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${localStorage.getItem('token')}`
     },
     body: JSON.stringify({ userId, score, total }),
-    credentials: 'include'
+    credentials: 'include',
+    signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
   });
   
   if (!response.ok) {
@@ -286,12 +303,12 @@ export async function fetchQuestions(): Promise<{data: {questions: Question[]}}>
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token');
 
-  const response = await fetch(`${API_BASE}/api/questions`, {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/api/questions`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     },
-    credentials: 'include'
+    signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
   });
 
   if (!response.ok) {

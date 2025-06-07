@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Typography, ToggleButton, ToggleButtonGroup, Box, CircularProgress, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { motion, AnimatePresence } from 'framer-motion';
-import api from '../utils/api';
+import apiClient from '../utils/apiClient';
 
 interface LeaderboardEntry {
   user_id: number;
@@ -58,9 +58,9 @@ const Leaderboard: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      const response = await api.get<LeaderboardResponse>('/api/leaderboard');
-      console.log('Leaderboard response:', response.data);
-      setLeaderboard(response.data.leaderboard || []);
+      const response = await apiClient.get<LeaderboardResponse>('/leaderboard');
+      console.log('Leaderboard response:', response);
+      setLeaderboard(response.leaderboard || []);
     } catch (err: any) {
       console.error('Error fetching leaderboard:', err);
       setError(err.message || 'Failed to load leaderboard data');

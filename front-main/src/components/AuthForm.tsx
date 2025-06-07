@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../utils/api';
+import apiClient from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { jwtDecode } from 'jwt-decode';
 import { API_CONFIG, AUTH_CONFIG, PAYMENT_CONFIG } from '../config';
@@ -8,6 +8,21 @@ import { Checkbox, FormControlLabel, Link, IconButton } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import './AuthForm.css';
+
+interface PendingRegistrationResponse {
+  pending: boolean;
+  tx_ref?: string;
+}
+
+interface ResumePaymentResponse {
+  success: boolean;
+  tx_ref: string;
+  public_key: string;
+  amount: number;
+  email: string;
+  phone: string;
+  message: string;
+}
 
 // Helper function to generate UUID using Web Crypto API instead of Node.js crypto
 function generateUUID() {
@@ -132,25 +147,25 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
   const [pendingTxRef, setPendingTxRef] = useState('');
 
   // Check for pending registration
-  const checkPendingRegistration = async (emailToCheck: string) => {
+  const checkPendingRegistration = async (emailToCheck: string): Promise<PendingRegistrationResponse | null> => {
     try {
-      const response = await api.post<PendingRegistrationResponse>('/auth/check-pending-registration', { email: emailToCheck });
-      return response;
+      // The response is already the data we need
+      return await apiClient.post<PendingRegistrationResponse>('/auth/check-pending-registration', { email: emailToCheck });
     } catch (error) {
       console.error('Error checking pending registration:', error);
-      throw error;
+      return null;
     }
   };
 
   // Resume payment for pending registration
-  const resumePayment = async (originalTxRef: string, email: string) => {
+  const resumePayment = async (originalTxRef: string, email: string): Promise<ResumePaymentResponse> => {
     try {
-      const response = await api.post<ResumePaymentResponse>('/auth/resume-payment', {
+      // The response is already the data we need
+      return await apiClient.post<ResumePaymentResponse>('/auth/resume-payment', {
         tx_ref: 'TX' + Date.now() + Math.floor(Math.random() * 1000000),
         original_tx_ref: originalTxRef,
         email
       });
-      return response;
     } catch (error) {
       console.error('Error resuming payment:', error);
       throw error;
@@ -178,10 +193,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
 
     // Check for pending registration first
     if (currentMode === 'register') {
-      const hasPending = await checkPendingRegistration(email);
-      if (hasPending) {
+      const pendingResponse = await checkPendingRegistration(email);
+      if (pendingResponse?.pending && pendingResponse.tx_ref) {
         // Automatically resume payment if there's a pending registration
-        await resumePayment(hasPending.data.tx_ref, email);
+        await resumePayment(pendingResponse.tx_ref, email);
         return;
       }
     }
@@ -267,8 +282,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
           email: string;
         }
         
-        const response = await api.post<RegisterResponse>(endpoint, payload);
-        const regResult = response.data;
+        // The response is already the data we need
+        const regResult = await apiClient.post<RegisterResponse>(endpoint, payload);
         
         if (!regResult.tx_ref || !regResult.public_key) {
           setError('Registration initiation failed. Please try again.');
@@ -320,10 +335,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
           setLoading(true);
           try {
             // First check for pending registration to get the tx_ref
-            const hasPending = await checkPendingRegistration(email);
-            if (hasPending && pendingTxRef) {
+            const pendingResponse = await checkPendingRegistration(email);
+            if (pendingResponse?.pending && pendingResponse.tx_ref) {
               // Now we have the tx_ref, try to resume payment
-              await resumePayment(hasPending.data.tx_ref, email);
+              await resumePayment(pendingResponse.tx_ref, email);
               return;
             }
           } catch (error) {

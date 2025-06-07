@@ -17,7 +17,7 @@ import {
   loadQuizSession,
   clearQuizSession
 } from '../utils/session';
-import apiClient from '../utils/apiClient'; 
+import apiClient, { ApiResponse } from '../utils/apiClient'; 
 import { handleApiError } from '../utils/apiErrorHandler'; 
 
 // Types for Quiz component
@@ -101,12 +101,6 @@ interface QualificationResponse {
   isQualified: boolean;
   qualifies_for_next_round?: boolean;
   message?: string;
-}
-
-interface ApiResponse<T> {
-  data: T;
-  status?: number;
-  headers?: any;
 }
 
 const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
@@ -213,15 +207,35 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
   useEffect(() => {
     const checkQualification = async () => {
       try {
-        const response = await apiClient.get<ApiResponse<QualificationResponse>>('/qualification');
-        const responseDataUnion = response.data; // This can be QualificationResponse or ApiResponse<QualificationResponse>
-        // We need to ensure qualificationData is the actual QualificationResponse
-        const qualificationData = 
-          ('isQualified' in responseDataUnion && typeof responseDataUnion.isQualified === 'boolean') // Check if it's already QualificationResponse
-            ? responseDataUnion as QualificationResponse
-            : (responseDataUnion as ApiResponse<QualificationResponse>).data; // Otherwise, assume it's a wrapper and get .data
+        // The response will be of type AxiosResponse<QualificationResponse | ApiResponse<QualificationResponse>>
+        const response = await apiClient.get<QualificationResponse | ApiResponse<QualificationResponse>>('/qualification');
         
-        // Handle both response formats
+        // Handle both response formats - use type assertion to any first to avoid TypeScript errors
+        const responseData = response.data as unknown as (QualificationResponse | { data: QualificationResponse });
+        let qualificationData: QualificationResponse;
+        
+        // Type guard to check if the response is a direct QualificationResponse
+        const isDirectResponse = (data: any): data is QualificationResponse => {
+          return data && typeof data === 'object' && 
+                 ('isQualified' in data || 'qualifies_for_next_round' in data);
+        };
+        
+        // Type guard to check if the response is an ApiResponse
+        const isApiResponse = (data: any): data is { data: QualificationResponse } => {
+          return data && typeof data === 'object' && 'data' in data;
+        };
+        
+        if (isDirectResponse(responseData)) {
+          // Direct QualificationResponse
+          qualificationData = responseData as QualificationResponse;
+        } else if (isApiResponse(responseData)) {
+          // Wrapped in ApiResponse
+          qualificationData = responseData.data;
+        } else {
+          throw new Error('Unexpected response format from qualification endpoint');
+        }
+        
+        // Handle both response formats for the qualified flag
         const isQualified = qualificationData.isQualified || qualificationData.qualifies_for_next_round || false;
         setHasQualification(isQualified);
         

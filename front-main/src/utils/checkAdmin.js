@@ -1,5 +1,5 @@
 // Simple utility to check admin status and fix token issues
-import api from './api';
+import apiClient from './apiClient';
 
 export const checkAdminStatus = async () => {
   try {
