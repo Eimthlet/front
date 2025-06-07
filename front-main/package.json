@@ -33,10 +33,10 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "CI=false GENERATE_SOURCEMAP=false react-scripts build",
+    "build": "set CI=false && set GENERATE_SOURCEMAP=false && react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "vercel-build": "CI=false GENERATE_SOURCEMAP=false react-scripts build",
+    "vercel-build": "set CI=false && set GENERATE_SOURCEMAP=false && react-scripts build",
     "server": "node index.js"
   },
   "eslintConfig": {

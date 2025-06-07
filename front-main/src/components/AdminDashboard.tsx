@@ -91,26 +91,21 @@ const AdminDashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       // Fetch insights stats
-      const insightsRes = await apiClient.get<ApiResponse<DashboardResponse>>('/api/admin/insights-stats');
+      const response = await apiClient.get<ApiResponse<DashboardResponse> | DashboardResponse>('/api/admin/insights-stats');
       
-      if (insightsRes.error) {
-        throw new Error(insightsRes.error);
+      // Check if the response is an error response
+      if ('error' in response && response.error) {
+        throw new Error(response.error);
       }
       
-      const dashboardDataField = insightsRes.data;
-      // Assuming DashboardResponse is the actual data type (e.g., { totalUsers: number; ... })
-      // and ApiResponse<T> is a wrapper like { data: T; ... }
-      // This logic unwraps dashboardDataField if it's the ApiResponse wrapper.
-      const actualStatsData =
-        ('totalUsers' in dashboardDataField && dashboardDataField.totalUsers !== undefined)
-          ? dashboardDataField // dashboardDataField is already the actual DashboardResponse data
-          : (dashboardDataField as ApiResponse<DashboardResponse>).data; // dashboardDataField is ApiResponse<DashboardResponse>, get its .data property
-
+      // Handle both response formats
+      const dashboardData = 'data' in response ? response.data : response;
+      
       setStats({
-        totalUsers: actualStatsData.totalUsers,
-        totalQuizzes: actualStatsData.totalQuizzes,
-        averageScore: actualStatsData.averageScore,
-        recentActivity: actualStatsData.recentActivity
+        totalUsers: dashboardData.totalUsers,
+        totalQuizzes: dashboardData.totalQuizzes,
+        averageScore: dashboardData.averageScore,
+        recentActivity: dashboardData.recentActivity || []
       });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
