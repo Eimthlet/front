@@ -9,7 +9,7 @@ const API_BASE = 'https://car-quizz.onrender.com';
 const API_TIMEOUT = 30000; // 30 seconds timeout
 
 // Create axios instance with default config
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_BASE,
   timeout: API_TIMEOUT,
   headers: {
@@ -309,3 +309,6 @@ export async function fetchQuestions(): Promise<{data: {questions: Question[]}}>
     }
   };
 }
+
+// Export the api instance as default
+export default api;
