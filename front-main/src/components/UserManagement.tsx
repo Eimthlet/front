@@ -673,6 +673,7 @@ const UserManagement: React.FC<UserManagementProps> = () => {
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             helperText="Password must be at least 8 characters long"
+            autoComplete="new-password"
           />
         </DialogContent>
         <DialogActions>

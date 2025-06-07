@@ -90,8 +90,7 @@ const AdminDashboard: React.FC = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch insights stats
-      const insightsRes = await apiClient.get<ApiResponse<DashboardResponse>>('/api/admin/insights-stats');
+      const insightsRes = await apiClient.get<ApiResponse<DashboardResponse>>('/admin/insights-stats');
       
       if (insightsRes.error) {
         throw new Error(insightsRes.error);

@@ -253,27 +253,19 @@ api.interceptors.response.use(
   }
 );
 
-// Helper function to ensure API prefix
-const ensureApiPrefix = (endpoint: string) => {
-  if (!endpoint.startsWith('/api/')) {
-    return `/api${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-  }
-  return endpoint;
-};
-
 // Create a typed API client
 const typedApi = {
   get: <T>(url: string, config = {}) => 
-    api.get<ApiResponse<T>>(ensureApiPrefix(url), config).then(response => response.data),
+    api.get<ApiResponse<T>>(url, config).then(response => response.data),
   
   post: <T>(url: string, data = {}, config = {}) => 
-    api.post<ApiResponse<T>>(ensureApiPrefix(url), data, config).then(response => response.data),
+    api.post<ApiResponse<T>>(url, data, config).then(response => response.data),
   
   put: <T>(url: string, data = {}, config = {}) => 
-    api.put<ApiResponse<T>>(ensureApiPrefix(url), data, config).then(response => response.data),
+    api.put<ApiResponse<T>>(url, data, config).then(response => response.data),
   
   delete: <T>(url: string, config = {}) => 
-    api.delete<ApiResponse<T>>(ensureApiPrefix(url), config).then(response => response.data)
+    api.delete<ApiResponse<T>>(url, config).then(response => response.data)
 };
 
 export default typedApi;

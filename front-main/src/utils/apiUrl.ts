@@ -6,15 +6,15 @@
  */
 export const getApiUrl = (endpoint: string): string => {
   const baseUrl = 'https://car-quizz.onrender.com';
-  const cleanEndpoint = endpoint.replace(/^\/+|\/+$/g, '');
-  return `${baseUrl}/api/${cleanEndpoint}`;
+  const cleanEndpoint = endpoint.replace(/^\/+|\/+$/g, '').replace('/api/', '/');
+  return `${baseUrl}/${cleanEndpoint}`;
 };
 
 // For local development if needed
 export const getApiUrlLocal = (endpoint: string): string => {
   const baseUrl = 'http://localhost:5000';
-  const cleanEndpoint = endpoint.replace(/^\/+|\/+$/g, '');
-  return `${baseUrl}/api/${cleanEndpoint}`;
+  const cleanEndpoint = endpoint.replace(/^\/+|\/+$/g, '').replace('/api/', '/');
+  return `${baseUrl}/${cleanEndpoint}`;
 };
 
 export const verifyApiConfig = (): void => {

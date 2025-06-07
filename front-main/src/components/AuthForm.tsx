@@ -131,85 +131,29 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
   const [hasPendingRegistration, setHasPendingRegistration] = useState(false);
   const [pendingTxRef, setPendingTxRef] = useState('');
 
-  // Function to check for pending registration and resume payment
+  // Check for pending registration
   const checkPendingRegistration = async (emailToCheck: string) => {
     try {
-      setLoading(true);
-      const response = await api.post<PendingRegistrationResponse>('/api/auth/check-pending-registration', { email: emailToCheck });
-      if (response.data.pending && response.data.tx_ref) {
-        setPendingTxRef(response.data.tx_ref);
-        setHasPendingRegistration(true);
-        return true;
-      }
-      return false;
+      const response = await api.post<PendingRegistrationResponse>('/auth/check-pending-registration', { email: emailToCheck });
+      return response;
     } catch (error) {
       console.error('Error checking pending registration:', error);
-      return false;
-    } finally {
-      setLoading(false);
+      throw error;
     }
   };
 
-  // Function to resume payment with existing tx_ref
-  const resumePayment = async () => {
-    if (!pendingTxRef || !email) {
-      setError('Missing transaction reference or email. Please try registering again.');
-      setLoading(false);
-      return;
-    }
-
+  // Resume payment for pending registration
+  const resumePayment = async (originalTxRef: string, email: string) => {
     try {
-      setLoading(true);
-      const response = await api.post<ResumePaymentResponse>('/api/auth/resume-payment', { 
-        tx_ref: generateUUID(), // Generate a new transaction reference
-        original_tx_ref: pendingTxRef, // Pass the original tx_ref for reference
-        email: email
+      const response = await api.post<ResumePaymentResponse>('/auth/resume-payment', {
+        tx_ref: 'TX' + Date.now() + Math.floor(Math.random() * 1000000),
+        original_tx_ref: originalTxRef,
+        email
       });
-      
-      if (!response.data.public_key || !response.data.tx_ref) {
-        throw new Error('Invalid payment information received from server');
-      }
-
-      const config: PayChanguConfig = {
-        public_key: response.data.public_key,
-        tx_ref: response.data.tx_ref,
-        amount: response.data.amount || amount,
-        currency: PAYMENT_CONFIG.CURRENCY,
-        callback_url: PAYMENT_CONFIG.CALLBACK_URL,
-        return_url: PAYMENT_CONFIG.RETURN_URL,
-        customer: {
-          email: email,
-          first_name: username || email.split('@')[0],
-          last_name: ''
-        },
-        customization: {
-          title: 'Car Quiz Registration',
-          description: 'Complete your registration payment',
-          logo: undefined
-        },
-        meta: {
-          uuid: generateUUID(),
-          response: 'success'
-        }
-      };
-      
-      // Make sure we have all required fields before launching payment
-      if (!config.public_key || !config.tx_ref || !config.amount || !config.customer.email) {
-        throw new Error('Invalid payment configuration');
-      }
-
-      // Clear any previous error messages
-      setError('');
-
-      // Launch payment popup
-      window.PaychanguCheckout?.(config);
-
-      // Show a message to the user
-      setError('Please complete your payment in the popup window.');
+      return response;
     } catch (error) {
       console.error('Error resuming payment:', error);
-      setError('Failed to resume payment. Please try again.');
-      setLoading(false);
+      throw error;
     }
   };
 
@@ -237,7 +181,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
       const hasPending = await checkPendingRegistration(email);
       if (hasPending) {
         // Automatically resume payment if there's a pending registration
-        await resumePayment();
+        await resumePayment(hasPending.data.tx_ref, email);
         return;
       }
     }
@@ -313,7 +257,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
 
       try {
         // 1. Send registration info to backend and get tx_ref, public_key, etc.
-        const endpoint = '/api/auth/register';
+        const endpoint = '/auth/register';
         const payload = { username, email, password, phone, amount };
         
         interface RegisterResponse {
@@ -379,7 +323,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
             const hasPending = await checkPendingRegistration(email);
             if (hasPending && pendingTxRef) {
               // Now we have the tx_ref, try to resume payment
-              await resumePayment();
+              await resumePayment(hasPending.data.tx_ref, email);
               return;
             }
           } catch (error) {
@@ -454,6 +398,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
               onChange={e => setUsername(e.target.value)}
               required
               disabled={loading}
+              autoComplete="username"
             />
             <input
               type="tel"
@@ -462,6 +407,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
               onChange={e => setPhone(e.target.value)}
               required
               disabled={loading}
+              autoComplete="tel"
             />
             <input
               type="number"
@@ -470,6 +416,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
               onChange={e => setAmount(Number(e.target.value))}
               required
               disabled={loading}
+              autoComplete="off"
             />
           </>
         )}
@@ -480,6 +427,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
           onChange={e => setEmail(e.target.value)}
           required
           disabled={loading}
+          autoComplete="email"
         />
         <div className="password-input">
           <input
@@ -489,6 +437,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
             onChange={e => setPassword(e.target.value)}
             required
             disabled={loading}
+            autoComplete="current-password"
           />
           <IconButton
             onClick={() => setShowPassword(!showPassword)}
@@ -508,6 +457,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
                 onChange={e => setConfirmPassword(e.target.value)}
                 required
                 disabled={loading}
+                autoComplete="new-password"
               />
               <IconButton
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -594,7 +544,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
             <p>You have a pending registration that requires payment completion.</p>
             <button 
               type="button" 
-              onClick={resumePayment}
+              onClick={() => resumePayment(pendingTxRef, email)}
               disabled={loading}
               className="resume-payment-btn"
             >

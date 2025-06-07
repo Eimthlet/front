@@ -17,7 +17,7 @@ function generateRefreshToken() {
 }
 
 // Registration endpoint
-router.post(['/register', '/api/auth/register'], async (req, res) => {
+router.post(['/register'], async (req, res) => {
   console.log('Register request received:', req.body);
   const { username, email, password } = req.body;
 
@@ -88,7 +88,7 @@ router.post(['/register', '/api/auth/register'], async (req, res) => {
 });
 
 // Login endpoint
-router.post(['/login', '/api/auth/login'], (req, res) => {
+router.post(['/login'], (req, res) => {
   console.log('Login request received:', { email: req.body.email });
   const { email, password } = req.body;
 
@@ -169,7 +169,7 @@ router.post(['/login', '/api/auth/login'], (req, res) => {
 });
 
 // Refresh token endpoint
-router.post(['/refresh-token', '/api/auth/refresh-token'], async (req, res) => {
+router.post(['/refresh-token'], async (req, res) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken) {

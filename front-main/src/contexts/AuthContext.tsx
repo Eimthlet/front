@@ -1,11 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/apiClient';
-import { getApiUrl, verifyApiConfig } from '../utils/apiUrl';
 import { handleApiError } from '../utils/apiErrorHandler';
-
-// Verify API config on initialization
-verifyApiConfig();
 
 // Define User and AuthContextType interfaces locally
 interface User {
@@ -13,37 +9,33 @@ interface User {
   email: string;
   isAdmin: boolean;
   role?: string;
+  exp?: number;
 }
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  loading: boolean;
+  isLoading: boolean;
   error: string | null;
 }
 
-// Represents the structure if the API client wraps the response (e.g., Axios default)
-interface WrappedLoginResponse {
-  data: ActualLoginPayload; // The actual payload is nested
-  error?: string; 
+// Represents the actual login response data structure
+interface LoginData {
+  success: boolean;
+  token: string;
+  refreshToken: string;
+  user: User;
+  error?: string;
 }
 
-// Represents the actual payload structure from the backend API for a login attempt
-// This is the primary type we expect after unwrapping/identifying the core response.
-interface ActualLoginPayload {
-  success: boolean; // 'success' is mandatory for a valid payload
-  token: string;    // 'token' is mandatory for a successful login payload
-  refreshToken?: string;
-  user: User;       // 'user' object is mandatory for a successful login payload
-  error?: string;   // 'error' might be present if success is false
-}
+// The login response comes directly, not wrapped
+type LoginResponse = LoginData;
 
 interface TokenCheckResponse {
-  data: {
-    user?: User;
-    error?: string;
-  };
+  success: boolean;
+  error?: string;
+  user: User;
 }
 
 interface JwtPayload {
@@ -60,21 +52,18 @@ interface ApiResponse<T> {
 }
 
 interface AuthEndpointsResponse {
-  paths?: string[];
-  status?: string;
-  data?: any;
-  message?: string;
+  status: string;
+  endpoints: string[];
 }
 
 interface ApiStatusResponse {
   status: string;
-  data?: any;
 }
 
 // Combined type for the context value, including state and action dispatchers
 interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<void>;
-  register: (userData: RegisterData) => Promise<void>;
+  register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -82,7 +71,7 @@ interface AuthContextValue extends AuthState {
 interface RegisterData {
   email: string;
   password: string;
-  // Add other fields like username, firstName, lastName if your registration form collects them
+  username?: string;
 }
 
 // Create the context
@@ -110,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     try {
       // Verify login endpoint exists
-      const response = await api.get<AuthEndpointsResponse>(getApiUrl('auth'), {
+      const response = await api.get<AuthEndpointsResponse>('/auth', {
         timeout: 15000,
         withCredentials: true,
         headers: {
@@ -121,101 +110,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('Auth endpoint response:', response);
       
-      // Type the initial API response as 'any' to allow for flexible structural checks without TypeScript errors.
-      // LoginResponse should be the type of the actual payload (e.g., { success: boolean; token: string; ... })
-      const authResponse: any = await api.post(getApiUrl('auth/login'), { email, password });
+      // First check if the auth endpoint is active
+      const authEndpointResponse = response as AuthEndpointsResponse;
+      if (authEndpointResponse.status !== 'active') {
+        console.error('Auth endpoint not active. Response:', response);
+        throw new Error('Authentication service is not available');
+      }
+
+      // Make the login request
+      const loginResponse = await api.post<LoginResponse>('/auth/login', { email, password });
       
-      let actualLoginPayload: ActualLoginPayload | undefined = undefined; 
+      console.log('Login response:', loginResponse);
 
-      // Check for a specific API client error structure first.
-      // This example assumes an error object like { error: string } without typical payload fields.
-      if (authResponse && typeof authResponse.error === 'string' &&
-          authResponse.success === undefined && authResponse.token === undefined && authResponse.data === undefined) {
-          throw new Error(`Login request failed due to API client error: ${authResponse.error}`);
+      // Check for errors in a safe way
+      const loginData = loginResponse as LoginData;
+      if (!loginData || !loginData.success) {
+        console.error('Invalid login response:', loginResponse);
+        throw new Error(loginData?.error || 'Invalid response from authentication service');
       }
 
-      // Scenario 1: authResponse is the LoginResponse payload itself (most likely based on logs)
-      if (authResponse && typeof authResponse.token === 'string' && typeof authResponse.success === 'boolean') {
-          actualLoginPayload = authResponse as ActualLoginPayload;
+      if (!loginData.token || !loginData.user) {
+        throw new Error('Invalid login response: missing token or user data');
       }
-      // Scenario 2: authResponse is { data: LoginResponse } (e.g., standard Axios wrapper)
-      else if (authResponse && authResponse.data &&
-               typeof authResponse.data.token === 'string' && typeof authResponse.data.success === 'boolean') {
-          actualLoginPayload = authResponse.data as ActualLoginPayload;
-      }
-      // Scenario 3: authResponse is { data: { data: LoginResponse } } (doubly wrapped)
-      else if (authResponse && authResponse.data && authResponse.data.data &&
-               typeof authResponse.data.data.token === 'string' && typeof authResponse.data.data.success === 'boolean') {
-          actualLoginPayload = authResponse.data.data as ActualLoginPayload;
-      }
-
-      // If no structure matched and payload wasn't identified
-      if (!actualLoginPayload) {
-        // Use the original authResponse in the error log as it holds the raw structure received.
-        console.error('Login response is in an unrecognized structure or essential data is missing:', authResponse);
-        throw new Error('Login response structure is invalid. Could not identify payload.');
-      }
-
-      // Now, actualLoginPayload is typed as ActualLoginPayload | undefined.
-
-      // Check if a valid payload was extracted. 
-      // If actualLoginPayload is undefined here, it means none of the scenarios matched.
-      if (!actualLoginPayload) {
-        // This error was already thrown by the scenario checks, but as a safeguard:
-        console.error('Critical: actualLoginPayload is undefined after structural checks. Original response:', authResponse);
-        throw new Error('Login failed: Payload could not be identified or is fundamentally malformed.');
-      }
-
-      // At this point, actualLoginPayload is guaranteed to be of type ActualLoginPayload.
-      // TypeScript should now correctly infer types for .success, .token, .user etc.
-
-      if (actualLoginPayload.success === false) {
-        // If success is false, there should be an error message from the server.
-        throw new Error(actualLoginPayload.error || 'Login failed due to an unspecified server error.');
-      }
-
-      // If success is true, token and user must be present as per ActualLoginPayload definition.
-      // The check for token presence is still good practice before using it.
-      if (!actualLoginPayload.token || !actualLoginPayload.user) {
-        console.error('Token or user data is missing in the successfully extracted login response payload:', actualLoginPayload);
-        throw new Error('Login failed: Essential data (token/user) not found in an otherwise successful response.');
-      }
-
-      // Destructure from the correctly typed actualLoginPayload
-      const { token, refreshToken, user: userDataFromPayload } = actualLoginPayload;
-      
-      console.log('Login successful. Tokens and user data processed.');
       
       // Store tokens in localStorage
-      localStorage.setItem('token', token);
-      if (refreshToken) {
-        localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem('token', loginData.token);
+      if (loginData.refreshToken) {
+        localStorage.setItem('refreshToken', loginData.refreshToken);
       }
       
-      // Set user state using userDataFromPayload
-      // Ensure the user object created for context matches the User interface
-      const authenticatedUser: User = {
-        id: userDataFromPayload.id,
-        email: userDataFromPayload.email, // Use email from payload
-        isAdmin: userDataFromPayload.isAdmin || userDataFromPayload.role === 'admin' || false,
-        role: userDataFromPayload.role
+      // Set user state
+      const user = {
+        id: loginData.user.id,
+        email,
+        isAdmin: loginData.user.isAdmin || loginData.user.role === 'admin' || false,
+        role: loginData.user.role
       };
       
-      setUser(authenticatedUser);
+      setUser(user);
       setIsAuthenticated(true);
-      setIsAdmin(authenticatedUser.isAdmin);
+      setIsAdmin(user.isAdmin);
       
       // Navigate based on user role
-      if (authenticatedUser.isAdmin) {
+      if (user.isAdmin) {
         navigate('/admin');
       } else {
         navigate('/quiz');
       }
     } catch (error: any) {
-      console.error('Login error details:', error);
-      const normalizedError = handleApiError(error);
-      setError(normalizedError.message);
-      throw normalizedError;
+      console.error('Login error:', error);
+      setError(error.message || 'Failed to log in');
+      throw error;
     }
   };
   
@@ -224,7 +169,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     try {
       // Use properly constructed API URL
-      const response = await api.get<AuthEndpointsResponse>(getApiUrl('auth'), {
+      const response = await api.get<AuthEndpointsResponse>('/auth', {
         timeout: 15000,
         withCredentials: true,
         headers: {
@@ -237,7 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Type the initial API response as 'any' for flexibility
       const registerResponse: any = await api.post<any>(
-        getApiUrl('auth/register'), 
+        '/auth/register', 
         userData, 
         {
           timeout: 15000,
@@ -249,7 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       );
 
-      let actualRegisterPayload: ActualLoginPayload | undefined = undefined;
+      let actualRegisterPayload: LoginData | undefined = undefined;
 
       // Check for a specific API client error structure first.
       if (registerResponse && typeof registerResponse.error === 'string' &&
@@ -257,19 +202,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           throw new Error(`Registration request failed due to API client error: ${registerResponse.error}`);
       }
 
-      // Scenario 1: registerResponse is the ActualLoginPayload itself
+      // Scenario 1: registerResponse is the LoginData itself
       if (registerResponse && typeof registerResponse.token === 'string' && typeof registerResponse.success === 'boolean') {
-          actualRegisterPayload = registerResponse as ActualLoginPayload;
+          actualRegisterPayload = registerResponse as LoginData;
       }
-      // Scenario 2: registerResponse is { data: ActualLoginPayload }
+      // Scenario 2: registerResponse is { data: LoginData }
       else if (registerResponse && registerResponse.data &&
                typeof registerResponse.data.token === 'string' && typeof registerResponse.data.success === 'boolean') {
-          actualRegisterPayload = registerResponse.data as ActualLoginPayload;
+          actualRegisterPayload = registerResponse.data as LoginData;
       }
-      // Scenario 3: registerResponse is { data: { data: ActualLoginPayload } } (doubly wrapped)
+      // Scenario 3: registerResponse is { data: { data: LoginData } } (doubly wrapped)
       else if (registerResponse && registerResponse.data && registerResponse.data.data &&
                typeof registerResponse.data.data.token === 'string' && typeof registerResponse.data.data.success === 'boolean') {
-          actualRegisterPayload = registerResponse.data.data as ActualLoginPayload;
+          actualRegisterPayload = registerResponse.data.data as LoginData;
       }
 
       // If no structure matched and payload wasn't identified
@@ -278,7 +223,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Register response data is in an unexpected format or essential data is missing.');
       }
 
-      // At this point, actualRegisterPayload is guaranteed to be of type ActualLoginPayload.
+      // At this point, actualRegisterPayload is guaranteed to be of type LoginData.
       // Proceed with checks on the identified payload.
       if (actualRegisterPayload.success === false) {
         throw new Error(actualRegisterPayload.error || 'Registration failed due to an unspecified server error.');
@@ -323,83 +268,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('User data not found in response');
       }
     } catch (error: any) {
-      console.error('Registration error details:', error);
-      const normalizedError = handleApiError(error);
-      setError(normalizedError.message);
-      throw normalizedError;
+      console.error('Registration error:', error);
+      setError(error.message || 'Failed to register');
+      throw error;
     }
   };
 
   // Logout function
   const logout = async (): Promise<void> => {
     try {
-      // Clear tokens
+      // Call logout endpoint
+      await api.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
-      
-      // Reset state
       setUser(null);
       setIsAuthenticated(false);
       setIsAdmin(false);
-      
-      // Navigate to login
       navigate('/login');
-    } catch (error: any) {
-      console.error('Logout error:', error);
-      setError(error.message || 'Failed to logout');
     }
   };
 
   // Check token function
   const checkToken = async (): Promise<TokenCheckResponse> => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        return { data: { error: 'No token found' } };
+      const response = await api.get<TokenCheckResponse>('/auth/check-token');
+      
+      // Handle the response format from the server
+      if ('data' in response) {
+        // Response is wrapped in ApiResponse
+        const apiResponse = response as ApiResponse<TokenCheckResponse>;
+        return apiResponse.data;
       }
-
-      const response = await api.get<TokenCheckResponse>(getApiUrl('auth/check-token'));
-      // response is TokenCheckResponse | ApiResponse<TokenCheckResponse>
-      // We need to return TokenCheckResponse
-      if ('data' in response && response.data !== undefined) {
-        // If response has a 'data' property, assume it's ApiResponse<TokenCheckResponse>
-        // and return its 'data' field, which should be TokenCheckResponse.
-        return (response as ApiResponse<TokenCheckResponse>).data;
-      } else {
-        // Otherwise, assume response is already TokenCheckResponse.
-        return response as TokenCheckResponse;
-      }
+      
+      // Response is direct
+      return response;
     } catch (error: any) {
-      console.error('Token check error details:', {
-        message: error.message,
-        response: error.response?.data, // If using Axios, this might contain server error details
-        status: error.response?.status,
-        request: error.request,
-        fullError: error
-      });
-      return { data: { error: error.message || 'Failed to check token' } };
+      console.error('Token check error details:', error);
+      throw error;
     }
   };
 
-  // Check API status
+  // Check API status function
   const checkApiStatus = async (): Promise<boolean> => {
     try {
-      const response = await api.get<ApiStatusResponse>(getApiUrl('auth/status'));
-      // response is ApiStatusResponse | ApiResponse<ApiStatusResponse>
-      // We need to access the 'status' property from the actual ApiStatusResponse object.
-      if ('status' in response && response.status !== undefined) {
-        // If response has a 'status' property directly, assume it's ApiStatusResponse.
-        return (response as ApiStatusResponse).status === 'ok';
-      } else if ('data' in response && response.data && 'status' in response.data && response.data.status !== undefined) {
-        // If response has a 'data' property, and that 'data' object has a 'status' property,
-        // assume response is ApiResponse<ApiStatusResponse>.
-        return (response.data as ApiStatusResponse).status === 'ok';
+      const response = await api.get<ApiStatusResponse>('/auth/status');
+      
+      // Handle the response format from the server
+      if ('data' in response) {
+        // Response is wrapped in ApiResponse
+        const apiResponse = response as ApiResponse<ApiStatusResponse>;
+        return apiResponse.data.status === 'active';
       }
-      // Fallback or error handling if the structure is unexpected
-      console.warn('Unexpected API status response structure:', response);
-      return false;
+      
+      // Response is direct
+      return response.status === 'active';
     } catch (error) {
-      console.error('API status check failed:', error);
+      console.error('API status check error:', error);
       return false;
     }
   };
@@ -411,10 +338,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(true);
         const tokenResponse = await checkToken();
         
-        if (tokenResponse.data?.user) {
-          setUser(tokenResponse.data.user);
+        if (tokenResponse.user) {
+          setUser(tokenResponse.user);
           setIsAuthenticated(true);
-          setIsAdmin(tokenResponse.data.user.isAdmin);
+          setIsAdmin(tokenResponse.user.isAdmin);
         }
       } catch (error: any) {
         console.error('Auth initialization error:', error);
@@ -432,7 +359,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       isAuthenticated,
       isAdmin,
-      loading: isLoading, // Map isLoading state to loading context value
+      isLoading,
       login,
       register,
       logout,

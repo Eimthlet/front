@@ -81,8 +81,8 @@ const SeasonManagement: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get<Season[]>('/api/admin/seasons');
-      setSeasons(response.data);
+      const response = await api.get<Season[]>('/admin/seasons');
+      setSeasons(response);
     } catch (err: any) {
       console.error('Error fetching seasons:', err);
       setError(err.response?.data?.message || err.message || 'Failed to fetch seasons');
@@ -164,7 +164,7 @@ const SeasonManagement: React.FC = () => {
 
       if (editMode && currentSeasonId) {
         // Update existing season
-        await api.put(`/api/admin/seasons/${currentSeasonId}`, payload);
+        await api.put(`/admin/seasons/${currentSeasonId}`, payload);
         setSnackbar({
           open: true,
           message: 'Season updated successfully',
@@ -172,7 +172,7 @@ const SeasonManagement: React.FC = () => {
         });
       } else {
         // Create new season
-        await api.post('/api/admin/seasons', payload);
+        await api.post('/admin/seasons', payload);
         setSnackbar({
           open: true,
           message: 'Season created successfully',
@@ -204,7 +204,7 @@ const SeasonManagement: React.FC = () => {
     if (!confirmDeleteDialog.seasonId) return;
 
     try {
-      await api.delete(`/api/admin/seasons/${confirmDeleteDialog.seasonId}`);
+      await api.delete(`/admin/seasons/${confirmDeleteDialog.seasonId}`);
       setSnackbar({
         open: true,
         message: 'Season deleted successfully',

@@ -19,7 +19,7 @@ const getBaseUrl = () => {
     return 'http://localhost:5001';
   }
   
-  // Default to production URL
+  // Default to production URL without /api prefix
   return 'https://car-quizz.onrender.com';
 };
 
@@ -42,6 +42,13 @@ apiClient.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Remove any double /api prefixes from the URL
+    if (config.url) {
+      config.url = config.url.replace('/api/api/', '/');
+      config.url = config.url.replace('/api/', '/');
+    }
+    
     return config;
   },
   (error) => {

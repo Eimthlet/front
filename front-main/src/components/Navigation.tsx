@@ -98,7 +98,7 @@ const Navigation: React.FC = () => {
         <>
           <Button
             color="inherit"
-            onClick={() => navigate('/admin')}
+            onClick={() => { console.log('Attempting to navigate to (desktop button): /admin/panel'); navigate('/admin/panel'); }}
             startIcon={<AdminPanelSettingsIcon />}
             sx={{ mr: 2 }}
           >
@@ -106,7 +106,7 @@ const Navigation: React.FC = () => {
           </Button>
           <Button
             color="inherit"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/admin')}
             startIcon={<DashboardIcon />}
             sx={{ mr: 2 }}
           >
@@ -161,10 +161,10 @@ const Navigation: React.FC = () => {
       {user ? (
         isAdmin ? (
           <>
-            <MenuItem onClick={() => handleNavigation('/admin')}>
+            <MenuItem onClick={() => { console.log('Attempting to navigate to (mobile menu): /admin/panel'); handleNavigation('/admin/panel'); }}>
               <AdminPanelSettingsIcon sx={{ mr: 1 }} /> Admin
             </MenuItem>
-            <MenuItem onClick={() => handleNavigation('/dashboard')}>
+            <MenuItem onClick={() => handleNavigation('/admin')}>
               <DashboardIcon sx={{ mr: 1 }} /> Dashboard
             </MenuItem>
             <MenuItem onClick={() => handleNavigation('/admin/users')}>

@@ -42,27 +42,40 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for logging and error handling
+// Response interceptor for error handling
 api.interceptors.response.use(
   (response) => {
-    console.log('API Response:', {
-      url: response.config.url,
-      method: response.config.method,
-      status: response.status,
-      data: response.data
-    });
     return response;
   },
-  (error) => {
-    console.error('API Response Error:', {
-      url: error.config?.url,
-      method: error.config?.method,
-      status: error.response?.status,
-      data: error.response?.data,
-      error: error.message,
-      errorName: error.name,
-      errorMessage: error.message
-    });
+  async (error) => {
+    if (error.response?.status === 401) {
+      // Token expired, try to refresh
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) {
+          throw new Error('No refresh token available');
+        }
+
+        const response = await api.post<{ token: string }>('/auth/refresh', { refreshToken });
+        const { token } = response.data;
+
+        // Update token in localStorage
+        localStorage.setItem('token', token);
+
+        // Retry the original request
+        const config = error.config;
+        if (config.headers) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return api.request(config);
+      } catch (refreshError) {
+        // Refresh failed, clear tokens and redirect to login
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
     return Promise.reject(error);
   }
 );
@@ -88,7 +101,7 @@ export interface AuthResponse {
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
   try {
-    const response = await fetch(`${API_BASE}/api/auth/login`, {
+    const response = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json'
@@ -118,7 +131,7 @@ export async function login(email: string, password: string): Promise<AuthRespon
 
 export async function register(username: string, email: string, password: string, phone: string, amount: number): Promise<any> {
   try {
-    const response = await fetch(`${API_BASE}/api/auth/register`, {
+    const response = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, email, password, phone, amount }),
@@ -142,7 +155,7 @@ export async function register(username: string, email: string, password: string
 
 export async function refreshToken(refreshToken: string): Promise<AuthResponse> {
   try {
-    const response = await fetch(`${API_BASE}/api/auth/refresh-token`, {
+    const response = await fetch(`${API_BASE}/auth/refresh-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
@@ -166,7 +179,7 @@ export async function refreshToken(refreshToken: string): Promise<AuthResponse> 
 
 export async function fetchAdminData(endpoint: string) {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_BASE}/api/admin/${endpoint}`, {
+  const response = await fetch(`${API_BASE}/admin/${endpoint}`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -194,7 +207,7 @@ export interface Question {
 
 export async function addQuestion(question: Question): Promise<Question> {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_BASE}/api/admin/questions`, {
+  const response = await fetch(`${API_BASE}/admin/questions`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -213,7 +226,7 @@ export async function addQuestion(question: Question): Promise<Question> {
 
 export async function editQuestion(question: Question): Promise<Question> {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_BASE}/api/admin/questions/${question.id}`, {
+  const response = await fetch(`${API_BASE}/admin/questions/${question.id}`, {
     method: 'PUT',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -232,7 +245,7 @@ export async function editQuestion(question: Question): Promise<Question> {
 
 export async function deleteQuestion(questionId: string): Promise<void> {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_BASE}/api/admin/questions/${questionId}`, {
+  const response = await fetch(`${API_BASE}/admin/questions/${questionId}`, {
     method: 'DELETE',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -248,7 +261,7 @@ export async function deleteQuestion(questionId: string): Promise<void> {
 
 export async function fetchAllQuestions(): Promise<Question[]> {
   const token = localStorage.getItem('token');
-  const response = await fetch(`${API_BASE}/api/admin/questions`, {
+  const response = await fetch(`${API_BASE}/admin/questions`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -264,7 +277,7 @@ export async function fetchAllQuestions(): Promise<Question[]> {
 }
 
 export async function saveProgress(userId: number, score: number, total: number) {
-  const response = await fetch(`${API_BASE}/api/progress`, {
+  const response = await fetch(`${API_BASE}/progress`, {
     method: 'POST',
     headers: { 
       'Content-Type': 'application/json',
@@ -282,16 +295,15 @@ export async function saveProgress(userId: number, score: number, total: number)
   return response.json();
 }
 
-export async function fetchQuestions(): Promise<{data: {questions: Question[]}}> {
+export async function fetchQuestions(): Promise<Question[]> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token');
 
-  const response = await fetch(`${API_BASE}/api/questions`, {
+  const response = await fetch(`${API_BASE}/questions`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
-    },
-    credentials: 'include'
+    }
   });
 
   if (!response.ok) {
@@ -299,13 +311,7 @@ export async function fetchQuestions(): Promise<{data: {questions: Question[]}}>
     throw new Error(error.error || 'Failed to fetch questions');
   }
 
-  const data = await response.json();
-  return {
-    data: {
-      questions: data.questions.map((q: any) => ({
-        ...q,
-        id: q.id.toString()
-      }))
-    }
-  };
+  return response.json();
 }
+
+export default api;

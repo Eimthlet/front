@@ -29,19 +29,19 @@ export const AUTH_CONFIG = {
   
   // Authentication endpoints
   ENDPOINTS: {
-    LOGIN: '/api/auth/login',
-    REGISTER: '/api/auth/register',
-    LOGOUT: '/api/auth/logout',
-    REFRESH: '/api/auth/refresh',
-    CHECK_TOKEN: '/api/auth/check-token',
-    VERIFY_PAYMENT: '/api/auth/verify-payment'
+    LOGIN: '/auth/login',
+    REGISTER: '/auth/register',
+    LOGOUT: '/auth/logout',
+    REFRESH: '/auth/refresh',
+    CHECK_TOKEN: '/auth/check-token',
+    VERIFY_PAYMENT: '/auth/verify-payment'
   }
 };
 
 // Payment configuration
 export const PAYMENT_CONFIG = {
   // PayChangu callback URL - always use production URL
-  CALLBACK_URL: 'https://car-quizz.onrender.com/api/paychangu-callback',
+  CALLBACK_URL: 'https://car-quizz.onrender.com/paychangu-callback',
   
   // Return URL after payment
   RETURN_URL: window.location.origin + '/login?payment=success',

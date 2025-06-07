@@ -196,7 +196,7 @@ const App: React.FC = () => {
 
             {/* Protected admin routes - must come first */}
             <Route path="/admin/*" element={
-              <ProtectedRoute adminOnly>
+              <ProtectedRoute requiredAdmin>
                 <Layout>
                   <Routes>
                     <Route path="" element={<AdminDashboard />} />

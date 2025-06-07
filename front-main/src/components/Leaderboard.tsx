@@ -58,7 +58,7 @@ const Leaderboard: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      const response = await api.get<LeaderboardResponse>('/api/leaderboard');
+      const response = await api.get<LeaderboardResponse>('/leaderboard');
       console.log('Leaderboard response:', response.data);
       setLeaderboard(response.data.leaderboard || []);
     } catch (err: any) {

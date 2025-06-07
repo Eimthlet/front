@@ -41,7 +41,7 @@ export const checkAdminStatus = async () => {
     
     // Verify the token with the server
     try {
-      const response = await api.get('/api/auth/check-token');
+      const response = await api.get('/auth/check-token');
       console.log('Token check response:', response);
       
       if (response.data && response.data.valid && response.data.user && response.data.user.isAdmin) {
@@ -76,40 +76,17 @@ export const checkAdminStatus = async () => {
 // Function to fix admin token issues
 export const fixAdminToken = async () => {
   try {
-    // First, try to log in with the admin credentials from memory
-    const response = await api.post('/api/auth/login', {
-      email: 'carguru@gmail.com',
-      password: 'Cars@2025'
-    });
-    
-    console.log('Login response:', response);
-    
-    if (response.data && response.data.token) {
-      // Store the new token
-      localStorage.setItem('token', response.data.token);
-      
-      if (response.data.refreshToken) {
-        localStorage.setItem('refreshToken', response.data.refreshToken);
-      }
-      
-      // Check if the new token has admin privileges
-      const adminStatus = await checkAdminStatus();
-      return {
-        success: true,
-        message: 'Admin token refreshed',
-        adminStatus
-      };
-    } else {
-      return {
-        success: false,
-        message: 'Failed to get new token'
-      };
-    }
+    console.error('Admin token needs to be refreshed. Please log in again with your admin credentials.');
+    return {
+      success: false,
+      message: 'Please log in again with your admin credentials',
+      error: 'Token expired or invalid'
+    };
   } catch (error) {
     console.error('Error fixing admin token:', error);
     return {
       success: false,
-      message: 'Error during admin login',
+      message: 'Error during admin authentication',
       error
     };
   }

@@ -5,18 +5,18 @@ import { CircularProgress, Box } from '@mui/material';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  adminOnly?: boolean;
+  requiredAdmin?: boolean;
 }
 
 export default function ProtectedRoute({ 
   children, 
-  adminOnly = false 
+  requiredAdmin = false 
 }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
+  const { user, isLoading } = useAuth();
   const location = useLocation();
 
   // Show loading state while checking authentication
-  if (loading) {
+  if (isLoading) {
     return (
       <Box sx={{ 
         display: 'flex', 
@@ -35,12 +35,12 @@ export default function ProtectedRoute({
   }
 
   // If route is admin-only and user is not an admin, redirect to quiz
-  if (adminOnly && !user.isAdmin) {
+  if (requiredAdmin && !user.isAdmin) {
     return <Navigate to="/quiz" replace />;
   }
 
   // If user is an admin and tries to access user-specific routes, redirect to admin panel
-  if (user.isAdmin && !adminOnly && (location.pathname === '/quiz' || location.pathname === '/')) {
+  if (user.isAdmin && !requiredAdmin && (location.pathname === '/quiz' || location.pathname === '/')) {
     return <Navigate to="/admin" replace />;
   }
 
