@@ -107,7 +107,7 @@ interface UserResponse {
 
 interface UserManagementProps {}
 
-const UserManagement: React.FC<UserManagementProps> = () => {
+const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
   // State
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
@@ -136,6 +136,7 @@ const UserManagement: React.FC<UserManagementProps> = () => {
       setLoading(true);
       setError(null);
       
+      // Build query parameters
       const queryParams = new URLSearchParams({
         page: pagination.page.toString(),
         limit: pagination.limit.toString()
@@ -148,101 +149,39 @@ const UserManagement: React.FC<UserManagementProps> = () => {
       const apiUrl = `/admin/users?${queryParams.toString()}`;
       console.log('Fetching users from:', apiUrl);
       
-      // Log the auth token being used
+      // Get the token from localStorage
       const token = localStorage.getItem('token');
       console.log('Using auth token:', token ? 'Token exists' : 'No token found');
-      
-      try {
-        // Make the API call with proper typing
-        // The API returns an Axios response with data of type UsersApiResponse
-        const response = await api.get<UsersApiResponse>(apiUrl);
-        
-        // The response object has status and data properties from Axios
-        const { status, data: responseData } = response as unknown as { 
-          status: number; 
-          data: UsersApiResponse 
-        };
-        
-        console.log('Users API response status:', status);
-        console.log('Users API response data:', responseData);
 
-        // Check if we got a successful response with data
-        if (status >= 200 && status < 300) {
-          if (!responseData) {
-            console.warn('No data in response');
-            setUsers([]);
-            return;
-          }
-          
-          const { users, pagination: paginationData } = responseData;
-          console.log('Users data received:', { users, pagination: paginationData });
-          
-          // Update users state
-          if (Array.isArray(users)) {
-            console.log(`Found ${users.length} users`);
-            setUsers(users);
-          } else {
-            console.warn('Users is not an array:', users);
-            setUsers([]);
-          }
-          
-          // Update pagination state
-          if (paginationData) {
-            console.log('Pagination data:', paginationData);
-            setPagination(prev => ({
-              ...prev,
-              ...paginationData,
-              total: paginationData.total || 0,
-              page: paginationData.page || 1,
-              limit: paginationData.limit || prev.limit,
-              totalPages: paginationData.totalPages || Math.ceil((paginationData.total || 0) / (paginationData.limit || prev.limit))
-            }));
-          } else {
-            console.warn('No pagination data in response');
-            // Set default pagination based on users array
-            const total = Array.isArray(users) ? users.length : 0;
-            setPagination(prev => ({
-              ...prev,
-              total,
-              totalPages: Math.ceil(total / prev.limit)
-            }));
-          }
-        } else {
-          console.warn('API returned non-success status:', status);
-          setUsers([]);
+      // Make the API call using the apiClient
+      const response = await api.get(apiUrl) as UsersApiResponse;
+      
+      // Handle successful response
+      if (response) {
+        const { users, pagination: paginationData } = response;
+        console.log(`Found ${users.length} users`);
+        
+        setUsers(users);
+        
+        if (paginationData) {
+          setPagination(prev => ({
+            ...prev,
+            ...paginationData,
+            total: paginationData.total || users.length,
+            page: paginationData.page || 1,
+            limit: paginationData.limit || prev.limit,
+            totalPages: paginationData.totalPages || 
+              Math.ceil((paginationData.total || users.length) / (paginationData.limit || prev.limit))
+          }));
         }
-      } catch (error: unknown) {
-        const apiError = error as {
-          message?: string;
-          response?: {
-            status?: number;
-            headers?: any;
-            data?: any;
-          };
-          config?: {
-            url?: string;
-            method?: string;
-            headers?: any;
-          };
-        };
-        
-        console.error('API Error details:', {
-          message: apiError.message || 'Unknown error',
-          response: apiError.response?.data,
-          status: apiError.response?.status,
-          headers: apiError.response?.headers,
-          config: {
-            url: apiError.config?.url,
-            method: apiError.config?.method,
-            headers: apiError.config?.headers
-          }
-        });
-        
-        throw error;
+      } else {
+        console.warn('No data in response');
+        setUsers([]);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching users:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to fetch users');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch users';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
