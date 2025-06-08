@@ -137,21 +137,21 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   }, [selectedSeasonId, updateError]);
 
   // Fetch seasons
-  const fetchSeasons = useCallback(async () => {
-    try {
-      const response = await api.get<Season[]>('/admin/seasons');
-      // The response is already unwrapped by the API client
-      const seasonsData = response?.data || [];
-      setSeasons(seasonsData);
-      if (seasonsData.length > 0 && !selectedSeasonId) {
-        setSelectedSeasonId(seasonsData[0].id);
-      }
-    } catch (error) {
-      console.error('Error fetching seasons:', error);
-      updateError('Error', 'Failed to load seasons');
-      setSeasons([]);
+const fetchSeasons = useCallback(async () => {
+  try {
+    const response = await api.get<Season[]>('/admin/seasons');
+    // The response is already unwrapped by the API client
+    const seasonsData = response?.data || [];
+    setSeasons(seasonsData);
+    if (seasonsData.length > 0 && !selectedSeasonId) {
+      setSelectedSeasonId(seasonsData[0].id);
     }
-  }, [selectedSeasonId, updateError]);
+  } catch (error) {
+    console.error('Error fetching seasons:', error);
+    updateError('Error', 'Failed to load seasons');
+    setSeasons([]);
+  }
+}, [selectedSeasonId, updateError]);
 
   // Check admin status on component mount
   useEffect(() => {
