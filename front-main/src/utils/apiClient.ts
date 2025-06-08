@@ -15,13 +15,11 @@ const getBaseUrl = () => {
     console.log('Using API URL from environment:', process.env.REACT_APP_API_URL);
     baseUrl = process.env.REACT_APP_API_URL;
   }
-  
   // In local development, use localhost
   else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     console.log('Using localhost API URL');
     baseUrl = 'http://localhost:5001';
   }
-  
   // Default to production URL
   else {
     console.log('Using default production API URL');
@@ -34,6 +32,7 @@ const getBaseUrl = () => {
 
 // Get base URL without any trailing slashes
 const baseUrl = getBaseUrl().replace(/\/+$/, '');
+console.log('Base URL:', baseUrl);
 
 // Create a custom Axios instance
 const apiClient = axios.create({
@@ -63,25 +62,21 @@ apiClient.interceptors.request.use(
       if (cleanUrl.startsWith('auth/')) {
         config.url = `/${cleanUrl}`;
       } 
-      // Handle admin endpoints (should have /api prefix)
-      else if (cleanUrl.startsWith('admin/')) {
+      // For all other requests, ensure they have the correct path
+      else {
+        // Remove any existing /api prefix to avoid duplication
+        cleanUrl = cleanUrl.replace(/^api\//, '');
+        // Add /api prefix for non-auth endpoints
         config.url = `/api/${cleanUrl}`;
-      }
-      // User-facing routes that don't need /api prefix
-      else if (['quiz', 'questions', 'results', 'progress', 'leaderboard', 'qualification'].some(route => cleanUrl.startsWith(route))) {
-        config.url = `/${cleanUrl}`;
-      }
-      // For any other endpoints, add /api prefix if not already present
-      else if (!cleanUrl.startsWith('api/')) {
-        config.url = `/api/${cleanUrl}`;
-      } else {
-        config.url = `/${cleanUrl}`;
       }
     }
     
-    // Log the request URL for debugging
+        // Log the request URL for debugging
     const fullUrl = `${config.baseURL}${config.url}`.replace(/([^:]\/)\/+/g, '$1');
-    console.log(`[Request] ${config.method?.toUpperCase()} ${fullUrl}`);
+    console.log(`[Request] ${config.method?.toUpperCase()} ${fullUrl}`, config.data ? 'with data:' : '');
+    if (config.data) {
+      console.log(JSON.stringify(config.data, null, 2));
+    }
     
     return config;
   },
