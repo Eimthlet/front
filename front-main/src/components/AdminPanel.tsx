@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/apiClient';
-import SeasonManagement from './SeasonManagement';
+import SeasonManager from './SeasonManager';
 import {
   Box,
   Button,
@@ -80,7 +80,6 @@ interface QuestionResponse {
 // Define props interface
 interface AdminPanelProps {}
 
-// AdminPanel component with full type annotations
 // Tab panel component
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -125,12 +124,65 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     timeLimit: 30,
     category: 'General Knowledge',
     difficulty: 'Medium'
-  })
-  
+  });
+
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
-  
+
+  // Function to handle question submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSeasonId) {
+      setError({ message: 'Please select a season' });
+      return;
+    }
+    const questionData = {
+      question: newQuestion.question,
+      options: newQuestion.options,
+      correctAnswer: newQuestion.correctAnswer,
+      timeLimit: newQuestion.timeLimit,
+      category: newQuestion.category,
+      difficulty: newQuestion.difficulty,
+      season_id: selectedSeasonId
+    };
+
+    try {
+      await api.post('/admin/questions', questionData);
+      setSuccess('Question added successfully');
+      setNewQuestion({
+        question: '',
+        options: ['', '', '', ''],
+        correctAnswer: '',
+        timeLimit: 30,
+        category: 'General Knowledge',
+        difficulty: 'Medium'
+      });
+      fetchQuestions();
+    } catch (err: unknown) {
+      const apiError = err as ApiError;
+      setError({
+        message: apiError.message || 'Failed to add question',
+        details: apiError.response?.data?.details
+      });
+    }
+  };
+
+  // Function to handle question deletion
+  const handleDeleteQuestion = async (questionId: number) => {
+    try {
+      await api.delete(`/admin/questions/${questionId}`);
+      setSuccess('Question deleted successfully');
+      fetchQuestions();
+    } catch (err: unknown) {
+      const apiError = err as ApiError;
+      setError({
+        message: apiError.message || 'Failed to delete question',
+        details: apiError.response?.data?.details
+      });
+    }
+  };
+
   // Fetch seasons when component mounts
   useEffect(() => {
     const fetchSeasons = async () => {
@@ -203,59 +255,6 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     }
   }, [isAdmin, navigate]);
 
-  // Delete a question
-  const handleDeleteQuestion = async (questionId: number) => {
-    try {
-      await api.delete(`/admin/questions/${questionId}`);
-      setSuccess('Question deleted successfully');
-      fetchQuestions();
-    } catch (err: unknown) {
-      const apiError = err as ApiError;
-      setError({
-        message: apiError.message || 'Failed to delete question',
-        details: apiError.response?.data?.details
-      });
-    }
-  };
-
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedSeasonId) {
-      setError({ message: 'Please select a season' });
-      return;
-    }
-    const questionData = {
-      question: newQuestion.question,
-      options: newQuestion.options,
-      correctAnswer: newQuestion.correctAnswer,  // Changed from correct_answer to correctAnswer to match server expectations
-      timeLimit: newQuestion.timeLimit,          // Changed from time_limit to timeLimit to match server expectations
-      category: newQuestion.category,
-      difficulty: newQuestion.difficulty,
-      season_id: selectedSeasonId
-    };
-
-    try {
-      await api.post('/admin/questions', questionData);
-      setSuccess('Question added successfully');
-      setNewQuestion({
-        question: '',
-        options: ['', '', '', ''],
-        correctAnswer: '',
-        timeLimit: 30,
-        category: 'General Knowledge',
-        difficulty: 'Medium'
-      });
-      fetchQuestions();
-    } catch (err: unknown) {
-      const apiError = err as ApiError;
-      setError({
-        message: apiError.message || 'Failed to add question',
-        details: apiError.response?.data?.details
-      });
-    }
-  };
-
   return (
     <Box sx={{ 
       p: { xs: 2, md: 4 },
@@ -306,7 +305,6 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                 {error.details && <Typography variant="body2" color="error">{error.details}</Typography>}
               </Box>
             )}
-
             {success && (
               <Box sx={{ 
                 p: 2, 
@@ -374,8 +372,8 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                         newOptions[index] = e.target.value;
                         setNewQuestion({ ...newQuestion, options: newOptions });
                       }}
-                      sx={{ mb: 2 }} /* Added margin bottom for spacing between options */
-                      required={index === 0 || index === 1} /* First two options are required */
+                      sx={{ mb: 2 }}
+                      required={index === 0 || index === 1}
                     />
                   ))}
                 </Box>
@@ -489,7 +487,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                       <Button 
                         variant="text" 
                         color="error"
-                        onClick={() => handleDeleteQuestion(question.id)}
+                        onClick={() => question.id && handleDeleteQuestion(question.id)}
                         sx={{ minWidth: 'auto', p: 0.5 }}
                       >
                         X
@@ -538,7 +536,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
 
       {/* Season Management Tab */}
       <TabPanel value={tabValue} index={1}>
-        <SeasonManagement />
+        <SeasonManager />
       </TabPanel>
     </Box>
   );
