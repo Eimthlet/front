@@ -209,16 +209,16 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const fetchQuestions = async () => {
     try {
       setIsLoading(true);
-      const questionsData = await api.get<QuestionsResponse | Question[]>('/admin/questions');
+      const response = await api.get<Question[] | QuestionsResponse>('/admin/questions');
       
-      // Check if response.data is an array or has a questions property
-      if (Array.isArray(questionsData)) {
-        setQuestions(questionsData);
-      } else if (questionsData && 'questions' in questionsData && Array.isArray((questionsData as QuestionsResponse).questions)) {
-        // If the response has a nested questions array
-        setQuestions((questionsData as QuestionsResponse).questions);
+      // The response is already unwrapped by apiClient
+      if (Array.isArray(response)) {
+        setQuestions(response);
+      } else if (response && 'questions' in response && Array.isArray(response.questions)) {
+        // Handle the case where questions are nested in a 'questions' property
+        setQuestions(response.questions);
       } else {
-        console.error('Unexpected API response format:', questionsData);
+        console.error('Unexpected API response format:', response);
         setQuestions([]);
         setError({
           message: 'Failed to load questions',

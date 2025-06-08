@@ -207,28 +207,23 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
   useEffect(() => {
     const checkQualification = async () => {
       try {
-        // The response will be of type AxiosResponse<QualificationResponse>
-        const response = await apiClient.get<QualificationResponse>('/qualification');
-        
-        // The API response is already unwrapped by axios
-        const responseData = response.data;
+        // The response is already unwrapped by apiClient
+        const qualificationData = await apiClient.get<QualificationResponse>('/qualification');
         
         // Type guard to validate the response data structure
-        if (!responseData || typeof responseData !== 'object') {
-          console.error('Invalid response data:', responseData);
+        if (!qualificationData || typeof qualificationData !== 'object') {
+          console.error('Invalid response data:', qualificationData);
           throw new Error('Invalid response format from qualification endpoint');
         }
         
         // Check if the response has the expected properties
-        const hasQualificationData = 'hasAttempted' in responseData && 
-                                  ('isQualified' in responseData || 'qualifies_for_next_round' in responseData);
+        const hasRequiredProps = 'hasAttempted' in qualificationData && 
+                              ('isQualified' in qualificationData || 'qualifies_for_next_round' in qualificationData);
         
-        if (!hasQualificationData) {
-          console.error('Unexpected response format:', responseData);
+        if (!hasRequiredProps) {
+          console.error('Unexpected response format:', qualificationData);
           throw new Error('Invalid qualification data format from server');
         }
-        
-        const qualificationData = responseData;
         
         // Handle both response formats for the qualified flag
         const isQualified = qualificationData.isQualified || qualificationData.qualifies_for_next_round || false;

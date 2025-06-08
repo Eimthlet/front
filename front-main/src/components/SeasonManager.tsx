@@ -121,8 +121,19 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
   const fetchSeasons = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get<ApiResponse<Season[]>>(`/admin/seasons`);
-      setSeasons(response.data.data);
+      // The response is already unwrapped by apiClient
+      const seasonsData = await api.get<Season[] | ApiResponse<Season[]>>('/admin/seasons');
+      
+      // Handle both direct array response and wrapped response
+      if (Array.isArray(seasonsData)) {
+        setSeasons(seasonsData);
+      } else if (seasonsData && 'data' in seasonsData && Array.isArray(seasonsData.data)) {
+        setSeasons(seasonsData.data);
+      } else {
+        console.error('Unexpected API response format:', seasonsData);
+        setError('Unexpected data format received from server');
+        setSeasons([]);
+      }
       setError(null);
     } catch (err: unknown) {
       console.error('Error fetching seasons:', err);
