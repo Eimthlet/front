@@ -28,8 +28,13 @@ const getBaseUrl = () => {
     baseUrl = 'https://car-quizz.onrender.com';
   }
 
-  // Remove any trailing slashes and add /api
-  baseUrl = baseUrl.replace(/\/+$/, '') + '/api';
+  // Remove any trailing slashes
+  baseUrl = baseUrl.replace(/\/+$/, '');
+  
+  // Add /api if not already in the URL
+  if (!baseUrl.endsWith('/api')) {
+    baseUrl += '/api';
+  }
   
   return baseUrl;
 };
@@ -58,7 +63,8 @@ apiClient.interceptors.request.use(
     }
     
     // Log the request URL for debugging
-    console.log(`[Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    const fullUrl = `${config.baseURL}${config.url}`.replace(/([^:]\/)\/+/g, '$1');
+    console.log(`[Request] ${config.method?.toUpperCase()} ${fullUrl}`);
     
     return config;
   },
