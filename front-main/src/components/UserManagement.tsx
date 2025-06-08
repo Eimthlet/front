@@ -35,11 +35,7 @@ import RefreshIcon from '@mui/icons-material/RefreshOutlined';
 import api from '../utils/apiClient';
 
 // Response type for users API
-// Note: Currently using direct array response from API, keeping interface for future use
-// interface UsersApiResponse {
-//   users: User[];
-//   pagination: PaginationData;
-// }
+// Using direct array response from API
 
 // Component Types
 interface User {
