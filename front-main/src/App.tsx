@@ -9,6 +9,7 @@ import AdminDashboard from './components/AdminDashboard';
 import UserManagement from './components/UserManagement';
 import Leaderboard from './components/Leaderboard';
 import AdminDiagnostic from './components/AdminDiagnostic';
+import AdminPanel from './components/AdminPanel';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import { useAuth } from './contexts/AuthContext';
@@ -227,6 +228,7 @@ const App: React.FC = () => {
                     <Route path="" element={<AdminDashboard />} />
                     <Route path="users" element={<UserManagement />} />
                     <Route path="diagnostic" element={<AdminDiagnostic />} />
+                    <Route path="panel" element={<AdminPanel />} />
                     <Route path="*" element={<Navigate to="" replace />} />
                   </Routes>
                 </Layout>
