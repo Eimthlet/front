@@ -125,9 +125,9 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     try {
       setIsLoading(true);
       clearError();
-      // Handle the ApiResponse<Question[]> type
       const response = await api.get<Question[]>(`/admin/seasons/${selectedSeasonId}/questions`);
-      const questionsData = Array.isArray(response) ? response : [];
+      // Extract the data from ApiResponse
+      const questionsData = response?.data ?? [];
       setQuestions(questionsData);
     } catch (error) {
       console.error('Error fetching questions:', error);
@@ -138,13 +138,13 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     }
   }, [selectedSeasonId, updateError, clearError]);
 
-  // Fetch seasons - FIXED VERSION
+  // Fetch seasons
   const fetchSeasons = useCallback(async () => {
     try {
       clearError();
-      // Handle the ApiResponse<Season[]> type
       const response = await api.get<Season[]>('/admin/seasons');
-      const seasonsData = Array.isArray(response) ? response : [];
+      // Extract the data from ApiResponse
+      const seasonsData = response?.data ?? [];
       setSeasons(seasonsData);
       if (seasonsData.length > 0 && !selectedSeasonId) {
         setSelectedSeasonId(seasonsData[0].id);
