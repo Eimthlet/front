@@ -58,11 +58,15 @@ apiClient.interceptors.request.use(
       if (cleanUrl.startsWith('auth/')) {
         config.url = `/${cleanUrl}`;
       } 
-      // For all other requests, ensure they have the correct path
+      // Handle admin endpoints (should not have /api prefix)
+      else if (cleanUrl.startsWith('admin/')) {
+        config.url = `/${cleanUrl}`;
+      }
+      // For all other requests, add /api prefix
       else {
         // Remove any existing /api prefix to avoid duplication
         cleanUrl = cleanUrl.replace(/^api\//, '');
-        // Add /api prefix for non-auth endpoints
+        // Add /api prefix for non-auth, non-admin endpoints
         config.url = `/api/${cleanUrl}`;
       }
     }
