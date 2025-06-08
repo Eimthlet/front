@@ -240,11 +240,22 @@ const SeasonManager: React.FC = () => {
     try {
       setLoading(true);
       
+      // Prepare the season data with all required fields
+      const seasonData = {
+        name: currentSeason.name || '',
+        start_date: currentSeason.start_date || new Date().toISOString().split('T')[0],
+        end_date: currentSeason.end_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        is_active: currentSeason.is_active || false,
+        is_qualification_round: currentSeason.is_qualification_round || false,
+        minimum_score_percentage: currentSeason.minimum_score_percentage || 70,
+        description: currentSeason.description || ''
+      };
+      
       if (dialogMode === 'create') {
-        await api.post<Season>('/admin/seasons', currentSeason);
+        const response = await api.post<Season>('/admin/seasons', seasonData);
         setSuccess('Season created successfully');
       } else if (currentSeason.id) {
-        await api.put<Season>(`/admin/seasons/${currentSeason.id}`, currentSeason);
+        const response = await api.put<Season>(`/admin/seasons/${currentSeason.id}`, seasonData);
         setSuccess('Season updated successfully');
       }
       
@@ -255,7 +266,12 @@ const SeasonManager: React.FC = () => {
       handleCloseDialog();
     } catch (err: any) {
       const error = err as ApiError;
-      setError(error.response?.data?.message || error.message || 'Failed to save season');
+      console.error('Error saving season:', error);
+      const errorMessage = error.response?.data?.message || 
+                         error.response?.data?.error || 
+                         error.message || 
+                         'Failed to save season. Please check all required fields.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

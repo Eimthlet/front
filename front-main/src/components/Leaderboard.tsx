@@ -58,13 +58,19 @@ const Leaderboard: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      // The API client now returns the data directly
+      // Fetch leaderboard data
       const response = await apiClient.get<LeaderboardResponse>('/leaderboard');
-      console.log('Leaderboard response:', response);
-      setLeaderboard(response?.leaderboard || []);
+      
+      if (response && Array.isArray(response.leaderboard)) {
+        setLeaderboard(response.leaderboard);
+      } else {
+        console.warn('Unexpected leaderboard response format:', response);
+        setLeaderboard([]);
+      }
     } catch (err: any) {
       console.error('Error fetching leaderboard:', err);
-      setError(err.message || 'Failed to load leaderboard data');
+      setError(err.response?.data?.message || err.message || 'Failed to load leaderboard data');
+      setLeaderboard([]);
     } finally {
       setLoading(false);
     }

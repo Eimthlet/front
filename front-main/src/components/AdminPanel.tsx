@@ -125,14 +125,15 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     try {
       setIsLoading(true);
       clearError();
-      const response = await api.get<Question[]>(`/admin/seasons/${selectedSeasonId}/questions`);
+      // Use the correct endpoint format
+      const response = await api.get<{ questions: Question[] }>(`/admin/seasons/${selectedSeasonId}`);
       
-      // Fix: Handle response properly - response should already be the data array
-      const questionsData = Array.isArray(response) ? response : [];
-      setQuestions(questionsData);
+      // Handle the response format - response should have a questions property
+      const questionsData = response?.questions || [];
+      setQuestions(Array.isArray(questionsData) ? questionsData : []);
     } catch (error) {
       console.error('Error fetching questions:', error);
-      updateError('Error', 'Failed to load questions');
+      updateError('Error', 'Failed to load questions. The season may not have any questions yet.');
       setQuestions([]);
     } finally {
       setIsLoading(false);
