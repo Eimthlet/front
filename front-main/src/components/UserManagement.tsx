@@ -81,7 +81,7 @@ interface UserQualification {
 
 
 
-interface Pagination {
+interface PaginationData {
   total: number;
   page: number;
   limit: number;
@@ -90,7 +90,7 @@ interface Pagination {
 
 interface UsersResponse {
   users: User[];
-  pagination: Pagination;
+  pagination: PaginationData;
 }
 
 interface UserResponse {
@@ -106,7 +106,7 @@ const UserManagement: React.FC<UserManagementProps> = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [pagination, setPagination] = useState<Pagination>({
+  const [pagination, setPagination] = useState<PaginationData>({
     total: 0,
     page: 1,
     limit: 10,
