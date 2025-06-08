@@ -110,17 +110,25 @@ const SeasonManager: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Helper function to extract data from API response
+  const extractApiData = <T,>(response: any): T => {
+    // Handle both wrapped ApiResponse and direct response
+    if (response && typeof response === 'object' && 'data' in response) {
+      return response.data;
+    }
+    return response;
+  };
+
   // Fetch seasons on component mount
   useEffect(() => {
     const fetchSeasons = async () => {
       try {
         setLoading(true);
-        setError(null);
-        const data = await api.get<Season[]>('/admin/seasons');
-        // Fixed: Handle both wrapped and unwrapped API responses
-        const seasonsData = (data as any)?.data ? (data as any).data : data;
+        setError('');
+        const response = await api.get<Season[]>('/admin/seasons');
+        const seasonsData = extractApiData<Season[]>(response);
         setSeasons(Array.isArray(seasonsData) ? seasonsData : []);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching seasons:', err);
         setError(err.message || 'Failed to fetch seasons');
         setSeasons([]);
@@ -183,11 +191,11 @@ const SeasonManager: React.FC = () => {
       
       // Fetch questions for the season
       const response = await api.get<Question[]>(`/admin/seasons/${seasonId}/questions`);
-      const questionsData = (response as any)?.data ? (response as any).data : response;
+      const questionsData = extractApiData<Question[]>(response);
       setQuestions(Array.isArray(questionsData) ? questionsData : []);
       
       setOpenQuestionsDialog(true);
-    } catch (err) {
+    } catch (err: any) {
       const error = err as ApiError;
       setError(error.response?.data?.message || 'Failed to fetch questions');
       setQuestions([]);
@@ -204,11 +212,11 @@ const SeasonManager: React.FC = () => {
       
       // Fetch qualified users for the season
       const response = await api.get<QualifiedUser[]>(`/admin/seasons/${seasonId}/qualified-users`);
-      const usersData = (response as any)?.data ? (response as any).data : response;
+      const usersData = extractApiData<QualifiedUser[]>(response);
       setQualifiedUsers(Array.isArray(usersData) ? usersData : []);
       
       setOpenQualifiedUsersDialog(true);
-    } catch (err) {
+    } catch (err: any) {
       const error = err as ApiError;
       setError(error.response?.data?.message || 'Failed to fetch qualified users');
       setQualifiedUsers([]);
@@ -260,11 +268,11 @@ const SeasonManager: React.FC = () => {
       
       // Refresh seasons
       const response = await api.get<Season[]>('/admin/seasons');
-      const seasonsData = (response as any)?.data ? (response as any).data : response;
+      const seasonsData = extractApiData<Season[]>(response);
       setSeasons(Array.isArray(seasonsData) ? seasonsData : []);
       
       handleCloseDialog();
-    } catch (err) {
+    } catch (err: any) {
       const error = err as ApiError;
       setError(error.response?.data?.message || error.message || 'Failed to save season');
     } finally {
@@ -296,7 +304,7 @@ const SeasonManager: React.FC = () => {
       const response = await api.get<Question[]>(
         `/admin/seasons/${selectedSeasonId}/questions`
       );
-      const questionsData = (response as any)?.data ? (response as any).data : response;
+      const questionsData = extractApiData<Question[]>(response);
       setQuestions(Array.isArray(questionsData) ? questionsData : []);
       
       // Reset form
@@ -306,7 +314,7 @@ const SeasonManager: React.FC = () => {
         correct_answer: '',
         season_id: selectedSeasonId
       });
-    } catch (err) {
+    } catch (err: any) {
       const error = err as ApiError;
       setError(error.response?.data?.message || error.message || 'Failed to save question');
     } finally {
@@ -324,11 +332,11 @@ const SeasonManager: React.FC = () => {
       
       // Refresh seasons
       const response = await api.get<Season[]>('/admin/seasons');
-      const seasonsData = (response as any)?.data ? (response as any).data : response;
+      const seasonsData = extractApiData<Season[]>(response);
       setSeasons(Array.isArray(seasonsData) ? seasonsData : []);
       
       setSuccess('Season deleted successfully');
-    } catch (err) {
+    } catch (err: any) {
       const error = err as ApiError;
       setError(error.response?.data?.message || 'Failed to delete season');
     } finally {
