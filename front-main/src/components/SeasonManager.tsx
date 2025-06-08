@@ -178,7 +178,7 @@ const SeasonManager: React.FC = () => {
       setSelectedSeasonId(Number(seasonId));
       
       // Fetch questions for the season
-      const response = await api.get<ApiResponse<Question[]>>(`/api/admin/seasons/${seasonId}/questions`);
+      const response = await api.get<ApiResponse<Question[]>>(`/admin/seasons/${seasonId}/questions`);
       setQuestions(response.data.data);
       
       setOpenQuestionsDialog(true);
@@ -197,7 +197,7 @@ const SeasonManager: React.FC = () => {
       setSelectedSeasonId(Number(seasonId));
       
       // Fetch qualified users for the season
-      const response = await api.get<ApiResponse<QualifiedUser[]>>(`/api/admin/seasons/${seasonId}/qualified-users`);
+      const response = await api.get<ApiResponse<QualifiedUser[]>>(`/admin/seasons/${seasonId}/qualified-users`);
       setQualifiedUsers(response.data.data);
       
       setOpenQualifiedUsersDialog(true);
@@ -239,10 +239,10 @@ const SeasonManager: React.FC = () => {
       setLoading(true);
       
       if (dialogMode === 'create') {
-        await api.post<ApiResponse<Season>>('/api/admin/seasons', currentSeason);
+        await api.post<ApiResponse<Season>>('/admin/seasons', currentSeason);
         setSuccess('Season created successfully');
       } else if (currentSeason.id) {
-        await api.put<ApiResponse<Season>>(`/api/admin/seasons/${currentSeason.id}`, currentSeason);
+        await api.put<ApiResponse<Season>>(`/admin/seasons/${currentSeason.id}`, currentSeason);
         setSuccess('Season updated successfully');
       }
       
@@ -267,13 +267,13 @@ const SeasonManager: React.FC = () => {
       
       if (currentQuestion.id) {
         await api.put<ApiResponse<Question>>(
-          `/api/admin/seasons/${selectedSeasonId}/questions/${currentQuestion.id}`,
+          `/admin/seasons/${selectedSeasonId}/questions/${currentQuestion.id}`,
           currentQuestion
         );
         setSuccess('Question updated successfully');
       } else {
         await api.post<ApiResponse<Question>>(
-          `/api/admin/seasons/${selectedSeasonId}/questions`,
+          `/admin/seasons/${selectedSeasonId}/questions`,
           currentQuestion
         );
         setSuccess('Question added successfully');
@@ -281,7 +281,7 @@ const SeasonManager: React.FC = () => {
       
       // Refresh questions
       const response = await api.get<ApiResponse<Question[]>>(
-        `/api/admin/seasons/${selectedSeasonId}/questions`
+        `/admin/seasons/${selectedSeasonId}/questions`
       );
       setQuestions(response.data.data);
       
@@ -305,7 +305,7 @@ const SeasonManager: React.FC = () => {
     
     try {
       setLoading(true);
-      await api.delete(`/api/admin/seasons/${id}`);
+      await api.delete(`/admin/seasons/${id}`);
       
       // Refresh seasons
       const response = await api.get<ApiResponse<Season[]>>('/seasons');

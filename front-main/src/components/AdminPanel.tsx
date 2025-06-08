@@ -128,7 +128,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     
     try {
       setIsLoading(true);
-      const response = await api.get<Question[]>(`/api/admin/seasons/${selectedSeasonId}/questions`);
+      const response = await api.get<Question[]>(`/admin/seasons/${selectedSeasonId}/questions`);
       setQuestions(response);
     } catch (error) {
       console.error('Error fetching questions:', error);
@@ -141,7 +141,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   // Fetch seasons
   const fetchSeasons = useCallback(async () => {
     try {
-      const response = await api.get<Season[]>('/api/admin/seasons');
+      const response = await api.get<Season[]>('/admin/seasons');
       const seasonsData = response;
       setSeasons(seasonsData);
       if (seasonsData.length > 0 && !selectedSeasonId) {
@@ -241,7 +241,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       }
 
       // Submit the question
-      await api.post<ApiResponse<Question>>(`/api/admin/seasons/${selectedSeasonId}/questions`, newQuestion);
+      await api.post<ApiResponse<Question>>(`/admin/seasons/${selectedSeasonId}/questions`, newQuestion);
       await fetchQuestions();
       updateSuccess('Question added successfully!');
       
@@ -271,7 +271,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
 
     try {
       setIsLoading(true);
-      await api.delete<ApiResponse<{ message: string }>>(`/api/admin/questions/${questionId}`);
+      await api.delete<ApiResponse<{ message: string }>>(`/admin/questions/${questionId}`);
       await fetchQuestions();
       updateSuccess('Question deleted successfully!');
     } catch (error) {

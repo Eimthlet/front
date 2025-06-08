@@ -28,20 +28,23 @@ const getBaseUrl = () => {
     baseUrl = 'https://car-quizz.onrender.com';
   }
 
-  // Defensively remove trailing /api or / from the baseUrl
-  if (baseUrl.endsWith('/api')) {
-    baseUrl = baseUrl.slice(0, -4);
-  }
-  if (baseUrl.endsWith('/')) {
-    baseUrl = baseUrl.slice(0, -1);
+  // Remove any trailing slashes
+  baseUrl = baseUrl.replace(/\/+$/, '');
+  
+  // Add /api to the base URL
+  if (!baseUrl.endsWith('/api')) {
+    baseUrl += '/api';
   }
   
   return baseUrl;
 };
 
+// Get base URL without any trailing slashes
+const baseUrl = getBaseUrl().replace(/\/+$/, '');
+
 // Create a custom Axios instance
 const apiClient = axios.create({
-  baseURL: getBaseUrl(),
+  baseURL: baseUrl,
   timeout: 30000,
   withCredentials: true,
   headers: {
@@ -60,8 +63,10 @@ apiClient.interceptors.request.use(
     }
     
     console.log(`[Request Interceptor] Original URL: ${config.url}`);
-    // Defensively remove '/api' from the start of the URL path
-    if (config.url && config.url.startsWith('/api/')) {
+    
+    // Remove any duplicate /api in the URL if baseURL already contains it
+    const baseUrl = config.baseURL || '';
+    if (baseUrl.endsWith('/api') && config.url?.startsWith('/api/')) {
       config.url = config.url.substring(4);
       console.log(`[Request Interceptor] Modified URL: ${config.url}`);
     }
