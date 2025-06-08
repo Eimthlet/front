@@ -100,7 +100,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const [tabValue, setTabValue] = useState(0);
   const [adminCheckFailed, setAdminCheckFailed] = useState(false);
   const [seasons, setSeasons] = useState<Season[]>([]);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<Question[] | null>(null);
   const [newQuestion, setNewQuestion] = useState<Omit<Question, 'id'>>({
     question: '',
     options: ['', '', '', ''],
@@ -129,7 +129,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     try {
       setIsLoading(true);
       const response = await api.get<Question[]>(`/admin/seasons/${selectedSeasonId}/questions`);
-      setQuestions(response);
+      setQuestions(response.data);
     } catch (error) {
       console.error('Error fetching questions:', error);
       updateError('Error', 'Failed to load questions');
@@ -142,7 +142,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const fetchSeasons = useCallback(async () => {
     try {
       const response = await api.get<Season[]>('/admin/seasons');
-      const seasonsData = response;
+      const seasonsData = response.data;
       setSeasons(seasonsData);
       if (seasonsData.length > 0 && !selectedSeasonId) {
         setSelectedSeasonId(seasonsData[0].id);

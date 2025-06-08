@@ -1,11 +1,39 @@
 import axios from 'axios';
 
-// Define types for API responses
-export interface ApiResponse<T> {
+// Define the API response type
+export interface ApiResponse<T = any> {
   data: T;
   error?: string;
   message?: string;
+  success?: boolean;
 }
+
+// Define types for API responses
+export interface ApiResponse<T = any> {
+  data: T;
+  error?: string;
+  message?: string;
+  success?: boolean;
+}
+
+// Define request config interface
+interface RequestConfig {
+  headers?: Record<string, string>;
+  params?: Record<string, any>;
+  [key: string]: any;
+}
+
+// Define the API client type
+type ApiClient = {
+  get: <T = any>(url: string, config?: any) => Promise<ApiResponse<T>>;
+  post: <T = any, D = any>(url: string, data?: D, config?: any) => Promise<ApiResponse<T>>;
+  put: <T = any, D = any>(url: string, data?: D, config?: any) => Promise<ApiResponse<T>>;
+  delete: <T = any>(url: string, config?: any) => Promise<ApiResponse<T>>;
+};
+
+// Helper type to unwrap the response type
+type UnwrapApiResponse<T> = T extends Promise<infer U> ? U : T;
+type AxiosResponse<T> = { data: T };
 
 // Determine the API base URL based on the environment
 const getBaseUrl = () => {
@@ -50,7 +78,7 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-        if (config.url) {
+    if (config.url) {
       // Skip URL modification for full URLs
       if (config.url.startsWith('http')) {
         return config;
@@ -94,8 +122,9 @@ apiClient.interceptors.request.use(
 
 // Response interceptor
 apiClient.interceptors.response.use(
-  (response) => {
-    // Return the response data directly
+  (response: any) => {
+    // Log the response for debugging
+    console.log('[Response]', response.config.method?.toUpperCase(), response.config.url, response.status);
     return response;
   },
   (error) => {
@@ -123,19 +152,35 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Create typed API methods
-const api = {
-  get: <T>(url: string, config = {}) => 
-    apiClient.get<T>(url, config).then(response => response.data),
-  
-  post: <T>(url: string, data = {}, config = {}) => 
-    apiClient.post<T>(url, data, config).then(response => response.data),
-  
-  put: <T>(url: string, data = {}, config = {}) => 
-    apiClient.put<T>(url, data, config).then(response => response.data),
-  
-  delete: <T>(url: string, config = {}) => 
-    apiClient.delete<T>(url, config).then(response => response.data)
+// Create typed API methods with proper Promise handling
+const api: ApiClient = {
+  get: (url, config) => 
+    new Promise((resolve, reject) => {
+      apiClient.get(url, config)
+        .then((response: any) => resolve(response.data))
+        .catch(reject);
+    }) as Promise<any>,
+    
+  post: (url, data, config) => 
+    new Promise((resolve, reject) => {
+      apiClient.post(url, data, config)
+        .then((response: any) => resolve(response.data))
+        .catch(reject);
+    }) as Promise<any>,
+    
+  put: (url, data, config) => 
+    new Promise((resolve, reject) => {
+      apiClient.put(url, data, config)
+        .then((response: any) => resolve(response.data))
+        .catch(reject);
+    }) as Promise<any>,
+    
+  delete: (url, config) => 
+    new Promise((resolve, reject) => {
+      apiClient.delete(url, config)
+        .then((response: any) => resolve(response.data))
+        .catch(reject);
+    }) as Promise<any>
 };
 
 export default api;
