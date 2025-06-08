@@ -125,11 +125,10 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     try {
       setIsLoading(true);
       clearError();
+      // Handle the ApiResponse<Question[]> type
       const response = await api.get<Question[]>(`/admin/seasons/${selectedSeasonId}/questions`);
-      // The API response is of type ApiResponse<Question[]>
-      // We need to access the data property which contains our questions array
-      const questionsData = response.data;
-      setQuestions(Array.isArray(questionsData) ? questionsData : []);
+      const questionsData = Array.isArray(response) ? response : [];
+      setQuestions(questionsData);
     } catch (error) {
       console.error('Error fetching questions:', error);
       updateError('Error', 'Failed to load questions');
@@ -143,12 +142,11 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const fetchSeasons = useCallback(async () => {
     try {
       clearError();
+      // Handle the ApiResponse<Season[]> type
       const response = await api.get<Season[]>('/admin/seasons');
-      // The API response is of type ApiResponse<Season[]>
-      // We need to access the data property which contains our seasons array
-      const seasonsData = response.data;
-      setSeasons(Array.isArray(seasonsData) ? seasonsData : []);
-      if (seasonsData?.length > 0 && !selectedSeasonId) {
+      const seasonsData = Array.isArray(response) ? response : [];
+      setSeasons(seasonsData);
+      if (seasonsData.length > 0 && !selectedSeasonId) {
         setSelectedSeasonId(seasonsData[0].id);
       }
     } catch (error) {

@@ -154,33 +154,33 @@ apiClient.interceptors.response.use(
 
 // Create typed API methods with proper Promise handling
 const api: ApiClient = {
-  get: (url, config) => 
-    new Promise((resolve, reject) => {
-      apiClient.get(url, config)
-        .then((response: any) => resolve(response.data))
+  get: <T = any>(url: string, config?: any) => 
+    new Promise<T>((resolve, reject) => {
+      apiClient.get<T>(url, config)
+        .then((response) => resolve(response.data))
         .catch(reject);
-    }) as Promise<any>,
+    }),
     
-  post: (url, data, config) => 
-    new Promise((resolve, reject) => {
-      apiClient.post(url, data, config)
-        .then((response: any) => resolve(response.data))
+  post: <T = any, D = any>(url: string, data?: D, config?: any) => 
+    new Promise<T>((resolve, reject) => {
+      apiClient.post<T>(url, data, config)
+        .then((response) => resolve(response.data))
         .catch(reject);
-    }) as Promise<any>,
+    }),
     
-  put: (url, data, config) => 
-    new Promise((resolve, reject) => {
-      apiClient.put(url, data, config)
-        .then((response: any) => resolve(response.data))
+  put: <T = any, D = any>(url: string, data?: D, config?: any) => 
+    new Promise<T>((resolve, reject) => {
+      apiClient.put<T>(url, data, config)
+        .then((response) => resolve(response.data))
         .catch(reject);
-    }) as Promise<any>,
+    }),
     
-  delete: (url, config) => 
-    new Promise((resolve, reject) => {
-      apiClient.delete(url, config)
-        .then((response: any) => resolve(response.data))
+  delete: <T = any>(url: string, config?: any) => 
+    new Promise<T>((resolve, reject) => {
+      apiClient.delete<T>(url, config)
+        .then((response) => resolve(response.data))
         .catch(reject);
-    }) as Promise<any>
+    })
 };
 
 export default api;
