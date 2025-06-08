@@ -21,12 +21,12 @@ import {
   MenuItem,
   Chip,
   IconButton,
-  Pagination,
   CircularProgress,
   Alert,
   Tabs,
   Tab
 } from '@mui/material';
+import { Pagination } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LockIcon from '@mui/icons-material/LockOutlined';
@@ -78,6 +78,8 @@ interface UserQualification {
   minimum_score_percentage: number;
   percentage_score: number;
 }
+
+
 
 interface Pagination {
   total: number;
@@ -273,10 +275,6 @@ const UserManagement: React.FC<UserManagementProps> = () => {
 
   const handleViewUser = (user: User) => {
     fetchUserDetails(user.id);
-  };
-
-  const handleOpenPasswordDialog = () => {
-    setOpenPasswordDialog(true);
   };
 
   const handleCloseUserDialog = () => {

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/apiClient';
 import { handleApiError } from '../utils/apiErrorHandler';
@@ -28,40 +28,10 @@ interface LoginResponse {
   error?: string;
 }
 
-// The login response comes directly from the API
-type LoginData = LoginResponse;
-
 interface TokenCheckResponse {
   success: boolean;
   user?: User;
   error?: string;
-}
-
-interface JwtPayload {
-  id: number;
-  email: string;
-  isAdmin?: boolean;
-  role?: string;
-  exp?: number;
-}
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-}
-
-interface AuthEndpointsResponse {
-  status: string;
-  endpoints: string[];
-  data?: any;
-  message?: string;
-}
-
-interface ApiStatusResponse {
-  status: string;
-  data?: any;
 }
 
 // Combined type for the context value, including state and action dispatchers
@@ -188,52 +158,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Check API status
-  const checkApiStatus = async (): Promise<boolean> => {
-    try {
-      const response = await api.get<ApiStatusResponse>('/auth/status');
-      // Handle both direct and wrapped responses
-      if ('data' in response && response.data.status) {
-        return response.data.status === 'active';
-      }
-      return (response as ApiStatusResponse).status === 'active';
-    } catch (error) {
-      console.error('API status check error:', error);
-      return false;
-    }
-  };
-
-  // Initialize auth function
-  const initializeAuth = async () => {
-    if (!localStorage.getItem('token')) {
+  // Initialize auth state
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          const response = await checkToken();
+          if (response.success && response.user) {
+            setUser(response.user);
+            setIsAuthenticated(true);
+            setIsAdmin(response.user.isAdmin || false);
+          } else {
+            localStorage.removeItem('token');
+            setUser(null);
+            setIsAuthenticated(false);
+            setIsAdmin(false);
+          }
+        }
         setIsLoading(false);
-        return;
-    }
-
-    try {
-      const tokenResponse = await checkToken();
-      
-      if (tokenResponse.success && tokenResponse.user) {
-        setUser(tokenResponse.user);
-        setIsAuthenticated(true);
-        setIsAdmin(tokenResponse.user.isAdmin || tokenResponse.user.role === 'admin' || false);
-      } else {
+      } catch (error) {
+        console.error('Auth initialization error:', error);
         setUser(null);
         setIsAuthenticated(false);
         setIsAdmin(false);
+        setIsLoading(false);
       }
-    } catch (error: any) {
-      console.error('Auth initialization error:', error);
-      setUser(null);
-      setIsAuthenticated(false);
-      setIsAdmin(false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
 
-  // Effect for initial auth check
-  useEffect(() => {
     initializeAuth();
   }, []);
 

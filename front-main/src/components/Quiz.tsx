@@ -109,7 +109,6 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
 
   // State hooks must be called first, before any early returns
   const [showTerms, setShowTerms] = useState(true);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showResult, setShowResult] = useState(false);
 
   // Validate and prepare questions
@@ -289,15 +288,6 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
     }
   };
 
-  const handleAcceptTerms = () => {
-    setAcceptedTerms(true);
-    setShowTerms(false);
-  };
-
-  const handleDeclineTerms = () => {
-    navigate('/leaderboard');
-  };
-
   if (showTerms) {
     return (
       <Box sx={{ 
@@ -422,21 +412,17 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
 
           <Box sx={{ 
             display: 'flex', 
-            justifyContent: 'flex-end', 
-            gap: 2,
+            justifyContent: 'center', 
             mt: 4 
           }}>
             <ActionButton 
-              className="decline" 
-              onClick={handleDeclineTerms}
-            >
-              Decline
-            </ActionButton>
-            <ActionButton 
               className="accept"
-              onClick={handleAcceptTerms}
+              onClick={() => setShowTerms(false)}
+              variant="contained"
+              color="primary"
+              size="large"
             >
-              Accept
+              Start Quiz
             </ActionButton>
           </Box>
         </GlassDialog>

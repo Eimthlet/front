@@ -11,7 +11,7 @@ import {
   useTheme,
   useMediaQuery
 } from '@mui/material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import LoginIcon from '@mui/icons-material/Login';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
@@ -36,27 +36,10 @@ const StyledAppBar = styled(AppBar)(({ theme }: { theme: Theme }) => ({
   },
 }));
 
-const NavButton = styled(Button)(({ theme }) => ({
-  color: '#fff',
-  padding: theme.spacing(1, 2.5),
-  borderRadius: '12px',
-  fontWeight: 500,
-  fontSize: '0.95rem',
-  letterSpacing: 0.5,
-  transition: 'all 0.2s',
-  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  '&.active': {
-    background: 'rgba(255, 255, 255, 0.1)',
-    color: '#fff',
-  },
-  '&:hover': {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-  },
-}));
 
 const Navigation: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
+
   const { user, logout, isAdmin } = useAuth();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));

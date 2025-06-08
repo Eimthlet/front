@@ -1,4 +1,3 @@
-import axios from 'axios';
 
 // Version-agnostic axios error type
 type AxiosErrorType = Error & {

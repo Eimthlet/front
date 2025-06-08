@@ -31,11 +31,9 @@ const AdminDashboard: React.FC = () => {
     recentActivity: []
   });
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      setIsLoading(true);
       const response = await apiClient.get<DashboardApiResponse>('/api/admin/dashboard-stats');
       
       setStats({
@@ -49,8 +47,6 @@ const AdminDashboard: React.FC = () => {
       const error = err as Error;
       console.error('Error fetching dashboard data:', error);
       setError(error.message || 'Failed to fetch dashboard data');
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
