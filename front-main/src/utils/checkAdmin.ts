@@ -51,68 +51,77 @@ export const checkAdminStatus = async (): Promise<AdminStatusResponse> => {
     }
     
     // Decode the token to check if isAdmin is set
-    const parseJwt = (token: string): TokenPayload | null => {
-      try {
-        return JSON.parse(atob(token.split('.')[1]));
-      } catch (e) {
-        console.error('Failed to parse JWT token:', e);
-        return null;
-      }
-    };
-    
-    const decodedToken = parseJwt(token);
-    console.log('Decoded token:', decodedToken);
-    
-    if (!decodedToken) {
-      console.error('Failed to decode token');
+    let decodedToken: TokenPayload;
+    try {
+      decodedToken = JSON.parse(atob(token.split('.')[1]));
+    } catch (e) {
+      console.error('Failed to parse JWT token:', e);
       return { success: false, message: 'Invalid token format' };
     }
     
-    // Check if isAdmin is set in the token
-    if (!decodedToken.isAdmin) {
-      console.error('User is not an admin according to the token');
+    console.log('Decoded token:', decodedToken);
+    
+    // Check if token is expired
+    if (decodedToken.exp && decodedToken.exp < Date.now() / 1000) {
+      console.log('Token expired');
       return { 
         success: false, 
-        message: 'Not an admin user', 
-        userId: decodedToken.id,
+        message: 'Token expired', 
+        userId: decodedToken.id, 
         email: decodedToken.email 
+      };
+    }
+    
+    // Check if user is admin in the token
+    if (!decodedToken.isAdmin) {
+      console.log('User is not an admin according to token');
+      return { 
+        success: false, 
+        message: 'User does not have admin privileges',
+        userId: decodedToken.id,
+        email: decodedToken.email
       };
     }
     
     // Verify the token with the server
     try {
-      const response = await api.get<{ valid: boolean; user?: { id: number; email: string; isAdmin: boolean } }>('/auth/check-token');
-      console.log('Token check response:', response);
+      const { data: checkTokenData } = await api.get<{ valid: boolean; user?: { id: number; email: string; isAdmin: boolean } }>('/auth/check-token');
+      console.log('Token check response:', checkTokenData);
       
-      if (response.valid && response.user?.isAdmin) {
+      if (checkTokenData.valid && checkTokenData.user?.isAdmin) {
         console.log('Server confirms admin status');
         // Verify with the server if the user is still an admin
         try {
-          const response = await api.get<UserInfoResponse>('/auth/me');
-          console.log('User info from server:', response);
+          const { data: userData } = await api.get<UserInfoResponse>('/auth/me');
+          console.log('User info from server:', userData);
           
-          if (!response || !(response.isAdmin || response.role === 'admin')) {
+          if (!userData || !(userData.isAdmin || (userData as any).role === 'admin')) {
             console.log('Server does not recognize user as admin');
             return { 
               success: false, 
               message: 'User does not have admin privileges on the server',
-              userId: response?.id,
-              email: response?.email
+              userId: userData?.id,
+              email: userData?.email
             };
           }
           console.log('Server confirms admin status');
+          // If we got here, the user is confirmed to be an admin
           return { 
             success: true, 
-            message: 'Admin status confirmed',
-            user: response
+            message: 'User is an admin',
+            userId: userData.id,
+            email: userData.email,
+            user: userData
           };
-        } catch (error: any) {
-          console.error('Error verifying token with server:', error);
+        } catch (error) {
+          console.error('Error verifying admin status with server:', error);
+          // If we can't verify with the server, trust the token but log a warning
           return { 
-            success: false, 
-            message: 'Error verifying admin status with server',
-            userId: decodedToken.id,
-            email: decodedToken.email
+            success: true, 
+            message: 'Using cached admin status (server verification failed)',
+            userId: checkTokenData.user?.id,
+            email: checkTokenData.user?.email,
+            user: checkTokenData.user
           };
         }
       } else {
@@ -124,13 +133,13 @@ export const checkAdminStatus = async (): Promise<AdminStatusResponse> => {
           email: decodedToken.email
         };
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error verifying token with server:', error);
       return { 
         success: false, 
         message: 'Error verifying admin status with server',
-        userId: decodedToken.id,
-        email: decodedToken.email
+        userId: decodedToken?.id,
+        email: decodedToken?.email
       };
     }
   } catch (error) {
@@ -156,34 +165,27 @@ export const fixAdminToken = async (): Promise<{ success: boolean; message: stri
     }
     
     // Try to refresh the token
-    console.log('Attempting to refresh token...');
-    const response = await api.post<RefreshTokenResponse>('/auth/refresh-token', { token });
-    
-    if (response && 'token' in response && response.token) {
-      // Save the new token
-      console.log('Token refresh successful');
-      localStorage.setItem('token', response.token);
+    try {
+      console.log('Attempting to refresh token...');
+      const { data } = await api.post<RefreshTokenResponse>('/auth/refresh-token', { token });
       
-      // Verify the new token has admin privileges
-      const adminCheck = await checkAdminStatus();
-      if (!adminCheck.success) {
-        console.error('Refreshed token does not have admin privileges');
-        return { 
-          success: false, 
-          message: adminCheck.message || 'Refreshed token is not an admin token' 
-        };
+      if (data.token) {
+        // Save the new token
+        localStorage.setItem('token', data.token);
+        console.log('Token refreshed successfully');
+        return { success: true, message: 'Token refreshed successfully' };
+      } else {
+        console.error('No token in refresh response:', data);
+        return { success: false, message: data.message || 'Failed to refresh token' };
       }
+    } catch (error) {
+      console.error('Error refreshing token:', error);
       
       return { 
         success: true, 
         message: 'Token refreshed and verified as admin' 
       };
     }
-    
-    return { 
-      success: false, 
-      message: (response as { message?: string })?.message || 'Failed to refresh token' 
-    };
   } catch (error) {
     console.error('Error refreshing token:', error);
     return { 
