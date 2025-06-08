@@ -88,27 +88,36 @@ const App: React.FC = () => {
           return;
         }
         
-        // Get the response from the API
+        // Get the qualification data from the API
         const response = await api.get<QualificationApiResponse>('/qualification');
         
-        // Safely extract the data from the response
-        const responseData = getResponseData<QualificationApiResponse>(response);
+        // The API client now returns the data directly, but we'll add a safety check
+        const responseData = response && typeof response === 'object' ? response : null;
         
         // Validate the response structure
-        if (!responseData || typeof responseData !== 'object') {
+        if (!responseData) {
           throw new Error('Invalid response format from qualification endpoint');
         }
         
         // Create a properly typed qualification object
         const qualificationData: QualificationResponse = {
-          hasAttempted: Boolean(responseData.hasAttempted),
-          isQualified: Boolean(
-            responseData.isQualified || 
-            responseData.qualifies_for_next_round
-          ),
+          hasAttempted: false,
+          isQualified: false,
           // Include any additional properties that might be present
           ...responseData
         };
+        
+        // Set the correct values from the response
+        if ('hasAttempted' in responseData) {
+          qualificationData.hasAttempted = Boolean(responseData.hasAttempted);
+        }
+        
+        if ('isQualified' in responseData || 'qualifies_for_next_round' in responseData) {
+          qualificationData.isQualified = Boolean(
+            (responseData as any).isQualified || 
+            (responseData as any).qualifies_for_next_round
+          );
+        }
         
         setQualification(qualificationData);
         
@@ -116,16 +125,13 @@ const App: React.FC = () => {
         if (!qualificationData.hasAttempted || qualificationData.isQualified) {
           try {
             // Get questions from the API
-            const questionsResponse = await api.get<ApiQuestion[] | QuestionsResponse>('/questions');
-            
-            // Safely extract the data from the response
-            const responseData = getResponseData<ApiQuestion[] | QuestionsResponse>(questionsResponse);
+            const questionsData = await api.get<ApiQuestion[] | QuestionsResponse>('/questions');
             
             // Handle both direct array response and wrapped response
-            const questions = Array.isArray(responseData) 
-              ? responseData 
-              : 'questions' in responseData && Array.isArray(responseData.questions) 
-                ? responseData.questions 
+            const questions = Array.isArray(questionsData) 
+              ? questionsData 
+              : 'questions' in questionsData && Array.isArray(questionsData.questions) 
+                ? questionsData.questions 
                 : [];
                 
             // Map the API question format to the Quiz component's expected format

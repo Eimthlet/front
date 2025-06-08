@@ -72,18 +72,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string): Promise<void> => {
     setError(null);
     try {
-      const { data } = await api.post<LoginResponse>('/auth/login', { email, password });
+      const response = await api.post<LoginResponse>('/auth/login', { email, password });
 
-      if (!data.success || !data.token || !data.user) {
-        throw new Error(data.error || 'Login failed: Invalid response from server.');
+      if (!response.success || !response.token || !response.user) {
+        throw new Error(response.error || 'Login failed: Invalid response from server.');
       }
       
-      localStorage.setItem('token', data.token);
-      if (data.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken);
+      localStorage.setItem('token', response.token);
+      if (response.refreshToken) {
+        localStorage.setItem('refreshToken', response.refreshToken);
       }
       
-      const { user } = data;
+      const { user } = response;
       setUser(user);
       setIsAuthenticated(true);
       setIsAdmin(user.isAdmin);
@@ -100,18 +100,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (userData: RegisterData): Promise<void> => {
     setError(null);
     try {
-      const { data } = await api.post<LoginResponse>('/auth/register', userData);
+      const response = await api.post<LoginResponse>('/auth/register', userData);
 
-      if (!data.success || !data.token || !data.user) {
-        throw new Error(data.error || 'Registration failed: Invalid response from server.');
+      if (!response.success || !response.token || !response.user) {
+        throw new Error(response.error || 'Registration failed: Invalid response from server.');
       }
 
-      localStorage.setItem('token', data.token);
-      if (data.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken);
+      localStorage.setItem('token', response.token);
+      if (response.refreshToken) {
+        localStorage.setItem('refreshToken', response.refreshToken);
       }
 
-      const { user } = data;
+      const { user } = response;
       setUser(user);
       setIsAuthenticated(true);
       setIsAdmin(user.isAdmin);
@@ -150,8 +150,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check token function
   const checkToken = async (): Promise<TokenCheckResponse> => {
     try {
-      const { data } = await api.get<TokenCheckResponse>('/auth/check-token');
-      return data;
+      const response = await api.get<TokenCheckResponse>('/auth/check-token');
+      return response;
     } catch (error: any) {
       console.error('Token check error details:', error);
       return { success: false, error: handleApiError(error).message };
