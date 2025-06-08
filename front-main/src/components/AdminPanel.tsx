@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import api from '../utils/apiClient';
+import api, { ApiResponse } from '../utils/apiClient';
 import SeasonManager from './SeasonManager';
 import { 
   Box, 
@@ -28,11 +28,6 @@ import {
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
 
-// API Response Interfaces
-interface ApiResponse<T> {
-  data: T;
-  message?: string;
-}
 
 // Define interfaces
 interface Question {
@@ -128,8 +123,8 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     
     try {
       setIsLoading(true);
-      const response = await api.get<Question[]>(`/admin/seasons/${selectedSeasonId}/questions`);
-      setQuestions(response.data);
+      const { data } = await api.get<Question[]>(`/admin/seasons/${selectedSeasonId}/questions`);
+      setQuestions(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching questions:', error);
       updateError('Error', 'Failed to load questions');
@@ -141,8 +136,8 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   // Fetch seasons
   const fetchSeasons = useCallback(async () => {
     try {
-      const response = await api.get<Season[]>('/admin/seasons');
-      const seasonsData = response.data;
+      const { data } = await api.get<Season[]>('/admin/seasons');
+      const seasonsData = Array.isArray(data) ? data : [];
       setSeasons(seasonsData);
       if (seasonsData.length > 0 && !selectedSeasonId) {
         setSelectedSeasonId(seasonsData[0].id);
@@ -241,9 +236,17 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       }
 
       // Submit the question
-      await api.post<ApiResponse<Question>>(`/admin/seasons/${selectedSeasonId}/questions`, newQuestion);
-      await fetchQuestions();
-      updateSuccess('Question added successfully!');
+      const { data } = await api.post<ApiResponse<Question>>(`/admin/seasons/${selectedSeasonId}/questions`, newQuestion);
+      if (data) {
+        if (data.success) {
+          await fetchQuestions();
+          updateSuccess('Question added successfully!');
+        } else {
+          throw new Error(data.message || 'Failed to add question');
+        }
+      } else {
+        throw new Error('No response data received');
+      }
       
       // Reset form
       setNewQuestion({
@@ -271,12 +274,21 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
 
     try {
       setIsLoading(true);
-      await api.delete<ApiResponse<{ message: string }>>(`/admin/questions/${questionId}`);
-      await fetchQuestions();
-      updateSuccess('Question deleted successfully!');
+      const { data } = await api.delete<ApiResponse<{ message: string }>>(`/admin/questions/${questionId}`);
+      if (data) {
+        if (data.success) {
+          await fetchQuestions();
+          updateSuccess('Question deleted successfully!');
+        } else {
+          throw new Error(data.message || 'Failed to delete question');
+        }
+      } else {
+        throw new Error('No response data received');
+      }
     } catch (error) {
       console.error('Error deleting question:', error);
-      updateError('Error', 'Failed to delete question');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete question';
+      updateError('Error', errorMessage);
     } finally {
       setIsLoading(false);
     }
