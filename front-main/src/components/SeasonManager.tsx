@@ -252,10 +252,10 @@ const SeasonManager: React.FC = () => {
       };
       
       if (dialogMode === 'create') {
-        const response = await api.post<Season>('/admin/seasons', seasonData);
+        await api.post<Season>('/admin/seasons', seasonData);
         setSuccess('Season created successfully');
       } else if (currentSeason.id) {
-        const response = await api.put<Season>(`/admin/seasons/${currentSeason.id}`, seasonData);
+        await api.put<Season>(`/admin/seasons/${currentSeason.id}`, seasonData);
         setSuccess('Season updated successfully');
       }
       
