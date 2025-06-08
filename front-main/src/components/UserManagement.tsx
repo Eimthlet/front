@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -34,7 +34,7 @@ import SearchIcon from '@mui/icons-material/SearchOutlined';
 import RefreshIcon from '@mui/icons-material/RefreshOutlined';
 import api from '../utils/apiClient';
 
-// API Response Types
+// API Response Type
 interface ApiResponse<T> {
   data: T;
   message?: string;
@@ -102,7 +102,8 @@ interface PaginationData {
   totalPages: number;
 }
 
-interface UsersResponse {
+// Users API response type
+interface UsersApiResponse {
   users: User[];
   pagination: PaginationData;
 }
