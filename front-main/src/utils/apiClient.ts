@@ -29,14 +29,7 @@ const getBaseUrl = () => {
   }
 
   // Remove any trailing slashes
-  baseUrl = baseUrl.replace(/\/+$/, '');
-  
-  // Don't add /api for authentication endpoints
-  if (baseUrl.endsWith('/api')) {
-    baseUrl = baseUrl.replace(/\/api$/, '');
-  }
-  
-  return baseUrl;
+  return baseUrl.replace(/\/+$/, '');
 };
 
 // Get base URL without any trailing slashes
@@ -60,6 +53,11 @@ apiClient.interceptors.request.use(
     const token = localStorage.getItem('token');
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    // For non-authentication endpoints, ensure they start with /api
+    if (config.url && !config.url.startsWith('/auth/') && !config.url.startsWith('/api/')) {
+      config.url = `/api${config.url}`;
     }
     
     // Log the request URL for debugging
