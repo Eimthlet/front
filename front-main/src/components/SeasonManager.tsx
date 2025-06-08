@@ -116,11 +116,15 @@ const SeasonManager: React.FC = () => {
       try {
         setLoading(true);
         const response = await api.get<Season[]>('/admin/seasons');
-        const { data } = response;
-        setSeasons(Array.isArray(data) ? data : []);
+        if (response && response.data) {
+          setSeasons(Array.isArray(response.data) ? response.data : []);
+        } else {
+          setSeasons([]);
+        }
       } catch (err) {
         const error = err as ApiError;
         setError(error.response?.data?.message || 'Failed to fetch seasons');
+        setSeasons([]);
       } finally {
         setLoading(false);
       }
@@ -172,45 +176,57 @@ const SeasonManager: React.FC = () => {
     setOpenDialog(true);
   }, []);
 
-  // Handle opening the questions dialog
-  const handleOpenQuestionsDialog = useCallback(async (seasonId: number | string) => {
+  // Handle view questions
+  const handleViewQuestions = useCallback(async (seasonId: number | string) => {
     try {
       setLoading(true);
       setSelectedSeasonId(Number(seasonId));
       
       // Fetch questions for the season
       const response = await api.get<Question[]>(`/admin/seasons/${seasonId}/questions`);
-      const { data } = response;
-      setQuestions(Array.isArray(data) ? data : []);
+      if (response && response.data) {
+        setQuestions(Array.isArray(response.data) ? response.data : []);
+      } else {
+        setQuestions([]);
+      }
       
       setOpenQuestionsDialog(true);
     } catch (err) {
       const error = err as ApiError;
       setError(error.response?.data?.message || 'Failed to fetch questions');
+      setQuestions([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Handle opening qualified users dialog
-  const handleOpenQualifiedUsersDialog = useCallback(async (seasonId: number | string) => {
+  // Handle view qualified users
+  const handleViewQualifiedUsers = useCallback(async (seasonId: number | string) => {
     try {
       setLoading(true);
       setSelectedSeasonId(Number(seasonId));
       
       // Fetch qualified users for the season
       const response = await api.get<QualifiedUser[]>(`/admin/seasons/${seasonId}/qualified-users`);
-      const { data } = response;
-      setQualifiedUsers(Array.isArray(data) ? data : []);
+      if (response && response.data) {
+        setQualifiedUsers(Array.isArray(response.data) ? response.data : []);
+      } else {
+        setQualifiedUsers([]);
+      }
       
       setOpenQualifiedUsersDialog(true);
     } catch (err) {
       const error = err as ApiError;
       setError(error.response?.data?.message || 'Failed to fetch qualified users');
+      setQualifiedUsers([]);
     } finally {
       setLoading(false);
     }
   }, []);
+  
+  // Alias for backward compatibility
+  const handleOpenQuestionsDialog = handleViewQuestions;
+  const handleOpenQualifiedUsersDialog = handleViewQualifiedUsers;
 
   // Handle form changes
   const handleSeasonChange = useCallback((field: keyof Season, value: any) => {
@@ -242,24 +258,33 @@ const SeasonManager: React.FC = () => {
       setLoading(true);
       
       if (dialogMode === 'create') {
-        const response = await api.post<ApiResponse<Season>>('/admin/seasons', currentSeason);
-        const { data } = response;
-        setSuccess('Season created successfully');
+        const response = await api.post<Season>('/admin/seasons', currentSeason);
+        if (response) {
+          setSuccess('Season created successfully');
+        } else {
+          throw new Error('Failed to create season');
+        }
       } else if (currentSeason.id) {
-        const response = await api.put<ApiResponse<Season>>(`/admin/seasons/${currentSeason.id}`, currentSeason);
-        const { data } = response;
-        setSuccess('Season updated successfully');
+        const response = await api.put<Season>(`/admin/seasons/${currentSeason.id}`, currentSeason);
+        if (response) {
+          setSuccess('Season updated successfully');
+        } else {
+          throw new Error('Failed to update season');
+        }
       }
       
       // Refresh seasons
-      const response = await api.get<Season[]>('/admin/seasons');
-      const { data } = response;
-      setSeasons(Array.isArray(data) ? data : []);
+      const seasonsResponse = await api.get<Season[]>('/admin/seasons');
+      if (seasonsResponse && seasonsResponse.data) {
+        setSeasons(Array.isArray(seasonsResponse.data) ? seasonsResponse.data : []);
+      } else {
+        setSeasons([]);
+      }
       
       handleCloseDialog();
     } catch (err) {
       const error = err as ApiError;
-      setError(error.response?.data?.message || 'Failed to save season');
+      setError(error.response?.data?.message || error.message || 'Failed to save season');
     } finally {
       setLoading(false);
     }
@@ -272,37 +297,47 @@ const SeasonManager: React.FC = () => {
       setLoading(true);
       
       if (currentQuestion.id) {
-        const response = await api.put<ApiResponse<Question>>(
+        const response = await api.put<Question>(
           `/admin/seasons/${selectedSeasonId}/questions/${currentQuestion.id}`,
           currentQuestion
         );
-        const { data } = response;
-        setSuccess('Question updated successfully');
+        if (response) {
+          setSuccess('Question updated successfully');
+        } else {
+          throw new Error('Failed to update question');
+        }
       } else {
-        const response = await api.post<ApiResponse<Question>>(
+        const response = await api.post<Question>(
           `/admin/seasons/${selectedSeasonId}/questions`,
           currentQuestion
         );
-        const { data } = response;
-        setSuccess('Question added successfully');
+        if (response) {
+          setSuccess('Question added successfully');
+        } else {
+          throw new Error('Failed to add question');
+        }
       }
       
       // Refresh questions
-      const response = await api.get<ApiResponse<Question[]>>(
+      const questionsResponse = await api.get<Question[]>(
         `/admin/seasons/${selectedSeasonId}/questions`
       );
-      const { data } = response;
-      setQuestions(Array.isArray(data) ? data : []);
+      if (questionsResponse && questionsResponse.data) {
+        setQuestions(Array.isArray(questionsResponse.data) ? questionsResponse.data : []);
+      } else {
+        setQuestions([]);
+      }
       
       // Reset form
       setCurrentQuestion({
         question_text: '',
         options: ['', '', '', ''],
-        correct_answer: ''
+        correct_answer: '',
+        season_id: selectedSeasonId
       });
     } catch (err) {
       const error = err as ApiError;
-      setError(error.response?.data?.message || 'Failed to save question');
+      setError(error.response?.data?.message || error.message || 'Failed to save question');
     } finally {
       setLoading(false);
     }
