@@ -8,27 +8,34 @@ import {
   Button, 
   TextField, 
   Typography, 
-  Alert, 
   CircularProgress, 
   FormControl, 
   InputLabel, 
   Select, 
   MenuItem, 
-  Snackbar, 
   Tabs, 
-  Tab, 
-  SelectChangeEvent 
+  Tab,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  Alert,
+  Snackbar
 } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import DeleteIcon from '@mui/icons-material/Delete';
 
-// Define Season interface with all required fields
-interface Season {
-  id: number;
-  name: string;
-  is_active: boolean;
+// API Response Interfaces
+interface ApiResponse<T> {
+  data: T;
+  message?: string;
 }
 
-// Define Question interface with all required fields
+// Define interfaces
 interface Question {
   id?: number;
   question: string;
@@ -39,46 +46,19 @@ interface Question {
   difficulty: string;
 }
 
-// Add JWT payload interface
-interface JwtPayload {
-  id: string | number;
-  email: string;
-  isAdmin: boolean;
-  exp?: number;
-}
-
-// Add these interfaces after the Question interface
-interface ApiError {
-  response?: {
-    data?: {
-      error?: string;
-      details?: string;
-    };
-  };
-  message?: string;
-}
-
-interface ApiResponse<T> {
-  data: T;
-  message?: string;
-}
-
 interface ErrorState {
   message: string;
   details?: string;
 }
 
-interface QuestionsResponse {
-  questions: Question[];
+interface Season {
+  id: number;
+  name: string;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
 }
 
-interface QuestionResponse {
-  data: {
-    question: Question;
-  };
-}
-
-// Define props interface
 interface AdminPanelProps {}
 
 // Tab panel component
@@ -110,11 +90,9 @@ function a11yProps(index: number) {
 
 const AdminPanel: React.FC<AdminPanelProps> = () => {
   const navigate = useNavigate();
-  const { isAdmin, user, logout } = useAuth();
-  
-  // State variables with proper types
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [seasons, setSeasons] = useState<Season[]>([]);
+  const { isAdmin } = useAuth();
+
+  // State variables
   const [selectedSeasonId, setSelectedSeasonId] = useState<number | null>(null);
   const [error, setError] = useState<ErrorState | null>(null);
   const [success, setSuccess] = useState('');
@@ -122,23 +100,8 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const [isVerifying, setIsVerifying] = useState(true);
   const [tabValue, setTabValue] = useState(0);
   const [adminCheckFailed, setAdminCheckFailed] = useState(false);
-
-  // Helper functions for error handling and state management
-  const updateError = (message: string, details?: string) => {
-    setError({ message, details });
-  };
-
-  const clearError = () => setError(null);
-  
-  const updateSuccess = (message: string) => {
-    setSuccess(message);
-    setTimeout(() => setSuccess(''), 5000); // Auto-clear after 5 seconds
-  };
-  
-  const clearSuccess = () => setSuccess('');
-  const setLoadingState = (loading: boolean) => setIsLoading(loading);
-
-  // Form state
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [newQuestion, setNewQuestion] = useState<Omit<Question, 'id'>>({
     question: '',
     options: ['', '', '', ''],
@@ -147,16 +110,102 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     category: 'General Knowledge',
     difficulty: 'Medium'
   });
-  
-  // Form handlers
-  const handleQuestionChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+
+  // Helper functions - moved before usage
+  const updateError = useCallback((message: string, details?: string) => {
+    setError({ message, details });
+  }, []);
+
+  const clearError = useCallback(() => setError(null), []);
+
+  const updateSuccess = useCallback((message: string) => {
+    setSuccess(message);
+    setTimeout(() => setSuccess(''), 5000);
+  }, []);
+
+  // Fetch questions for the selected season
+  const fetchQuestions = useCallback(async () => {
+    if (!selectedSeasonId) return;
+    
+    try {
+      setIsLoading(true);
+      const response = await api.get<Question[]>(`/admin/seasons/${selectedSeasonId}/questions`);
+      setQuestions(response);
+    } catch (error) {
+      console.error('Error fetching questions:', error);
+      updateError('Error', 'Failed to load questions');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedSeasonId, updateError]);
+
+  // Fetch seasons
+  const fetchSeasons = useCallback(async () => {
+    try {
+      const response = await api.get<Season[]>('/admin/seasons');
+      const seasonsData = response;
+      setSeasons(seasonsData);
+      if (seasonsData.length > 0 && !selectedSeasonId) {
+        setSelectedSeasonId(seasonsData[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching seasons:', error);
+      updateError('Error', 'Failed to load seasons');
+    }
+  }, [selectedSeasonId, updateError]);
+
+  // Check admin status on component mount
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      try {
+        setIsVerifying(true);
+        if (!isAdmin) {
+          setAdminCheckFailed(true);
+          navigate('/');
+        }
+      } catch (error) {
+        console.error('Error verifying admin status:', error);
+        setAdminCheckFailed(true);
+      } finally {
+        setIsVerifying(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [isAdmin, navigate]);
+
+  // Fetch initial data
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      await fetchSeasons();
+    };
+    if (!isVerifying && isAdmin && !adminCheckFailed) {
+      fetchInitialData();
+    }
+  }, [fetchSeasons, isVerifying, isAdmin, adminCheckFailed]);
+
+  // Fetch questions when selectedSeasonId changes
+  useEffect(() => {
+    if (selectedSeasonId && !isVerifying && isAdmin && !adminCheckFailed) {
+      fetchQuestions();
+    }
+  }, [selectedSeasonId, fetchQuestions, isVerifying, isAdmin, adminCheckFailed]);
+
+  // Handle tab change
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+  // Handle input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setNewQuestion(prev => ({
       ...prev,
       [name]: value
     }));
   };
-  
+
+  // Handle option change
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...newQuestion.options];
     newOptions[index] = value;
@@ -165,74 +214,37 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       options: newOptions
     }));
   };
-  
-  const handleCategoryChange = (e: SelectChangeEvent) => {
-    setNewQuestion(prev => ({
-      ...prev,
-      category: e.target.value as string
-    }));
-  };
-  
-  const handleDifficultyChange = (e: SelectChangeEvent) => {
-    setNewQuestion(prev => ({
-      ...prev,
-      difficulty: e.target.value as string
-    }));
-  };
-  
-  const handleTimeLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewQuestion(prev => ({
-      ...prev,
-      timeLimit: parseInt(e.target.value, 10) || 30
-    }));
-  };
-  
-  const handleCorrectAnswerChange = (e: SelectChangeEvent) => {
-    setNewQuestion(prev => ({
-      ...prev,
-      correctAnswer: e.target.value as string
-    }));
-  };
-  
-  // Handle tab change
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
 
-  // Function to handle question submission
+  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!selectedSeasonId) {
-      updateError(
-        'No Season Selected',
-        'Please select a season before adding a question.'
-      );
+      updateError('No Season Selected', 'Please select a season before adding a question.');
       return;
     }
 
     try {
       setIsLoading(true);
       clearError();
-      
+
       // Validate question data
       if (!newQuestion.question.trim()) {
         throw new Error('Question text is required');
       }
-      
+
       if (newQuestion.options.some(opt => !opt.trim())) {
         throw new Error('All options must be filled');
       }
-      
+
       if (!newQuestion.correctAnswer) {
         throw new Error('Please select the correct answer');
       }
-      
+
       // Submit the question
-      await api.post(`/admin/seasons/${selectedSeasonId}/questions`, newQuestion);
-      
-      // Refresh questions
+      await api.post<ApiResponse<Question>>(`/admin/seasons/${selectedSeasonId}/questions`, newQuestion);
       await fetchQuestions();
+      updateSuccess('Question added successfully!');
       
       // Reset form
       setNewQuestion({
@@ -243,9 +255,6 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
         category: 'General Knowledge',
         difficulty: 'Medium'
       });
-      
-      updateSuccess('Question added successfully!');
-      
     } catch (error) {
       console.error('Error adding question:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to add question';
@@ -255,494 +264,228 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     }
   };
 
-  // Function to handle question deletion
+  // Handle question deletion
   const handleDeleteQuestion = async (questionId: number) => {
-    try {
-      await api.delete(`/admin/questions/${questionId}`);
-      setSuccess('Question deleted successfully');
-      fetchQuestions();
-    } catch (err: unknown) {
-      const apiError = err as ApiError;
-      setError({
-        message: apiError.message || 'Failed to delete question',
-        details: apiError.response?.data?.details
-      });
+    if (!window.confirm('Are you sure you want to delete this question?')) {
+      return;
     }
-  };
 
-  // Verify admin status on component mount
-  useEffect(() => {
-    let isMounted = true;
-    
-    const verifyAdminStatus = async () => {
-      // Skip if already verified or checking
-      if (!isVerifying || adminCheckFailed) return;
-      
-      try {
-        const response = await api.get<{ isAdmin: boolean }>('/auth/verify-admin');
-        
-        if (!isMounted) return;
-        
-        if (!response.isAdmin) {
-          console.error('User is not an admin');
-          setAdminCheckFailed(true);
-          updateError(
-            'Access Denied',
-            'You do not have permission to access the admin panel.'
-          );
-          // Redirect to home after a delay
-          setTimeout(() => navigate('/'), 3000);
-          return;
-        }
-        
-        // If we get here, user is verified as admin
-        setAdminCheckFailed(false);
-        clearError();
-        
-      } catch (error) {
-        if (!isMounted) return;
-        
-        console.error('Error verifying admin status:', error);
-        setAdminCheckFailed(true);
-        updateError(
-          'Authentication Error',
-          'Failed to verify admin privileges. Please log in again.'
-        );
-        // Redirect to login after a delay
-        setTimeout(() => navigate('/login'), 3000);
-      } finally {
-        if (isMounted) {
-          setIsVerifying(false);
-        }
-      }
-    };
-
-    verifyAdminStatus();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [navigate, isVerifying, adminCheckFailed]);
-
-  // Fetch seasons when admin is verified
-  useEffect(() => {
-    if (adminCheckFailed) return;
-    
-    const fetchSeasons = async () => {
-      try {
-        const seasonsData = await api.get<Season[]>('/admin/seasons');
-        setSeasons(seasonsData);
-        // Set the first active season as selected
-        const activeSeason = seasonsData.find(s => s.is_active);
-        if (activeSeason) {
-          setSelectedSeasonId(activeSeason.id);
-        }
-      } catch (error) {
-        console.error('Error fetching seasons:', error);
-        setError({
-          message: 'Failed to fetch seasons',
-          details: error instanceof Error ? error.message : undefined
-        });
-      }
-    };
-    fetchSeasons();
-  }, [adminCheckFailed]);
-
-  // Fetch questions when selected season changes
-  const fetchQuestions = useCallback(async () => {
-    if (!selectedSeasonId) return;
-    
     try {
       setIsLoading(true);
-      clearError();
-      
-      // First try to fetch questions for the selected season
-      try {
-        const questionsData = await api.get<Question[]>(`/admin/seasons/${selectedSeasonId}/questions`);
-        setQuestions(questionsData);
-        return; // Success, exit the function
-      } catch (seasonError) {
-        console.warn('Failed to fetch questions by season, falling back to all questions:', seasonError);
-      }
-      
-      // Fallback to fetching all questions if season-specific fetch fails
-      const response = await api.get<Question[] | QuestionsResponse>('/admin/questions');
-      
-      // The response is already unwrapped by apiClient
-      if (Array.isArray(response)) {
-        setQuestions(response);
-      } else if (response && 'questions' in response && Array.isArray(response.questions)) {
-        // Handle the case where questions are nested in a 'questions' property
-        setQuestions(response.questions);
-      } else {
-        throw new Error('Unexpected data format received from server');
-      }
-      
-    } catch (err) {
-      console.error('Error fetching questions:', err);
-      updateError(
-        'Failed to fetch questions',
-        err instanceof Error ? err.message : 'Unknown error occurred'
-      );
-      setQuestions([]);
+      await api.delete<ApiResponse<{ message: string }>>(`/admin/questions/${questionId}`);
+      await fetchQuestions();
+      updateSuccess('Question deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting question:', error);
+      updateError('Error', 'Failed to delete question');
     } finally {
       setIsLoading(false);
     }
-  }, [selectedSeasonId]);
+  };
 
-  // Fetch questions when selected season changes
-  useEffect(() => {
-    if (selectedSeasonId) {
-      fetchQuestions();
-    }
-  }, [selectedSeasonId, fetchQuestions]);
+  // Render loading state
+  if (isVerifying || !isAdmin) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
-  // Check if user is admin and redirect if not
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      try {
-        // Check if user is authenticated and has admin privileges
-        const response = await api.get<{ isAdmin: boolean }>('/auth/verify-admin');
-        
-        if (!response.isAdmin) {
-          console.log('Non-admin user attempting to access admin panel');
-          navigate('/login');
-        } else {
-          setIsVerifying(false);
-        }
-      } catch (error) {
-        console.error('Error verifying admin status:', error);
-        setAdminCheckFailed(true);
-        updateError(
-          'Authentication Error',
-          'You must be logged in as an administrator to access this page.'
-        );
-      }
-    };
-
-    checkAdminStatus();
-  }, [navigate]);
+  // Render admin check failed
+  if (adminCheckFailed) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <ErrorOutlineIcon color="error" sx={{ fontSize: 60, mb: 2 }} />
+        <Typography variant="h5" gutterBottom>
+          Access Denied
+        </Typography>
+        <Typography variant="body1" paragraph>
+          You don't have permission to access the admin panel.
+        </Typography>
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={() => navigate('/')}
+        >
+          Return to Home
+        </Button>
+      </Box>
+    );
+  }
 
   return (
-    <Box sx={{ 
-      p: { xs: 2, md: 4 },
-      maxWidth: '1200px', 
-      mx: 'auto',
-      minHeight: '100vh',
-      background: 'linear-gradient(to right, rgba(24, 42, 115, 0.8), rgba(33, 138, 174, 0.8))',
-      color: 'white'
-    }}>
-      <Typography variant="h4" component="h1" sx={{ mb: 4, fontWeight: 700 }}>
-        Admin Dashboard
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" component="h1" gutterBottom>
+        Admin Panel
       </Typography>
 
-      {/* Tab Navigation */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs 
-          value={tabValue} 
-          onChange={handleTabChange} 
-          aria-label="admin tabs"
-          sx={{ 
-            '& .MuiTab-root': { color: 'rgba(255, 255, 255, 0.7)' },
-            '& .Mui-selected': { color: 'white' },
-            '& .MuiTabs-indicator': { backgroundColor: 'white' }
-          }}
+      {/* Error Alert */}
+      {error && (
+        <Alert 
+          severity="error" 
+          onClose={clearError}
+          sx={{ mb: 2 }}
         >
-          <Tab label="Question Management" {...a11yProps(0)} />
-          <Tab label="Season Management" {...a11yProps(1)} />
-        </Tabs>
-      </Box>
+          <Typography variant="subtitle1">{error.message}</Typography>
+          {error.details && (
+            <Typography variant="body2">{error.details}</Typography>
+          )}
+        </Alert>
+      )}
 
-      {/* Question Management Tab */}
+      {/* Success Alert */}
+      {success && (
+        <Alert 
+          severity="success" 
+          onClose={() => setSuccess('')}
+          sx={{ mb: 2 }}
+        >
+          {success}
+        </Alert>
+      )}
+
+      <Tabs 
+        value={tabValue} 
+        onChange={handleTabChange} 
+        aria-label="admin panel tabs"
+        sx={{ mb: 3 }}
+      >
+        <Tab label="Questions" {...a11yProps(0)} />
+        <Tab label="Seasons" {...a11yProps(1)} />
+      </Tabs>
+
       <TabPanel value={tabValue} index={0}>
-        {isVerifying ? (
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column',
-            justifyContent: 'center', 
-            alignItems: 'center', 
-            minHeight: '70vh',
-            padding: 3
-          }}>
-            <CircularProgress size={60} thickness={4} sx={{ mb: 3 }} />
-            <Typography variant="h6" sx={{ mt: 2, color: 'text.secondary' }}>
-              Verifying admin privileges...
-            </Typography>
-          </Box>
-        ) : adminCheckFailed ? (
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column',
-            justifyContent: 'center', 
-            alignItems: 'center', 
-            minHeight: '70vh',
-            padding: 3,
-            textAlign: 'center'
-          }}>
-            <ErrorOutlineIcon color="error" sx={{ fontSize: 60, mb: 2 }} />
-            <Typography variant="h5" color="error" gutterBottom>
-              {error?.message || 'Access Denied'}
-            </Typography>
-            <Typography variant="body1" color="text.secondary" paragraph>
-              {error?.details || 'You do not have permission to access this page.'}
-            </Typography>
-            <Button 
-              variant="contained" 
-              color="primary" 
-              onClick={() => navigate('/')}
-              sx={{ mt: 2 }}
-            >
-              Return to Home
-            </Button>
-          </Box>
-        ) : isLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <Box>
-            {error && (
-              <Box sx={{ 
-                p: 2, 
-                mb: 3, 
-                borderRadius: 2, 
-                bgcolor: 'rgba(255, 0, 0, 0.1)', 
-                border: '1px solid rgba(255, 0, 0, 0.3)' 
-              }}>
-                <Typography color="error">{error.message}</Typography>
-                {error.details && <Typography variant="body2" color="error">{error.details}</Typography>}
-              </Box>
-            )}
-            {success && (
-              <Box sx={{ 
-                p: 2, 
-                mb: 3, 
-                borderRadius: 2, 
-                bgcolor: 'rgba(0, 255, 0, 0.1)', 
-                border: '1px solid rgba(0, 255, 0, 0.3)' 
-              }}>
-                <Typography color="success.main">{success}</Typography>
-              </Box>
-            )}
-
-            {/* Add Question Form */}
-            <Box sx={{ 
-              p: 3, 
-              borderRadius: 2, 
-              background: 'rgba(18, 18, 18, 0.8)',
-              backdropFilter: 'blur(10px)',
-              boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)'
-            }}>
-              <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-                Add New Question
-              </Typography>
-
-              <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%', maxWidth: 600, mx: 'auto' }}>
-                {/* Season Selection */}
-                <FormControl fullWidth sx={{ mb: 3 }}>
-                  <InputLabel id="season-select-label">Season</InputLabel>
-                  <Select
-                    labelId="season-select-label"
-                    value={selectedSeasonId || ''}
-                    onChange={(e) => setSelectedSeasonId(e.target.value as number)}
-                    required
-                  >
-                    {seasons.map((season) => (
-                      <MenuItem key={season.id} value={season.id}>
-                        {season.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <TextField
-                  fullWidth
-                  label="Question"
-                  value={newQuestion.question}
-                  onChange={(e) => setNewQuestion({ ...newQuestion, question: e.target.value })}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" gutterBottom>
+            Add New Question
+          </Typography>
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <form onSubmit={handleSubmit}>
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel id="season-select-label">Season</InputLabel>
+                <Select
+                  labelId="season-select-label"
+                  id="season-select"
+                  value={selectedSeasonId || ''}
+                  onChange={(e) => setSelectedSeasonId(Number(e.target.value))}
+                  label="Season"
                   required
-                  sx={{ mb: 3 }}
-                />
-
-                {/* Options */}
-                <Box sx={{ mb: 4 }}>
-                  <Typography variant="subtitle1" sx={{ mb: 2 }}>
-                    Options
-                  </Typography>
-                  {newQuestion.options.map((option, index) => (
-                    <TextField
-                      key={index}
-                      fullWidth
-                      label={`Option ${index + 1}`}
-                      value={option}
-                      onChange={(e) => {
-                        const newOptions = [...newQuestion.options];
-                        newOptions[index] = e.target.value;
-                        setNewQuestion({ ...newQuestion, options: newOptions });
-                      }}
-                      sx={{ mb: 2 }}
-                      required={index === 0 || index === 1}
-                    />
+                >
+                  {seasons.map((season) => (
+                    <MenuItem key={season.id} value={season.id}>
+                      {season.name}
+                    </MenuItem>
                   ))}
-                </Box>
-                
-                {/* Correct Answer Selection */}
-                <FormControl fullWidth sx={{ mb: 4 }}>
-                  <InputLabel id="correct-answer-label">Correct Answer</InputLabel>
-                  <Select
-                    labelId="correct-answer-label"
-                    value={newQuestion.correctAnswer || ''}
-                    onChange={(e) => setNewQuestion({ ...newQuestion, correctAnswer: e.target.value })}
-                    required
-                  >
-                    {newQuestion.options.filter(option => option.trim() !== '').map((option, index) => (
-                      <MenuItem key={index} value={option}>
-                        {option}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                </Select>
+              </FormControl>
 
-                {/* Category */}
-                <FormControl fullWidth sx={{ mb: 4 }}>
-                  <InputLabel id="category-label">Category</InputLabel>
-                  <Select
-                    labelId="category-label"
-                    value={newQuestion.category}
-                    onChange={(e) => setNewQuestion({ ...newQuestion, category: e.target.value })}
-                    required
-                  >
-                    <MenuItem value="Car Brands">Car Brands</MenuItem>
-                    <MenuItem value="Car Models">Car Models</MenuItem>
-                    <MenuItem value="Car Technology">Car Technology</MenuItem>
-                    <MenuItem value="Car History">Car History</MenuItem>
-                    <MenuItem value="General Knowledge">General Knowledge</MenuItem>
-                  </Select>
-                </FormControl>
+              <TextField
+                fullWidth
+                label="Question"
+                name="question"
+                value={newQuestion.question}
+                onChange={handleInputChange}
+                margin="normal"
+                required
+              />
 
-                {/* Difficulty */}
-                <FormControl fullWidth sx={{ mb: 4 }}>
-                  <InputLabel id="difficulty-label">Difficulty</InputLabel>
-                  <Select
-                    labelId="difficulty-label"
-                    value={newQuestion.difficulty}
-                    onChange={(e) => setNewQuestion({ ...newQuestion, difficulty: e.target.value })}
-                    required
-                  >
-                    <MenuItem value="Easy">Easy</MenuItem>
-                    <MenuItem value="Medium">Medium</MenuItem>
-                    <MenuItem value="Hard">Hard</MenuItem>
-                  </Select>
-                </FormControl>
-
-                {/* Time Limit */}
+              {newQuestion.options.map((option, index) => (
                 <TextField
+                  key={index}
                   fullWidth
-                  label="Time Limit (seconds)"
-                  type="number"
-                  value={newQuestion.timeLimit}
-                  onChange={(e) => setNewQuestion({ ...newQuestion, timeLimit: Number(e.target.value) })}
+                  label={`Option ${index + 1}`}
+                  value={option}
+                  onChange={(e) => handleOptionChange(index, e.target.value)}
+                  margin="normal"
                   required
-                  sx={{ mb: 4 }}
-                  InputProps={{ inputProps: { min: 10, max: 120 } }}
                 />
+              ))}
 
+              <FormControl fullWidth margin="normal">
+                <InputLabel id="correct-answer-label">Correct Answer</InputLabel>
+                <Select
+                  labelId="correct-answer-label"
+                  id="correct-answer"
+                  value={newQuestion.correctAnswer}
+                  onChange={(e) => setNewQuestion(prev => ({
+                    ...prev,
+                    correctAnswer: e.target.value as string
+                  }))}
+                  label="Correct Answer"
+                  required
+                >
+                  {newQuestion.options.map((option, index) => (
+                    <MenuItem 
+                      key={index} 
+                      value={option}
+                      disabled={!option.trim()}
+                    >
+                      {option || `Option ${index + 1}`}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button 
                   type="submit" 
                   variant="contained" 
-                  fullWidth
-                  sx={{ 
-                    mt: 2,
-                    bgcolor: 'rgba(67, 206, 162, 0.1)',
-                    color: '#43cea2',
-                    '&:hover': {
-                      bgcolor: 'rgba(67, 206, 162, 0.2)',
-                    }
-                  }}
+                  color="primary"
+                  disabled={isLoading}
                 >
-                  Add Question
+                  {isLoading ? <CircularProgress size={24} /> : 'Add Question'}
                 </Button>
               </Box>
-            </Box>
+            </form>
+          </Paper>
 
-            {/* Questions List */}
-            <Box sx={{ mt: 6 }}>
-              <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-                Existing Questions
-              </Typography>
-              <Box sx={{ 
-                display: 'grid', 
-                gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: '1fr 1fr 1fr' },
-                gap: 3 
-              }}>
-                {Array.isArray(questions) && questions.length > 0 ? questions.map((question) => (
-                  <Box 
-                    key={question.id}
-                    sx={{
-                      p: 3,
-                      borderRadius: 2,
-                      background: 'rgba(18, 18, 18, 0.8)',
-                      backdropFilter: 'blur(10px)',
-                      boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
-                      position: 'relative'
-                    }}
-                  >
-                    <Typography variant="h6" sx={{ mb: 2, pr: 4 }}>
-                      {question.question}
-                    </Typography>
-                    
-                    <Box sx={{ position: 'absolute', top: 12, right: 12 }}>
-                      <Button 
-                        variant="text" 
-                        color="error"
-                        onClick={() => question.id && handleDeleteQuestion(question.id)}
-                        sx={{ minWidth: 'auto', p: 0.5 }}
-                      >
-                        X
-                      </Button>
-                    </Box>
-
-                    <Typography variant="body2" sx={{ mb: 1, opacity: 0.7 }}>
-                      Category: {question.category}
-                    </Typography>
-                    
-                    <Typography variant="body2" sx={{ mb: 2, opacity: 0.7 }}>
-                      Difficulty: {question.difficulty}
-                    </Typography>
-
-                    <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-                      Options:
-                    </Typography>
-                    
-                    <Box component="ul" sx={{ pl: 2, mb: 2 }}>
-                      {question.options.map((option, index) => (
-                        <Typography 
-                          component="li" 
-                          key={index} 
-                          sx={{ 
-                            color: option === question.correctAnswer ? '#43cea2' : 'white',
-                            fontWeight: option === question.correctAnswer ? 'bold' : 'normal'
-                          }}
-                        >
-                          {option} {option === question.correctAnswer && '✓'}
-                        </Typography>
-                      ))}
-                    </Box>
-                  </Box>
-                )) : (
-                  <Box sx={{ p: 3, textAlign: 'center' }}>
-                    <Typography variant="body1">
-                      No questions found. Add your first question using the form above.
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-            </Box>
-          </Box>
-        )}
+          <Typography variant="h6" gutterBottom>
+            Existing Questions
+          </Typography>
+          <Paper>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Question</TableCell>
+                    <TableCell>Category</TableCell>
+                    <TableCell>Difficulty</TableCell>
+                    <TableCell>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {questions.length > 0 ? (
+                    questions.map((question) => (
+                      <TableRow key={question.id}>
+                        <TableCell>{question.question}</TableCell>
+                        <TableCell>{question.category}</TableCell>
+                        <TableCell>{question.difficulty}</TableCell>
+                        <TableCell>
+                          <IconButton 
+                            color="error" 
+                            onClick={() => question.id && handleDeleteQuestion(question.id)}
+                            disabled={isLoading}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} align="center">
+                        No questions found. Add a question to get started.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </Box>
       </TabPanel>
 
-      {/* Season Management Tab */}
       <TabPanel value={tabValue} index={1}>
         <SeasonManager />
       </TabPanel>

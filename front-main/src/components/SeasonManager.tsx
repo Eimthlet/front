@@ -21,6 +21,8 @@ import {
   Tab,
   CircularProgress,
   IconButton,
+  Alert,
+  Snackbar
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -83,75 +85,50 @@ interface ApiError extends Error {
   };
 }
 
-interface SeasonManagerProps {}
-
-// Utility function to format dates
-const formatDate = (date: Date): string => {
-  return date.toISOString().split('T')[0];
-};
-
-const SeasonManager: React.FC<SeasonManagerProps> = () => {
-  // Consolidated state management
+const SeasonManager: React.FC = () => {
+  // State management
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [currentSeason, setCurrentSeason] = useState<Partial<Season>>({
     name: '',
     start_date: new Date().toISOString().split('T')[0],
     end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     is_active: false,
-    is_qualification_round: false,
-    minimum_score_percentage: 50
   });
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [openDialog, setOpenDialog] = useState(false);
   const [openQuestionsDialog, setOpenQuestionsDialog] = useState(false);
+  const [openQualifiedUsersDialog, setOpenQualifiedUsersDialog] = useState(false);
   const [selectedSeasonId, setSelectedSeasonId] = useState<number | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [qualifiedUsers, setQualifiedUsers] = useState<QualifiedUser[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<Question>({
     question_text: '',
     options: ['', '', '', ''],
     correct_answer: ''
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [openQualifiedUsersDialog, setOpenQualifiedUsersDialog] = useState(false);
-  const [qualifiedUsers, setQualifiedUsers] = useState<QualifiedUser[]>([]);
   const [tabValue, setTabValue] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   // Fetch seasons on component mount
-  const fetchSeasons = useCallback(async () => {
-    try {
-      setLoading(true);
-      // The response is already unwrapped by apiClient
-      const seasonsData = await api.get<Season[] | ApiResponse<Season[]>>('/admin/seasons');
-      
-      // Handle both direct array response and wrapped response
-      if (Array.isArray(seasonsData)) {
-        setSeasons(seasonsData);
-      } else if (seasonsData && 'data' in seasonsData && Array.isArray(seasonsData.data)) {
-        setSeasons(seasonsData.data);
-      } else {
-        console.error('Unexpected API response format:', seasonsData);
-        setError('Unexpected data format received from server');
-        setSeasons([]);
-      }
-      setError(null);
-    } catch (err: unknown) {
-      console.error('Error fetching seasons:', err);
-      const apiError = err as ApiError;
-      const errorMessage = apiError.response?.data?.message || 
-                         apiError.response?.data?.error || 
-                         apiError.message || 
-                         'Failed to fetch seasons';
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-  
   useEffect(() => {
+    const fetchSeasons = async () => {
+      try {
+        setLoading(true);
+        const response = await api.get<ApiResponse<Season[]>>('/seasons');
+        setSeasons(response.data.data);
+      } catch (err) {
+        const error = err as ApiError;
+        setError(error.response?.data?.message || 'Failed to fetch seasons');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchSeasons();
-  }, [fetchSeasons]);
-  
+  }, []);
+
   // Handle tab change
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -160,7 +137,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
   // Dialog handlers
   const handleCloseDialog = () => {
     setOpenDialog(false);
-    setError(null);
+    setCurrentSeason({});
   };
 
   const handleCloseQuestionsDialog = () => {
@@ -178,14 +155,10 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
   };
 
   // Handle opening the dialog
-  const handleOpenDialog = (mode: 'create' | 'edit', season?: Season) => {
+  const handleOpenDialog = useCallback((mode: 'create' | 'edit', season?: Season) => {
     setDialogMode(mode);
     if (mode === 'edit' && season) {
-      setCurrentSeason({
-        ...season,
-        start_date: season.start_date.split('T')[0],
-        end_date: season.end_date.split('T')[0]
-      });
+      setCurrentSeason(season);
     } else {
       setCurrentSeason({
         name: '',
@@ -197,69 +170,54 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
       });
     }
     setOpenDialog(true);
-  };
+  }, []);
 
   // Handle opening the questions dialog
-  const handleOpenQuestionsDialog = async (seasonId: number | string) => {
-    const numSeasonId = Number(seasonId);
-    setSelectedSeasonId(numSeasonId);
-    setQuestions([]);
-    setCurrentQuestion({
-      question_text: '',
-      options: ['', '', '', ''],
-      correct_answer: ''
-    });
-    
+  const handleOpenQuestionsDialog = useCallback(async (seasonId: number | string) => {
     try {
-      type QuestionsResponse = Question[] | ApiResponse<Question[]>;
-      const response = await api.get<QuestionsResponse>(`/admin/seasons/${numSeasonId}/questions`);
-      // Handle both direct array response and wrapped response
-      const questions: Question[] = Array.isArray(response) 
-        ? response 
-        : 'data' in response && Array.isArray(response.data) 
-          ? response.data 
-          : [];
-      setQuestions(questions);
+      setLoading(true);
+      setSelectedSeasonId(Number(seasonId));
+      
+      // Fetch questions for the season
+      const response = await api.get<ApiResponse<Question[]>>(`/seasons/${seasonId}/questions`);
+      setQuestions(response.data.data);
+      
       setOpenQuestionsDialog(true);
-    } catch (err: unknown) {
-      console.error('Error fetching season questions:', err);
-      const apiError = err as ApiError;
-      const errorMessage = apiError.response?.data?.message || 
-                         apiError.response?.data?.error || 
-                         apiError.message || 
-                         'Failed to load questions';
-      setError(errorMessage);
+    } catch (err) {
+      const error = err as ApiError;
+      setError(error.response?.data?.message || 'Failed to fetch questions');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   // Handle opening qualified users dialog
-  const handleOpenQualifiedUsersDialog = async (seasonId: number | string) => {
-    const numSeasonId = Number(seasonId);
-    setQualifiedUsers([]);
-    
+  const handleOpenQualifiedUsersDialog = useCallback(async (seasonId: number | string) => {
     try {
-      type UsersResponse = QualifiedUser[] | ApiResponse<QualifiedUser[]>;
-      const response = await api.get<UsersResponse>(`/admin/seasons/${numSeasonId}/qualified-users`);
-      // Handle both direct array response and wrapped response
-      const users: QualifiedUser[] = Array.isArray(response)
-        ? response
-        : 'data' in response && Array.isArray(response.data)
-          ? response.data
-          : [];
-      setQualifiedUsers(users);
+      setLoading(true);
+      setSelectedSeasonId(Number(seasonId));
+      
+      // Fetch qualified users for the season
+      const response = await api.get<ApiResponse<QualifiedUser[]>>(`/seasons/${seasonId}/qualified-users`);
+      setQualifiedUsers(response.data.data);
+      
       setOpenQualifiedUsersDialog(true);
-    } catch (err: unknown) {
-      console.error('Error fetching qualified users:', err);
-      const apiError = err as ApiError;
-      const errorMessage = apiError.response?.data?.message || 
-                         apiError.response?.data?.error || 
-                         apiError.message || 
-                         'Failed to load qualified users';
-      setError(errorMessage);
+    } catch (err) {
+      const error = err as ApiError;
+      setError(error.response?.data?.message || 'Failed to fetch qualified users');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
-  // Handle question form changes
+  // Handle form changes
+  const handleSeasonChange = useCallback((field: keyof Season, value: any) => {
+    setCurrentSeason(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  }, []);
+
   const handleQuestionChange = useCallback((field: keyof Question, value: string) => {
     setCurrentQuestion(prev => ({
       ...prev,
@@ -268,149 +226,103 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
   }, []);
 
   const handleOptionChange = useCallback((index: number, value: string) => {
+    const newOptions = [...currentQuestion.options];
+    newOptions[index] = value;
     setCurrentQuestion(prev => ({
       ...prev,
-      options: prev.options.map((option, i) => i === index ? value : option)
+      options: newOptions
     }));
-  }, []);
+  }, [currentQuestion.options]);
+
+  // Form submissions
+  const handleSubmitSeason = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      if (dialogMode === 'create') {
+        await api.post<ApiResponse<Season>>('/seasons', currentSeason);
+        setSuccess('Season created successfully');
+      } else if (currentSeason.id) {
+        await api.put<ApiResponse<Season>>(`/seasons/${currentSeason.id}`, currentSeason);
+        setSuccess('Season updated successfully');
+      }
+      
+      // Refresh seasons
+      const response = await api.get<ApiResponse<Season[]>>('/seasons');
+      setSeasons(response.data.data);
+      
+      handleCloseDialog();
+    } catch (err) {
+      const error = err as ApiError;
+      setError(error.response?.data?.message || 'Failed to save season');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentSeason, dialogMode]);
 
   const handleSubmitQuestions = useCallback(async () => {
-    if (!selectedSeasonId) return;
-
-    // Validate question data
-    if (!currentQuestion.question_text.trim()) {
-      setError('Question text is required');
-      return;
-    }
-    
-    if (currentQuestion.options.some(option => !option.trim())) {
-      setError('All options must be filled');
-      return;
-    }
-    
-    if (!currentQuestion.correct_answer.trim()) {
-      setError('Correct answer is required');
-      return;
-    }
-
     try {
-      await api.post<ApiResponse<void>>(`/admin/seasons/${selectedSeasonId}/questions`, { questions: [currentQuestion] });
-      const updatedQuestionsResponse = await api.get<Question[]>(`/seasons/${selectedSeasonId}/questions`);
-      setQuestions(updatedQuestionsResponse.data);
+      if (!selectedSeasonId) return;
+      
+      setLoading(true);
+      
+      if (currentQuestion.id) {
+        await api.put<ApiResponse<Question>>(
+          `/seasons/${selectedSeasonId}/questions/${currentQuestion.id}`,
+          currentQuestion
+        );
+        setSuccess('Question updated successfully');
+      } else {
+        await api.post<ApiResponse<Question>>(
+          `/seasons/${selectedSeasonId}/questions`,
+          currentQuestion
+        );
+        setSuccess('Question added successfully');
+      }
+      
+      // Refresh questions
+      const response = await api.get<ApiResponse<Question[]>>(
+        `/seasons/${selectedSeasonId}/questions`
+      );
+      setQuestions(response.data.data);
+      
+      // Reset form
       setCurrentQuestion({
         question_text: '',
         options: ['', '', '', ''],
         correct_answer: ''
       });
-      setError(null);
-    } catch (err: unknown) {
-      console.error('Error submitting questions:', err);
-      const apiError = err as ApiError;
-      const errorMessage = apiError.response?.data?.message || 
-                         apiError.response?.data?.error || 
-                         apiError.message || 
-                         'Failed to submit questions';
-      setError(errorMessage);
-    }
-  }, [selectedSeasonId, currentQuestion]);
-
-  // Handle season form changes
-  const handleSeasonChange = useCallback((field: keyof Season, value: string | boolean | number) => {
-    setCurrentSeason(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  }, []);
-
-  // Handle season form submission
-  const handleSubmitSeason = useCallback(async () => {
-    if (!currentSeason) return;
-    
-    try {
-      // Validate required fields
-      if (!currentSeason.name?.trim()) {
-        setError('Season name is required');
-        return;
-      }
-      if (!currentSeason.start_date) {
-        setError('Start date is required');
-        return;
-      }
-      if (!currentSeason.end_date) {
-        setError('End date is required');
-        return;
-      }
-
-      // Prepare season data
-      const seasonData: Omit<Season, 'id'> = {
-        name: currentSeason.name,
-        start_date: currentSeason.start_date,
-        end_date: currentSeason.end_date,
-        is_active: currentSeason.is_active || false,
-        is_qualification_round: currentSeason.is_qualification_round || false,
-        minimum_score_percentage: currentSeason.minimum_score_percentage || 50,
-        description: currentSeason.description || '',
-        question_count: currentSeason.question_count || 0,
-        attempts_count: currentSeason.attempts_count || 0,
-        qualified_users_count: currentSeason.qualified_users_count || 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      console.log('Submitting season data:', JSON.stringify(seasonData, null, 2));
-      
-      if (dialogMode === 'create') {
-        await api.post<ApiResponse<Season>>(`/admin/seasons`, seasonData);
-      } else if (currentSeason.id) {
-        await api.put<ApiResponse<Season>>(`/admin/seasons/${currentSeason.id}`, seasonData);
-      } else {
-        throw new Error('Cannot update season: No season ID provided');
-      }
-      
-      // Refresh seasons
-      await fetchSeasons();
-      setOpenDialog(false);
-      setError(null);
-      
-    } catch (err: unknown) {
-      console.error('Error submitting season:', err);
-      const apiError = err as ApiError;
-      const errorMessage = apiError.response?.data?.message || 
-                         apiError.response?.data?.error || 
-                         apiError.message || 
-                         'Failed to save season';
-      setError(errorMessage);
-    }
-  }, [dialogMode, currentSeason, fetchSeasons]);
-
-  // Handle season deletion
-  const handleDeleteSeason = async (id: number | string) => {
-    if (!window.confirm('Are you sure you want to delete this season? This action cannot be undone.')) {
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      await api.delete<ApiResponse<void>>(`/admin/seasons/${Number(id)}`);
-      await fetchSeasons();
-      setError(null);
-    } catch (err: unknown) {
-      console.error('Error deleting season:', err);
-      
-      const apiError = err as ApiError;
-      const errorMessage = apiError.response?.data?.message || 
-                         apiError.response?.data?.error || 
-                         apiError.message || 
-                         'Failed to delete season';
-      
-      setError(errorMessage);
+    } catch (err) {
+      const error = err as ApiError;
+      setError(error.response?.data?.message || 'Failed to save question');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentQuestion, selectedSeasonId]);
+
+  // Delete handlers
+  const handleDeleteSeason = useCallback(async (id: number | string) => {
+    if (!window.confirm('Are you sure you want to delete this season?')) return;
+    
+    try {
+      setLoading(true);
+      await api.delete(`/seasons/${id}`);
+      
+      // Refresh seasons
+      const response = await api.get<ApiResponse<Season[]>>('/seasons');
+      setSeasons(response.data.data);
+      
+      setSuccess('Season deleted successfully');
+    } catch (err) {
+      const error = err as ApiError;
+      setError(error.response?.data?.message || 'Failed to delete season');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   // Filter seasons based on tab selection
-  const getFilteredSeasons = () => {
+  const getFilteredSeasons = useCallback(() => {
     if (!Array.isArray(seasons)) return [];
     
     switch (tabValue) {
@@ -421,7 +333,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
       default: // All Seasons
         return seasons;
     }
-  };
+  }, [seasons, tabValue]);
 
   if (loading) {
     return (
@@ -433,6 +345,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
 
   return (
     <Box sx={{ p: 3 }}>
+      {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" component="h1">
           Season Manager
@@ -446,18 +359,27 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
         </Button>
       </Box>
       
+      {/* Error/Success Messages */}
       {error && (
-        <Box sx={{ mb: 2, p: 2, bgcolor: 'error.light', borderRadius: 1 }}>
-          <Typography color="error">{error}</Typography>
-        </Box>
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
       )}
       
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+          {success}
+        </Alert>
+      )}
+      
+      {/* Tabs */}
       <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 2 }}>
         <Tab label="All Seasons" />
         <Tab label="Active Seasons" />
         <Tab label="Qualification Rounds" />
       </Tabs>
       
+      {/* Seasons Table */}
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -475,21 +397,38 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
             {getFilteredSeasons().map(season => (
               <TableRow key={season.id}>
                 <TableCell>{season.name}</TableCell>
-                <TableCell>{season.start_date} - {season.end_date}</TableCell>
+                <TableCell>
+                  {new Date(season.start_date).toLocaleDateString()} - {new Date(season.end_date).toLocaleDateString()}
+                </TableCell>
                 <TableCell>
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     {season.is_active && (
-                      <Typography variant="caption" sx={{ bgcolor: 'success.light', px: 1, borderRadius: 1 }}>
+                      <Typography variant="caption" sx={{ 
+                        bgcolor: 'success.light', 
+                        color: 'white',
+                        px: 1, 
+                        borderRadius: 1 
+                      }}>
                         Active
                       </Typography>
                     )}
                     {season.is_qualification_round && (
-                      <Typography variant="caption" sx={{ bgcolor: 'info.light', px: 1, borderRadius: 1 }}>
+                      <Typography variant="caption" sx={{ 
+                        bgcolor: 'info.light', 
+                        color: 'white',
+                        px: 1, 
+                        borderRadius: 1 
+                      }}>
                         Qualification
                       </Typography>
                     )}
                     {!season.is_active && !season.is_qualification_round && (
-                      <Typography variant="caption" sx={{ bgcolor: 'grey.300', px: 1, borderRadius: 1 }}>
+                      <Typography variant="caption" sx={{ 
+                        bgcolor: 'grey.400', 
+                        color: 'white',
+                        px: 1, 
+                        borderRadius: 1 
+                      }}>
                         Inactive
                       </Typography>
                     )}
@@ -539,7 +478,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
           </TableBody>
         </Table>
       </TableContainer>
-      
+
       {/* Questions Dialog */}
       <Dialog 
         open={openQuestionsDialog} 
@@ -558,6 +497,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
               value={currentQuestion.question_text}
               onChange={(e) => handleQuestionChange('question_text', e.target.value)}
             />
+            
             {currentQuestion.options.map((option, index) => (
               <TextField
                 key={index}
@@ -567,6 +507,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
                 onChange={(e) => handleOptionChange(index, e.target.value)}
               />
             ))}
+            
             <TextField
               fullWidth
               label="Correct Answer"
@@ -595,8 +536,13 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseQuestionsDialog}>Cancel</Button>
-          <Button onClick={handleSubmitQuestions} variant="contained" color="primary">
-            Add Question
+          <Button 
+            onClick={handleSubmitQuestions} 
+            variant="contained" 
+            color="primary"
+            disabled={loading}
+          >
+            {loading ? 'Saving...' : 'Save Question'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -648,11 +594,11 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Main Dialog */}
+      {/* Season Form Dialog */}
       <Dialog 
         open={openDialog} 
         onClose={handleCloseDialog} 
-        maxWidth="md" 
+        maxWidth="sm" 
         fullWidth
       >
         <DialogTitle>{dialogMode === 'create' ? 'Create New Season' : 'Edit Season'}</DialogTitle>
@@ -720,8 +666,13 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSubmitSeason} variant="contained" color="primary">
-            {dialogMode === 'create' ? 'Create' : 'Update'}
+          <Button 
+            onClick={handleSubmitSeason} 
+            variant="contained" 
+            color="primary"
+            disabled={loading}
+          >
+            {loading ? 'Saving...' : (dialogMode === 'create' ? 'Create' : 'Update')}
           </Button>
         </DialogActions>
       </Dialog>
