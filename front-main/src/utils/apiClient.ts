@@ -55,9 +55,28 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // For non-authentication endpoints, ensure they start with /api
-    if (config.url && !config.url.startsWith('/auth/') && !config.url.startsWith('/api/')) {
-      config.url = `/api${config.url}`;
+        if (config.url) {
+      // Remove any leading slashes
+      let cleanUrl = config.url.replace(/^\/+/, '');
+      
+      // Handle auth endpoints (should not have /api prefix)
+      if (cleanUrl.startsWith('auth/')) {
+        config.url = `/${cleanUrl}`;
+      } 
+      // Handle admin endpoints (should have /api prefix)
+      else if (cleanUrl.startsWith('admin/')) {
+        config.url = `/api/${cleanUrl}`;
+      }
+      // User-facing routes that don't need /api prefix
+      else if (['quiz', 'questions', 'results', 'progress', 'leaderboard', 'qualification'].some(route => cleanUrl.startsWith(route))) {
+        config.url = `/${cleanUrl}`;
+      }
+      // For any other endpoints, add /api prefix if not already present
+      else if (!cleanUrl.startsWith('api/')) {
+        config.url = `/api/${cleanUrl}`;
+      } else {
+        config.url = `/${cleanUrl}`;
+      }
     }
     
     // Log the request URL for debugging
