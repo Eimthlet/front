@@ -51,13 +51,13 @@ apiClient.interceptors.request.use(
     }
     
         if (config.url) {
-      // Remove any leading slashes
-      let cleanUrl = config.url.replace(/^\/+/, '');
-      
       // Skip URL modification for full URLs
-      if (cleanUrl.startsWith('http')) {
+      if (config.url.startsWith('http')) {
         return config;
       }
+
+      // Remove any leading slashes
+      let cleanUrl = config.url.replace(/^\/+/, '');
       
       // Handle auth endpoints (should not have /api prefix)
       if (cleanUrl.startsWith('auth/')) {
@@ -65,16 +65,20 @@ apiClient.interceptors.request.use(
       } 
       // Handle admin endpoints (should not have /api prefix)
       else if (cleanUrl.startsWith('admin/') || cleanUrl.startsWith('api/admin/')) {
-        // Remove any existing /api prefix to be safe
+        // Remove any existing /api prefix
         cleanUrl = cleanUrl.replace(/^api\//, '');
         config.url = `/${cleanUrl}`;
       }
-      // For all other requests, add /api prefix
+      // For all other requests that don't start with /api, add it
       else if (!cleanUrl.startsWith('api/')) {
         config.url = `/api/${cleanUrl}`;
       } else {
+        // If it already starts with api/, just ensure it has a leading slash
         config.url = `/${cleanUrl}`;
       }
+      
+      // Log the final URL for debugging
+      console.log(`Processed URL: ${config.url}`);
     }
     
     // Log the request URL for debugging (without sensitive data)
