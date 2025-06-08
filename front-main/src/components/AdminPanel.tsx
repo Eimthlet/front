@@ -138,7 +138,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     }
   }, [selectedSeasonId, updateError, clearError]);
 
-  // Fetch seasons
+  // Fetch seasons - FIXED VERSION
   const fetchSeasons = useCallback(async () => {
     try {
       clearError();
