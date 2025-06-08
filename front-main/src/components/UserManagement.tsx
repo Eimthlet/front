@@ -91,11 +91,7 @@ interface PaginationData {
   totalPages: number;
 }
 
-// Users API response type
-interface UsersApiResponse {
-  users: User[];
-  pagination: PaginationData;
-}
+// Using direct array response from API
 
 interface UserResponse {
   user: User;
