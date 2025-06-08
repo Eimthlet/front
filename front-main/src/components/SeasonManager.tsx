@@ -115,7 +115,7 @@ const SeasonManager: React.FC = () => {
     const fetchSeasons = async () => {
       try {
         setLoading(true);
-        const response = await api.get<ApiResponse<Season[]>>('/api/seasons'); // updated endpoint
+        const response = await api.get<ApiResponse<Season[]>>('/admin/seasons');
         setSeasons(response.data.data);
       } catch (err) {
         const error = err as ApiError;
