@@ -64,12 +64,6 @@ interface QualifiedUser {
   completed_at: string;
 }
 
-interface ApiResponse<T> {
-  data: T;
-  message?: string;
-  success?: boolean;
-}
-
 interface ApiError extends Error {
   response?: {
     data?: {
@@ -110,24 +104,14 @@ const SeasonManager: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Helper function to extract data from API response
-  const extractApiData = <T,>(response: any): T => {
-    // Handle both wrapped ApiResponse and direct response
-    if (response && typeof response === 'object' && 'data' in response) {
-      return response.data;
-    }
-    return response;
-  };
-
   // Fetch seasons on component mount
   useEffect(() => {
     const fetchSeasons = async () => {
       try {
         setLoading(true);
         setError('');
-        const response = await api.get<Season[]>('/admin/seasons');
-        const seasonsData = extractApiData<Season[]>(response);
-        setSeasons(Array.isArray(seasonsData) ? seasonsData : []);
+        const data = await api.get<Season[]>('/admin/seasons');
+        setSeasons(Array.isArray(data) ? data : []);
       } catch (err: any) {
         console.error('Error fetching seasons:', err);
         setError(err.message || 'Failed to fetch seasons');
@@ -190,8 +174,7 @@ const SeasonManager: React.FC = () => {
       setSelectedSeasonId(Number(seasonId));
       
       // Fetch questions for the season
-      const response = await api.get<Question[]>(`/admin/seasons/${seasonId}/questions`);
-      const questionsData = extractApiData<Question[]>(response);
+      const questionsData = await api.get<Question[]>(`/admin/seasons/${seasonId}/questions`);
       setQuestions(Array.isArray(questionsData) ? questionsData : []);
       
       setOpenQuestionsDialog(true);
@@ -211,8 +194,7 @@ const SeasonManager: React.FC = () => {
       setSelectedSeasonId(Number(seasonId));
       
       // Fetch qualified users for the season
-      const response = await api.get<QualifiedUser[]>(`/admin/seasons/${seasonId}/qualified-users`);
-      const usersData = extractApiData<QualifiedUser[]>(response);
+      const usersData = await api.get<QualifiedUser[]>(`/admin/seasons/${seasonId}/qualified-users`);
       setQualifiedUsers(Array.isArray(usersData) ? usersData : []);
       
       setOpenQualifiedUsersDialog(true);
@@ -267,8 +249,7 @@ const SeasonManager: React.FC = () => {
       }
       
       // Refresh seasons
-      const response = await api.get<Season[]>('/admin/seasons');
-      const seasonsData = extractApiData<Season[]>(response);
+      const seasonsData = await api.get<Season[]>('/admin/seasons');
       setSeasons(Array.isArray(seasonsData) ? seasonsData : []);
       
       handleCloseDialog();
@@ -301,10 +282,9 @@ const SeasonManager: React.FC = () => {
       }
       
       // Refresh questions
-      const response = await api.get<Question[]>(
+      const questionsData = await api.get<Question[]>(
         `/admin/seasons/${selectedSeasonId}/questions`
       );
-      const questionsData = extractApiData<Question[]>(response);
       setQuestions(Array.isArray(questionsData) ? questionsData : []);
       
       // Reset form
@@ -331,8 +311,7 @@ const SeasonManager: React.FC = () => {
       await api.delete(`/admin/seasons/${id}`);
       
       // Refresh seasons
-      const response = await api.get<Season[]>('/admin/seasons');
-      const seasonsData = extractApiData<Season[]>(response);
+      const seasonsData = await api.get<Season[]>('/admin/seasons');
       setSeasons(Array.isArray(seasonsData) ? seasonsData : []);
       
       setSuccess('Season deleted successfully');

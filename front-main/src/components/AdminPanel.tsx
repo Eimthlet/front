@@ -126,8 +126,9 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       setIsLoading(true);
       clearError();
       const response = await api.get<Question[]>(`/admin/seasons/${selectedSeasonId}/questions`);
-      // Extract the data from ApiResponse
-      const questionsData = response?.data ?? [];
+      
+      // Fix: Handle response properly - response should already be the data array
+      const questionsData = Array.isArray(response) ? response : [];
       setQuestions(questionsData);
     } catch (error) {
       console.error('Error fetching questions:', error);
@@ -143,8 +144,9 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     try {
       clearError();
       const response = await api.get<Season[]>('/admin/seasons');
-      // Extract the data from ApiResponse
-      const seasonsData = response?.data ?? [];
+      
+      // Fix: Handle response properly - response should already be the data array
+      const seasonsData = Array.isArray(response) ? response : [];
       setSeasons(seasonsData);
       if (seasonsData.length > 0 && !selectedSeasonId) {
         setSelectedSeasonId(seasonsData[0].id);
@@ -277,13 +279,13 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       clearError();
       const response = await api.delete<ApiResponse<{ message: string }>>(`/admin/questions/${questionId}`);
       
-      // Handle the response properly
-      const data = response?.data || response;
-      if (data && (data.success !== false)) {
+      // Fix: Handle the response properly based on your API structure
+      // Check if the response indicates success (adjust based on your actual API response structure)
+      if (response) {
         await fetchQuestions();
         updateSuccess('Question deleted successfully!');
       } else {
-        throw new Error(data?.message || 'Failed to delete question');
+        throw new Error('Failed to delete question');
       }
     } catch (error) {
       console.error('Error deleting question:', error);

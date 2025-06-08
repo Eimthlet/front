@@ -8,14 +8,6 @@ export interface ApiResponse<T = any> {
   success?: boolean;
 }
 
-// Define types for API responses
-export interface ApiResponse<T = any> {
-  data: T;
-  error?: string;
-  message?: string;
-  success?: boolean;
-}
-
 // Define request config interface
 interface RequestConfig {
   headers?: Record<string, string>;
@@ -23,17 +15,13 @@ interface RequestConfig {
   [key: string]: any;
 }
 
-// Define the API client type
+// Define the API client type - returns unwrapped data, not ApiResponse
 type ApiClient = {
-  get: <T = any>(url: string, config?: any) => Promise<ApiResponse<T>>;
-  post: <T = any, D = any>(url: string, data?: D, config?: any) => Promise<ApiResponse<T>>;
-  put: <T = any, D = any>(url: string, data?: D, config?: any) => Promise<ApiResponse<T>>;
-  delete: <T = any>(url: string, config?: any) => Promise<ApiResponse<T>>;
+  get: <T = any>(url: string, config?: any) => Promise<T>;
+  post: <T = any, D = any>(url: string, data?: D, config?: any) => Promise<T>;
+  put: <T = any, D = any>(url: string, data?: D, config?: any) => Promise<T>;
+  delete: <T = any>(url: string, config?: any) => Promise<T>;
 };
-
-// Helper type to unwrap the response type
-type UnwrapApiResponse<T> = T extends Promise<infer U> ? U : T;
-type AxiosResponse<T> = { data: T };
 
 // Determine the API base URL based on the environment
 const getBaseUrl = () => {
@@ -68,6 +56,15 @@ const apiClient = axios.create({
     'Accept': 'application/json'
   }
 });
+
+// Helper function to extract data from API response
+const extractApiData = <T,>(response: any): T => {
+  // Handle both wrapped ApiResponse and direct response
+  if (response && typeof response === 'object' && 'data' in response) {
+    return response.data;
+  }
+  return response;
+};
 
 // Request interceptor
 apiClient.interceptors.request.use(
@@ -152,33 +149,45 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Create typed API methods with proper Promise handling
+// Create typed API methods that return unwrapped data
 const api: ApiClient = {
   get: <T = any>(url: string, config?: any) => 
     new Promise<T>((resolve, reject) => {
       apiClient.get<T>(url, config)
-        .then((response) => resolve(response.data))
+        .then((response) => {
+          const data = extractApiData<T>(response.data);
+          resolve(data);
+        })
         .catch(reject);
     }),
     
   post: <T = any, D = any>(url: string, data?: D, config?: any) => 
     new Promise<T>((resolve, reject) => {
       apiClient.post<T>(url, data, config)
-        .then((response) => resolve(response.data))
+        .then((response) => {
+          const responseData = extractApiData<T>(response.data);
+          resolve(responseData);
+        })
         .catch(reject);
     }),
     
   put: <T = any, D = any>(url: string, data?: D, config?: any) => 
     new Promise<T>((resolve, reject) => {
       apiClient.put<T>(url, data, config)
-        .then((response) => resolve(response.data))
+        .then((response) => {
+          const responseData = extractApiData<T>(response.data);
+          resolve(responseData);
+        })
         .catch(reject);
     }),
     
   delete: <T = any>(url: string, config?: any) => 
     new Promise<T>((resolve, reject) => {
       apiClient.delete<T>(url, config)
-        .then((response) => resolve(response.data))
+        .then((response) => {
+          const responseData = extractApiData<T>(response.data);
+          resolve(responseData);
+        })
         .catch(reject);
     })
 };
