@@ -77,7 +77,7 @@ const AdminDiagnostic: React.FC = () => {
       setApiTest({
         success: false,
         message: 'Failed to connect to admin endpoint',
-        error
+        error: error as Error
       });
     } finally {
       setLoading(false);

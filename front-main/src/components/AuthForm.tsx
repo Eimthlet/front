@@ -126,8 +126,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
   // Check for pending registration
   const checkPendingRegistration = async (emailToCheck: string): Promise<PendingRegistrationResponse | null> => {
     try {
-      const { data } = await apiClient.post<PendingRegistrationResponse>('/auth/check-pending-registration', { email: emailToCheck });
-      return data;
+      const response = await apiClient.post<PendingRegistrationResponse>('/auth/check-pending-registration', { email: emailToCheck });
+      return response;
     } catch (error) {
       console.error('Error checking pending registration:', error);
       return null;
@@ -137,12 +137,12 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
   // Resume payment for pending registration
   const resumePayment = async (originalTxRef: string, email: string): Promise<ResumePaymentResponse> => {
     try {
-      const { data } = await apiClient.post<ResumePaymentResponse>('/auth/resume-payment', {
+      const response = await apiClient.post<ResumePaymentResponse>('/auth/resume-payment', {
         tx_ref: 'TX' + Date.now() + Math.floor(Math.random() * 1000000),
         original_tx_ref: originalTxRef,
         email
       });
-      return data;
+      return response;
     } catch (error) {
       console.error('Error resuming payment:', error);
       throw error;
@@ -259,7 +259,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
           email: string;
         }
         
-        const { data: regResult } = await apiClient.post<RegisterResponse>(endpoint, payload);
+        const regResult = await apiClient.post<RegisterResponse>(endpoint, payload);
         
         if (!regResult || !regResult.tx_ref || !regResult.public_key) {
           setError('Registration initiation failed. Please try again.');
