@@ -123,11 +123,14 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     
     try {
       setIsLoading(true);
-      const { data } = await api.get<Question[]>(`/admin/seasons/${selectedSeasonId}/questions`);
-      setQuestions(Array.isArray(data) ? data : []);
+      const response = await api.get<Question[]>(`/admin/seasons/${selectedSeasonId}/questions`);
+      // The response is already unwrapped by the API client
+      const questions = response?.data || [];
+      setQuestions(questions);
     } catch (error) {
       console.error('Error fetching questions:', error);
       updateError('Error', 'Failed to load questions');
+      setQuestions([]);
     } finally {
       setIsLoading(false);
     }
@@ -136,8 +139,9 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   // Fetch seasons
   const fetchSeasons = useCallback(async () => {
     try {
-      const { data } = await api.get<Season[]>('/admin/seasons');
-      const seasonsData = Array.isArray(data) ? data : [];
+      const response = await api.get<Season[]>('/admin/seasons');
+      // The response is already unwrapped by the API client
+      const seasonsData = response?.data || [];
       setSeasons(seasonsData);
       if (seasonsData.length > 0 && !selectedSeasonId) {
         setSelectedSeasonId(seasonsData[0].id);
@@ -145,6 +149,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     } catch (error) {
       console.error('Error fetching seasons:', error);
       updateError('Error', 'Failed to load seasons');
+      setSeasons([]);
     }
   }, [selectedSeasonId, updateError]);
 
@@ -236,17 +241,9 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       }
 
       // Submit the question
-      const { data } = await api.post<ApiResponse<Question>>(`/admin/seasons/${selectedSeasonId}/questions`, newQuestion);
-      if (data) {
-        if (data.success) {
-          await fetchQuestions();
-          updateSuccess('Question added successfully!');
-        } else {
-          throw new Error(data.message || 'Failed to add question');
-        }
-      } else {
-        throw new Error('No response data received');
-      }
+      await api.post(`/admin/seasons/${selectedSeasonId}/questions`, newQuestion);
+      updateSuccess('Question added successfully!');
+      await fetchQuestions();
       
       // Reset form
       setNewQuestion({
