@@ -131,4 +131,5 @@ export const fixAdminToken = async (): Promise<{ success: boolean; message: stri
   }
 };
 
-export default { checkAdminStatus, fixAdminToken };
+const adminUtils = { checkAdminStatus, fixAdminToken };
+export default adminUtils;

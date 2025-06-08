@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
-import { API_CONFIG, AUTH_CONFIG, PAYMENT_CONFIG } from '../config';
+import { PAYMENT_CONFIG } from '../config';
 import { Checkbox, FormControlLabel, Link, IconButton } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -24,24 +24,19 @@ interface ResumePaymentResponse {
 }
 
 // Helper function to generate UUID using Web Crypto API instead of Node.js crypto
-function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0;
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
-}
+};
 
 interface AuthFormProps {
   mode: 'login' | 'register';
 }
 
-interface JwtPayload {
-  id: number;
-  email: string;
-  isAdmin?: boolean;
-  exp?: number;
-}
+// JwtPayload interface moved to a separate types file
 
 interface PayChanguConfig {
   public_key: string;
@@ -65,22 +60,6 @@ interface PayChanguConfig {
     response: string;
   };
 }
-
-interface ApiError {
-  response?: {
-    status: number;
-    statusText: string;
-    data: {
-      error?: string;
-      message?: string;
-    };
-    headers?: Record<string, string>;
-  };
-  message: string;
-  name: string;
-  stack?: string;
-}
-
 
 interface PendingRegistrationResponse {
   success: boolean;

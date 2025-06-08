@@ -1,82 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../utils/apiClient';
 import './AdminDashboard.css';
-import SeasonManager from './SeasonManager';
 
-// Remove any leftover fragments
-
-interface NonAdminUser {
-  id: string;
-  username: string;
-  email: string;
-  average_score: number;
-  total_games: number;
-  highest_score: number;
-  lowest_score: number;
-}
-
-interface InsightsStats {
-  averageScore: number;
-  mostPlayedGame: string;
-  leastPlayedGame: string;
-  insights: Array<{
-    id: string;
-    username: string;
-    insight: string;
-    average_score: number;
-    total_games: number;
-  }>;
-  totalUsers: number;
-  nonAdminUsers: NonAdminUser[];
+interface ActivityItem {
+  id: number;
+  type: string;
+  timestamp: string;
+  details: string;
 }
 
 interface DashboardStats {
   totalUsers: number;
   totalQuizzes: number;
   averageScore: number;
-  recentActivity: Array<{
-    id: number;
-    type: string;
-    timestamp: string;
-    details: string;
-  }>;
+  recentActivity: ActivityItem[];
 }
 
-interface DashboardResponse {
+interface DashboardApiResponse {
   totalUsers: number;
   totalQuizzes: number;
   averageScore: number;
-  recentActivity: Array<{
-    id: number;
-    type: string;
-    timestamp: string;
-    details: string;
-  }>;
+  recentActivity: ActivityItem[];
 }
 
 interface ApiResponse<T> {
-  data: T;
+  data?: T;
   error?: string;
-}
-
-interface DashboardStatsResponse {
-  data: {
-    totalUsers: number;
-    totalQuizzes: number;
-    averageScore: number;
-    recentActivity: Array<{
-      id: number;
-      type: string;
-      timestamp: string;
-      details: string;
-    }>;
-  };
-  error?: string;
-}
-
-interface ErrorState {
-  message: string;
-  isError: boolean;
 }
 
 const AdminDashboard: React.FC = () => {
@@ -90,26 +39,19 @@ const AdminDashboard: React.FC = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch insights stats
-      const response = await apiClient.get<ApiResponse<DashboardResponse> | DashboardResponse>('/api/admin/insights-stats');
-      
-      // Check if the response is an error response
-      if ('error' in response && response.error) {
-        throw new Error(response.error);
-      }
-      
-      // Handle both response formats
-      const dashboardData = 'data' in response ? response.data : response;
+      // Fetch dashboard stats with proper typing
+      const response = await apiClient.get<DashboardApiResponse>('/api/admin/dashboard-stats');
       
       setStats({
-        totalUsers: dashboardData.totalUsers,
-        totalQuizzes: dashboardData.totalQuizzes,
-        averageScore: dashboardData.averageScore,
-        recentActivity: dashboardData.recentActivity || []
+        totalUsers: response.totalUsers || 0,
+        totalQuizzes: response.totalQuizzes || 0,
+        averageScore: response.averageScore || 0,
+        recentActivity: response.recentActivity || []
       });
-    } catch (error) {
+    } catch (err) {
+      const error = err as Error;
       console.error('Error fetching dashboard data:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch dashboard data');
+      setError(error.message || 'Failed to fetch dashboard data');
     }
   };
 
