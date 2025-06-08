@@ -54,20 +54,26 @@ apiClient.interceptors.request.use(
       // Remove any leading slashes
       let cleanUrl = config.url.replace(/^\/+/, '');
       
+      // Skip URL modification for full URLs
+      if (cleanUrl.startsWith('http')) {
+        return config;
+      }
+      
       // Handle auth endpoints (should not have /api prefix)
       if (cleanUrl.startsWith('auth/')) {
         config.url = `/${cleanUrl}`;
       } 
       // Handle admin endpoints (should not have /api prefix)
-      else if (cleanUrl.startsWith('admin/')) {
+      else if (cleanUrl.startsWith('admin/') || cleanUrl.startsWith('api/admin/')) {
+        // Remove any existing /api prefix to be safe
+        cleanUrl = cleanUrl.replace(/^api\//, '');
         config.url = `/${cleanUrl}`;
       }
       // For all other requests, add /api prefix
-      else {
-        // Remove any existing /api prefix to avoid duplication
-        cleanUrl = cleanUrl.replace(/^api\//, '');
-        // Add /api prefix for non-auth, non-admin endpoints
+      else if (!cleanUrl.startsWith('api/')) {
         config.url = `/api/${cleanUrl}`;
+      } else {
+        config.url = `/${cleanUrl}`;
       }
     }
     

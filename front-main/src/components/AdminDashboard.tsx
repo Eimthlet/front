@@ -34,7 +34,7 @@ const AdminDashboard: React.FC = () => {
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      const response = await apiClient.get<DashboardApiResponse>('/api/admin/dashboard-stats');
+      const response = await apiClient.get<DashboardApiResponse>('/admin/dashboard-stats');
       
       setStats({
         totalUsers: response.totalUsers || 0,
