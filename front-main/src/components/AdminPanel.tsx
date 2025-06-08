@@ -95,7 +95,8 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const [tabValue, setTabValue] = useState(0);
   const [adminCheckFailed, setAdminCheckFailed] = useState(false);
   const [seasons, setSeasons] = useState<Season[]>([]);
-  const [questions, setQuestions] = useState<Question[] | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+
   const [newQuestion, setNewQuestion] = useState<Omit<Question, 'id'>>({
     question: '',
     options: ['', '', '', ''],
@@ -123,9 +124,10 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     
     try {
       setIsLoading(true);
+      clearError();
       const response = await api.get<Question[]>(`/admin/seasons/${selectedSeasonId}/questions`);
-      // The response is already unwrapped by the API client
-      const questions = response?.data || [];
+      // Handle both ApiResponse<Question[]> and Question[] response types
+      const questions = Array.isArray(response) ? response : (response?.data || []);
       setQuestions(questions);
     } catch (error) {
       console.error('Error fetching questions:', error);
@@ -134,24 +136,25 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedSeasonId, updateError]);
+  }, [selectedSeasonId, updateError, clearError]);
 
   // Fetch seasons
-const fetchSeasons = useCallback(async () => {
-  try {
-    const response = await api.get<Season[]>('/admin/seasons');
-    // The response is already unwrapped by the API client
-    const seasonsData = response?.data || [];
-    setSeasons(seasonsData);
-    if (seasonsData.length > 0 && !selectedSeasonId) {
-      setSelectedSeasonId(seasonsData[0].id);
+  const fetchSeasons = useCallback(async () => {
+    try {
+      clearError();
+      const response = await api.get<Season[]>('/admin/seasons');
+      // Handle both ApiResponse<Season[]> and Season[] response types
+      const seasonsData = Array.isArray(response) ? response : (response?.data || []);
+      setSeasons(seasonsData);
+      if (seasonsData.length > 0 && !selectedSeasonId) {
+        setSelectedSeasonId(seasonsData[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching seasons:', error);
+      updateError('Error', 'Failed to load seasons');
+      setSeasons([]);
     }
-  } catch (error) {
-    console.error('Error fetching seasons:', error);
-    updateError('Error', 'Failed to load seasons');
-    setSeasons([]);
-  }
-}, [selectedSeasonId, updateError]);
+  }, [selectedSeasonId, updateError, clearError]);
 
   // Check admin status on component mount
   useEffect(() => {
@@ -271,16 +274,16 @@ const fetchSeasons = useCallback(async () => {
 
     try {
       setIsLoading(true);
-      const { data } = await api.delete<ApiResponse<{ message: string }>>(`/admin/questions/${questionId}`);
-      if (data) {
-        if (data.success) {
-          await fetchQuestions();
-          updateSuccess('Question deleted successfully!');
-        } else {
-          throw new Error(data.message || 'Failed to delete question');
-        }
+      clearError();
+      const response = await api.delete<ApiResponse<{ message: string }>>(`/admin/questions/${questionId}`);
+      
+      // Handle the response properly
+      const data = response?.data || response;
+      if (data && (data.success !== false)) {
+        await fetchQuestions();
+        updateSuccess('Question deleted successfully!');
       } else {
-        throw new Error('No response data received');
+        throw new Error(data?.message || 'Failed to delete question');
       }
     } catch (error) {
       console.error('Error deleting question:', error);
@@ -483,7 +486,11 @@ const fetchSeasons = useCallback(async () => {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={4} align="center">
-                        No questions found. Add a question to get started.
+                        {isLoading ? (
+                          <CircularProgress size={24} />
+                        ) : (
+                          'No questions found. Add a question to get started.'
+                        )}
                       </TableCell>
                     </TableRow>
                   )}
