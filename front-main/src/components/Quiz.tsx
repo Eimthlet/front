@@ -17,7 +17,7 @@ import {
   loadQuizSession,
   clearQuizSession
 } from '../utils/session';
-import apiClient, { ApiResponse } from '../utils/apiClient'; 
+import api from '../utils/apiClient'; 
 import { handleApiError } from '../utils/apiErrorHandler'; 
 
 // Types for Quiz component
@@ -207,8 +207,8 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
   useEffect(() => {
     const checkQualification = async () => {
       try {
-        // The response is already unwrapped by apiClient
-        const qualificationData = await apiClient.get<QualificationResponse>('/qualification');
+        // The response is already unwrapped by the api wrapper
+        const qualificationData = await api.get<QualificationResponse>('/qualification');
         
         // Type guard to validate the response data structure
         if (!qualificationData || typeof qualificationData !== 'object') {
