@@ -50,22 +50,12 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [qualification, setQualification] = useState<QualificationResponse | null>(null);
   
-  // Helper type to narrow down the qualification response
+  // Type to narrow down the qualification response
   type QualificationApiResponse = {
     hasAttempted: boolean;
     isQualified?: boolean;
     qualifies_for_next_round?: boolean;
     [key: string]: any; // Allow additional properties
-  };
-  
-  // Helper function to safely extract data from API response
-  const getResponseData = <T,>(response: any): T => {
-    // If the response is an Axios response object, return its data
-    if (response && typeof response === 'object' && 'data' in response) {
-      return response.data;
-    }
-    // Otherwise, assume it's already the data
-    return response;
   };
   
   // Define the QuizQuestion type that matches what the Quiz component expects

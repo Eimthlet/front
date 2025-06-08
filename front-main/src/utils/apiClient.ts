@@ -8,13 +8,6 @@ export interface ApiResponse<T = any> {
   success?: boolean;
 }
 
-// Define request config interface
-interface RequestConfig {
-  headers?: Record<string, string>;
-  params?: Record<string, any>;
-  [key: string]: any;
-}
-
 // Define the API client type - returns unwrapped data, not ApiResponse
 type ApiClient = {
   get: <T = any>(url: string, config?: any) => Promise<T>;
