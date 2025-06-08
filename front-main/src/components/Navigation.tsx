@@ -78,7 +78,7 @@ const Navigation: React.FC = () => {
         <>
           <Button
             color="inherit"
-            onClick={() => navigate('/admin/panel')}
+            onClick={() => navigate('/admin')}
             startIcon={<AdminPanelSettingsIcon />}
             sx={{ mr: 2 }}
           >

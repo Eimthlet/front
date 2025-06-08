@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -34,7 +34,21 @@ import SearchIcon from '@mui/icons-material/SearchOutlined';
 import RefreshIcon from '@mui/icons-material/RefreshOutlined';
 import api from '../utils/apiClient';
 
-// Types
+// API Response Types
+interface ApiResponse<T> {
+  data: T;
+  message?: string;
+  error?: string;
+  status?: number;
+  statusText?: string;
+}
+
+interface UsersApiResponse {
+  users: User[];
+  pagination: PaginationData;
+}
+
+// Component Types
 interface User {
   id: number;
   username: string;
@@ -137,16 +151,100 @@ const UserManagement: React.FC<UserManagementProps> = () => {
       if (roleFilter) queryParams.append('role', roleFilter);
       if (statusFilter) queryParams.append('status', statusFilter);
       
-      const data = await api.get<UsersResponse>(`/admin/users?${queryParams.toString()}`);
-
-      if (data && data.users) {
-        setUsers(data.users || []);
-      } else {
-        setUsers([]);
-      }
+      const apiUrl = `/admin/users?${queryParams.toString()}`;
+      console.log('Fetching users from:', apiUrl);
       
-      if (data && data.pagination) {
-        setPagination(data.pagination);
+      // Log the auth token being used
+      const token = localStorage.getItem('token');
+      console.log('Using auth token:', token ? 'Token exists' : 'No token found');
+      
+      try {
+        // Make the API call with proper typing
+        // The API returns an Axios response with data of type UsersApiResponse
+        const response = await api.get<UsersApiResponse>(apiUrl);
+        
+        // The response object has status and data properties from Axios
+        const { status, data: responseData } = response as unknown as { 
+          status: number; 
+          data: UsersApiResponse 
+        };
+        
+        console.log('Users API response status:', status);
+        console.log('Users API response data:', responseData);
+
+        // Check if we got a successful response with data
+        if (status >= 200 && status < 300) {
+          if (!responseData) {
+            console.warn('No data in response');
+            setUsers([]);
+            return;
+          }
+          
+          const { users, pagination: paginationData } = responseData;
+          console.log('Users data received:', { users, pagination: paginationData });
+          
+          // Update users state
+          if (Array.isArray(users)) {
+            console.log(`Found ${users.length} users`);
+            setUsers(users);
+          } else {
+            console.warn('Users is not an array:', users);
+            setUsers([]);
+          }
+          
+          // Update pagination state
+          if (paginationData) {
+            console.log('Pagination data:', paginationData);
+            setPagination(prev => ({
+              ...prev,
+              ...paginationData,
+              total: paginationData.total || 0,
+              page: paginationData.page || 1,
+              limit: paginationData.limit || prev.limit,
+              totalPages: paginationData.totalPages || Math.ceil((paginationData.total || 0) / (paginationData.limit || prev.limit))
+            }));
+          } else {
+            console.warn('No pagination data in response');
+            // Set default pagination based on users array
+            const total = Array.isArray(users) ? users.length : 0;
+            setPagination(prev => ({
+              ...prev,
+              total,
+              totalPages: Math.ceil(total / prev.limit)
+            }));
+          }
+        } else {
+          console.warn('API returned non-success status:', status);
+          setUsers([]);
+        }
+      } catch (error: unknown) {
+        const apiError = error as {
+          message?: string;
+          response?: {
+            status?: number;
+            headers?: any;
+            data?: any;
+          };
+          config?: {
+            url?: string;
+            method?: string;
+            headers?: any;
+          };
+        };
+        
+        console.error('API Error details:', {
+          message: apiError.message || 'Unknown error',
+          response: apiError.response?.data,
+          status: apiError.response?.status,
+          headers: apiError.response?.headers,
+          config: {
+            url: apiError.config?.url,
+            method: apiError.config?.method,
+            headers: apiError.config?.headers
+          }
+        });
+        
+        throw error;
       }
     } catch (err: any) {
       console.error('Error fetching users:', err);
