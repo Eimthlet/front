@@ -6,7 +6,6 @@ import apiClient from '../utils/apiClient';
 const AdminDiagnostic: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [adminStatus, setAdminStatus] = useState<any>(null);
-  const [fixResult, setFixResult] = useState<any>(null);
   const [apiTest, setApiTest] = useState<any>(null);
   const [tokenDetails, setTokenDetails] = useState<any>(null);
 
@@ -53,14 +52,11 @@ const AdminDiagnostic: React.FC = () => {
   const fixAdminIssue = async () => {
     setLoading(true);
     try {
-      const result = await fixAdminToken();
-      setFixResult(result);
-      
+      await fixAdminToken();
       // Refresh admin status after fix attempt
       await checkStatus();
     } catch (error) {
       console.error('Error fixing admin token:', error);
-      setFixResult({ success: false, message: 'Error during fix attempt', error });
     } finally {
       setLoading(false);
     }

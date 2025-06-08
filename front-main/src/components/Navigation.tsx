@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { 
   AppBar, 
-  Box, 
   Toolbar, 
   Typography, 
   Button, 
@@ -18,12 +17,10 @@ import LoginIcon from '@mui/icons-material/Login';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { useAuth } from '../contexts/AuthContext';
 // Using HelpOutline icon as a fallback
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import LeaderboardIcon from '@mui/icons-material/Leaderboard';
 import MenuIcon from '@mui/icons-material/Menu';
-import HomeIcon from '@mui/icons-material/Home';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
+import LeaderboardIcon from '@mui/icons-material/Leaderboard';
 import { styled, Theme } from '@mui/material/styles';
 
 const StyledAppBar = styled(AppBar)(({ theme }: { theme: Theme }) => ({
@@ -75,7 +72,7 @@ const Navigation: React.FC = () => {
     setAnchorEl(null);
   };
 
-  const isActive = (path: string) => location.pathname === path;
+  // Removed unused isActive function
 
   const handleLogout = () => {
     logout();

@@ -26,8 +26,8 @@ interface ResumePaymentResponse {
 // Helper function to generate UUID using Web Crypto API instead of Node.js crypto
 const generateUUID = (): string => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    const r = Math.floor(Math.random() * 16);
+    const v = c === 'x' ? r : ((r & 0x3) | 0x8);
     return v.toString(16);
   });
 };
@@ -121,8 +121,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
   const navigate = useNavigate();
   const { login: authLogin, isAdmin, error: authError, clearError } = useAuth();
 
-  const [hasPendingRegistration, setHasPendingRegistration] = useState(false);
-  const [pendingTxRef, setPendingTxRef] = useState('');
+  // Removed unused state variables
 
   // Check for pending registration
   const checkPendingRegistration = async (emailToCheck: string): Promise<PendingRegistrationResponse | null> => {
@@ -516,7 +515,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
             <span>Already have an account? <button type="button" onClick={handleSwitchMode}>Login</button></span>
           )}
         </div>
-        {(error || authError) && !hasPendingRegistration && (
+        {(error || authError) && (
           <div className="auth-error">
             <p>{error || authError}</p>
             {error && error.includes('already pending for this email') && (
@@ -529,20 +528,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
                 {loading ? 'Checking...' : 'Check Pending Registration'}
               </button>
             )}
-          </div>
-        )}
-        
-        {hasPendingRegistration && (
-          <div className="pending-registration">
-            <p>You have a pending registration that requires payment completion.</p>
-            <button 
-              type="button" 
-              onClick={() => resumePayment(pendingTxRef, email)}
-              disabled={loading}
-              className="resume-payment-btn"
-            >
-              {loading ? 'Processing...' : 'Complete Payment'}
-            </button>
           </div>
         )}
       </form>

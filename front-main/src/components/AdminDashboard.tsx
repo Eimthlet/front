@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '../utils/apiClient';
 import './AdminDashboard.css';
 
@@ -23,11 +23,6 @@ interface DashboardApiResponse {
   recentActivity: ActivityItem[];
 }
 
-interface ApiResponse<T> {
-  data?: T;
-  error?: string;
-}
-
 const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
@@ -36,10 +31,11 @@ const AdminDashboard: React.FC = () => {
     recentActivity: []
   });
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
-      // Fetch dashboard stats with proper typing
+      setLoading(true);
       const response = await apiClient.get<DashboardApiResponse>('/api/admin/dashboard-stats');
       
       setStats({
@@ -48,12 +44,19 @@ const AdminDashboard: React.FC = () => {
         averageScore: response.averageScore || 0,
         recentActivity: response.recentActivity || []
       });
+      setError(null);
     } catch (err) {
       const error = err as Error;
       console.error('Error fetching dashboard data:', error);
       setError(error.message || 'Failed to fetch dashboard data');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   return (
     <div className="admin-dashboard">
