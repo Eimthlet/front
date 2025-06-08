@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Typography, ToggleButton, ToggleButtonGroup, Box, CircularProgress, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Typography, ToggleButton, ToggleButtonGroup, Box, CircularProgress, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { motion, AnimatePresence } from 'framer-motion';
 import apiClient from '../utils/apiClient';
@@ -53,7 +53,7 @@ const Leaderboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchLeaderboard = async () => {
+  const fetchLeaderboard = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -67,11 +67,11 @@ const Leaderboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchLeaderboard();
-  }, []);
+  }, [fetchLeaderboard]);
 
   if (loading) {
     return (
