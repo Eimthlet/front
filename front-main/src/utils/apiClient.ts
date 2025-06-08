@@ -31,9 +31,9 @@ const getBaseUrl = () => {
   // Remove any trailing slashes
   baseUrl = baseUrl.replace(/\/+$/, '');
   
-  // Add /api if not already in the URL
-  if (!baseUrl.endsWith('/api')) {
-    baseUrl += '/api';
+  // Don't add /api for authentication endpoints
+  if (baseUrl.endsWith('/api')) {
+    baseUrl = baseUrl.replace(/\/api$/, '');
   }
   
   return baseUrl;
