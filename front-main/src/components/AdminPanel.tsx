@@ -1,24 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/apiClient';
 import SeasonManager from './SeasonManager';
-import {
-  Box,
-  Button,
-  TextField,
-  Typography,
-  Alert,
-  CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Snackbar,
-  Tabs,
-  Tab,
-  SelectChangeEvent
+import { 
+  Box, 
+  Button, 
+  TextField, 
+  Typography, 
+  Alert, 
+  CircularProgress, 
+  FormControl, 
+  InputLabel, 
+  Select, 
+  MenuItem, 
+  Snackbar, 
+  Tabs, 
+  Tab, 
+  SelectChangeEvent 
 } from '@mui/material';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 // Define Season interface with all required fields
 interface Season {
@@ -109,15 +110,36 @@ function a11yProps(index: number) {
 
 const AdminPanel: React.FC<AdminPanelProps> = () => {
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user, logout } = useAuth();
+  
+  // State variables with proper types
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [selectedSeasonId, setSelectedSeasonId] = useState<number | null>(null);
   const [error, setError] = useState<ErrorState | null>(null);
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isVerifying, setIsVerifying] = useState(true);
   const [tabValue, setTabValue] = useState(0);
-  const [selectedSeasonId, setSelectedSeasonId] = useState<number | null>(null);
-  const [seasons, setSeasons] = useState<Season[]>([]);
-  const [newQuestion, setNewQuestion] = useState<Question>({
+  const [adminCheckFailed, setAdminCheckFailed] = useState(false);
+
+  // Helper functions for error handling and state management
+  const updateError = (message: string, details?: string) => {
+    setError({ message, details });
+  };
+
+  const clearError = () => setError(null);
+  
+  const updateSuccess = (message: string) => {
+    setSuccess(message);
+    setTimeout(() => setSuccess(''), 5000); // Auto-clear after 5 seconds
+  };
+  
+  const clearSuccess = () => setSuccess('');
+  const setLoadingState = (loading: boolean) => setIsLoading(loading);
+
+  // Form state
+  const [newQuestion, setNewQuestion] = useState<Omit<Question, 'id'>>({
     question: '',
     options: ['', '', '', ''],
     correctAnswer: '',
@@ -125,7 +147,54 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     category: 'General Knowledge',
     difficulty: 'Medium'
   });
-
+  
+  // Form handlers
+  const handleQuestionChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setNewQuestion(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  const handleOptionChange = (index: number, value: string) => {
+    const newOptions = [...newQuestion.options];
+    newOptions[index] = value;
+    setNewQuestion(prev => ({
+      ...prev,
+      options: newOptions
+    }));
+  };
+  
+  const handleCategoryChange = (e: SelectChangeEvent) => {
+    setNewQuestion(prev => ({
+      ...prev,
+      category: e.target.value as string
+    }));
+  };
+  
+  const handleDifficultyChange = (e: SelectChangeEvent) => {
+    setNewQuestion(prev => ({
+      ...prev,
+      difficulty: e.target.value as string
+    }));
+  };
+  
+  const handleTimeLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewQuestion(prev => ({
+      ...prev,
+      timeLimit: parseInt(e.target.value, 10) || 30
+    }));
+  };
+  
+  const handleCorrectAnswerChange = (e: SelectChangeEvent) => {
+    setNewQuestion(prev => ({
+      ...prev,
+      correctAnswer: e.target.value as string
+    }));
+  };
+  
+  // Handle tab change
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
@@ -133,23 +202,39 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   // Function to handle question submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!selectedSeasonId) {
-      setError({ message: 'Please select a season' });
+      updateError(
+        'No Season Selected',
+        'Please select a season before adding a question.'
+      );
       return;
     }
-    const questionData = {
-      question: newQuestion.question,
-      options: newQuestion.options,
-      correctAnswer: newQuestion.correctAnswer,
-      timeLimit: newQuestion.timeLimit,
-      category: newQuestion.category,
-      difficulty: newQuestion.difficulty,
-      season_id: selectedSeasonId
-    };
 
     try {
-      await api.post('/admin/questions', questionData);
-      setSuccess('Question added successfully');
+      setIsLoading(true);
+      clearError();
+      
+      // Validate question data
+      if (!newQuestion.question.trim()) {
+        throw new Error('Question text is required');
+      }
+      
+      if (newQuestion.options.some(opt => !opt.trim())) {
+        throw new Error('All options must be filled');
+      }
+      
+      if (!newQuestion.correctAnswer) {
+        throw new Error('Please select the correct answer');
+      }
+      
+      // Submit the question
+      await api.post(`/admin/seasons/${selectedSeasonId}/questions`, newQuestion);
+      
+      // Refresh questions
+      await fetchQuestions();
+      
+      // Reset form
       setNewQuestion({
         question: '',
         options: ['', '', '', ''],
@@ -158,13 +243,15 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
         category: 'General Knowledge',
         difficulty: 'Medium'
       });
-      fetchQuestions();
-    } catch (err: unknown) {
-      const apiError = err as ApiError;
-      setError({
-        message: apiError.message || 'Failed to add question',
-        details: apiError.response?.data?.details
-      });
+      
+      updateSuccess('Question added successfully!');
+      
+    } catch (error) {
+      console.error('Error adding question:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to add question';
+      updateError('Error', errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -183,8 +270,64 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     }
   };
 
-  // Fetch seasons when component mounts
+  // Verify admin status on component mount
   useEffect(() => {
+    let isMounted = true;
+    
+    const verifyAdminStatus = async () => {
+      // Skip if already verified or checking
+      if (!isVerifying || adminCheckFailed) return;
+      
+      try {
+        const response = await api.get<{ isAdmin: boolean }>('/auth/verify-admin');
+        
+        if (!isMounted) return;
+        
+        if (!response.isAdmin) {
+          console.error('User is not an admin');
+          setAdminCheckFailed(true);
+          updateError(
+            'Access Denied',
+            'You do not have permission to access the admin panel.'
+          );
+          // Redirect to home after a delay
+          setTimeout(() => navigate('/'), 3000);
+          return;
+        }
+        
+        // If we get here, user is verified as admin
+        setAdminCheckFailed(false);
+        clearError();
+        
+      } catch (error) {
+        if (!isMounted) return;
+        
+        console.error('Error verifying admin status:', error);
+        setAdminCheckFailed(true);
+        updateError(
+          'Authentication Error',
+          'Failed to verify admin privileges. Please log in again.'
+        );
+        // Redirect to login after a delay
+        setTimeout(() => navigate('/login'), 3000);
+      } finally {
+        if (isMounted) {
+          setIsVerifying(false);
+        }
+      }
+    };
+
+    verifyAdminStatus();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate, isVerifying, adminCheckFailed]);
+
+  // Fetch seasons when admin is verified
+  useEffect(() => {
+    if (adminCheckFailed) return;
+    
     const fetchSeasons = async () => {
       try {
         const seasonsData = await api.get<Season[]>('/admin/seasons');
@@ -203,12 +346,26 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       }
     };
     fetchSeasons();
-  }, []);
+  }, [adminCheckFailed]);
 
-  // Function to fetch questions
-  const fetchQuestions = async () => {
+  // Fetch questions when selected season changes
+  const fetchQuestions = useCallback(async () => {
+    if (!selectedSeasonId) return;
+    
     try {
       setIsLoading(true);
+      clearError();
+      
+      // First try to fetch questions for the selected season
+      try {
+        const questionsData = await api.get<Question[]>(`/admin/seasons/${selectedSeasonId}/questions`);
+        setQuestions(questionsData);
+        return; // Success, exit the function
+      } catch (seasonError) {
+        console.warn('Failed to fetch questions by season, falling back to all questions:', seasonError);
+      }
+      
+      // Fallback to fetching all questions if season-specific fetch fails
       const response = await api.get<Question[] | QuestionsResponse>('/admin/questions');
       
       // The response is already unwrapped by apiClient
@@ -218,42 +375,53 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
         // Handle the case where questions are nested in a 'questions' property
         setQuestions(response.questions);
       } else {
-        console.error('Unexpected API response format:', response);
-        setQuestions([]);
-        setError({
-          message: 'Failed to load questions',
-          details: 'Unexpected data format received from server'
-        });
+        throw new Error('Unexpected data format received from server');
       }
-    } catch (err: unknown) {
+      
+    } catch (err) {
       console.error('Error fetching questions:', err);
-      const apiError = err as ApiError;
-      setError({ 
-        message: apiError.message || 'Failed to fetch questions',
-        details: apiError.response?.data?.details
-      });
+      updateError(
+        'Failed to fetch questions',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
       setQuestions([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedSeasonId]);
 
-  // Fetch questions when component mounts
+  // Fetch questions when selected season changes
   useEffect(() => {
-    fetchQuestions();
-  }, []);
+    if (selectedSeasonId) {
+      fetchQuestions();
+    }
+  }, [selectedSeasonId, fetchQuestions]);
 
   // Check if user is admin and redirect if not
   useEffect(() => {
-    // Check if user is authenticated and has admin privileges
-    console.log('Admin panel access check:', { isAdmin });
+    const checkAdminStatus = async () => {
+      try {
+        // Check if user is authenticated and has admin privileges
+        const response = await api.get<{ isAdmin: boolean }>('/auth/verify-admin');
+        
+        if (!response.isAdmin) {
+          console.log('Non-admin user attempting to access admin panel');
+          navigate('/login');
+        } else {
+          setIsVerifying(false);
+        }
+      } catch (error) {
+        console.error('Error verifying admin status:', error);
+        setAdminCheckFailed(true);
+        updateError(
+          'Authentication Error',
+          'You must be logged in as an administrator to access this page.'
+        );
+      }
+    };
 
-    // Check if user is admin
-    if (!isAdmin) {
-      console.log('Non-admin user attempting to access admin panel');
-      navigate('/login');
-    }
-  }, [isAdmin, navigate]);
+    checkAdminStatus();
+  }, [navigate]);
 
   return (
     <Box sx={{ 
@@ -287,9 +455,49 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
 
       {/* Question Management Tab */}
       <TabPanel value={tabValue} index={0}>
-        {isLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-            <CircularProgress sx={{ color: 'white' }} />
+        {isVerifying ? (
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            minHeight: '70vh',
+            padding: 3
+          }}>
+            <CircularProgress size={60} thickness={4} sx={{ mb: 3 }} />
+            <Typography variant="h6" sx={{ mt: 2, color: 'text.secondary' }}>
+              Verifying admin privileges...
+            </Typography>
+          </Box>
+        ) : adminCheckFailed ? (
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            minHeight: '70vh',
+            padding: 3,
+            textAlign: 'center'
+          }}>
+            <ErrorOutlineIcon color="error" sx={{ fontSize: 60, mb: 2 }} />
+            <Typography variant="h5" color="error" gutterBottom>
+              {error?.message || 'Access Denied'}
+            </Typography>
+            <Typography variant="body1" color="text.secondary" paragraph>
+              {error?.details || 'You do not have permission to access this page.'}
+            </Typography>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              onClick={() => navigate('/')}
+              sx={{ mt: 2 }}
+            >
+              Return to Home
+            </Button>
+          </Box>
+        ) : isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+            <CircularProgress />
           </Box>
         ) : (
           <Box>

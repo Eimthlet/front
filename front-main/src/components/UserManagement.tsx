@@ -153,30 +153,23 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
       const token = localStorage.getItem('token');
       console.log('Using auth token:', token ? 'Token exists' : 'No token found');
 
-      // Make the API call using the apiClient
-      const response = await api.get(apiUrl) as UsersApiResponse;
+      // Make the API call using the apiClient with proper typing
+      const { users = [], pagination: paginationData } = await api.get<UsersApiResponse>(apiUrl);
+      console.log('API Response - Users:', users);
+      console.log(`Found ${users.length} users`);
       
-      // Handle successful response
-      if (response) {
-        const { users, pagination: paginationData } = response;
-        console.log(`Found ${users.length} users`);
-        
-        setUsers(users);
-        
-        if (paginationData) {
-          setPagination(prev => ({
-            ...prev,
-            ...paginationData,
-            total: paginationData.total || users.length,
-            page: paginationData.page || 1,
-            limit: paginationData.limit || prev.limit,
-            totalPages: paginationData.totalPages || 
-              Math.ceil((paginationData.total || users.length) / (paginationData.limit || prev.limit))
-          }));
-        }
-      } else {
-        console.warn('No data in response');
-        setUsers([]);
+      setUsers(users);
+      
+      if (paginationData) {
+        setPagination(prev => ({
+          ...prev,
+          ...paginationData,
+          total: paginationData.total || users.length,
+          page: paginationData.page || 1,
+          limit: paginationData.limit || prev.limit,
+          totalPages: paginationData.totalPages || 
+            Math.ceil((paginationData.total || users.length) / (paginationData.limit || prev.limit))
+        }));
       }
     } catch (err: unknown) {
       console.error('Error fetching users:', err);
