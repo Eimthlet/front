@@ -211,8 +211,15 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
     });
     
     try {
-      const response = await api.get<ApiResponse<Question[]>>(`/admin/seasons/${numSeasonId}/questions`);
-      setQuestions(response.data.data);
+      type QuestionsResponse = Question[] | ApiResponse<Question[]>;
+      const response = await api.get<QuestionsResponse>(`/admin/seasons/${numSeasonId}/questions`);
+      // Handle both direct array response and wrapped response
+      const questions: Question[] = Array.isArray(response) 
+        ? response 
+        : 'data' in response && Array.isArray(response.data) 
+          ? response.data 
+          : [];
+      setQuestions(questions);
       setOpenQuestionsDialog(true);
     } catch (err: unknown) {
       console.error('Error fetching season questions:', err);
@@ -231,8 +238,15 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
     setQualifiedUsers([]);
     
     try {
-      const response = await api.get<ApiResponse<QualifiedUser[]>>(`/admin/seasons/${numSeasonId}/qualified-users`);
-      setQualifiedUsers(response.data.data);
+      type UsersResponse = QualifiedUser[] | ApiResponse<QualifiedUser[]>;
+      const response = await api.get<UsersResponse>(`/admin/seasons/${numSeasonId}/qualified-users`);
+      // Handle both direct array response and wrapped response
+      const users: QualifiedUser[] = Array.isArray(response)
+        ? response
+        : 'data' in response && Array.isArray(response.data)
+          ? response.data
+          : [];
+      setQualifiedUsers(users);
       setOpenQualifiedUsersDialog(true);
     } catch (err: unknown) {
       console.error('Error fetching qualified users:', err);
