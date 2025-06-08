@@ -1,65 +1,61 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Button, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow,
-  Paper,
+import {
+  Box,
+  Button,
   Dialog,
-  DialogTitle,
-  DialogContent,
   DialogActions,
-  TextField,
+  DialogContent,
+  DialogTitle,
   FormControlLabel,
   Switch,
-  IconButton,
-  Chip,
-  Tooltip,
-  CircularProgress,
+  TextField,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Typography,
   Tabs,
   Tab,
-  Divider
+  CircularProgress,
+  IconButton,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PeopleIcon from '@mui/icons-material/People';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import CheckIcon from '@mui/icons-material/Check';
-import CloseIcon from '@mui/icons-material/Close';
-import apiClient from '../utils/apiClient';
+import api from '../utils/api';
 
+// TypeScript interfaces
 interface Season {
-  id?: string | number;
+  id: number | string;
   name: string;
   start_date: string;
   end_date: string;
   is_active: boolean;
-  is_qualification_round?: boolean;
-  minimum_score_percentage?: number;
-  created_at?: string;
-  updated_at?: string;
-  question_count?: number;
-  attempts_count?: number;
-  qualified_users_count?: number;
+  is_qualification_round: boolean;
+  minimum_score_percentage: number;
+  description?: string;
+  question_count: number;
+  attempts_count: number;
+  qualified_users_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
 interface Question {
-  id?: number;
+  id?: number | string;
   question_text: string;
   options: string[];
   correct_answer: string;
-  category?: string;
-  difficulty?: string;
+  season_id?: number | string;
 }
 
 interface QualifiedUser {
-  id: number;
+  id: number | string;
   username: string;
   email: string;
   score: number;
@@ -67,43 +63,40 @@ interface QualifiedUser {
   completed_at: string;
 }
 
-interface ApiError {
+interface ApiResponse<T> {
+  data: T;
+  message?: string;
+  success?: boolean;
+}
+
+interface ApiError extends Error {
   response?: {
-    status: number;
-    data: {
+    data?: {
       message?: string;
       error?: string;
     };
+    status?: number;
   };
-  message: string;
   config?: {
     url?: string;
     method?: string;
-    data?: unknown;
   };
 }
 
-interface SeasonsResponse {
-  data: Season[];
-}
-
-interface QuestionsResponse {
-  data: Question[];
-}
-
-interface QualifiedUsersResponse {
-  data: QualifiedUser[];
-}
-
 interface SeasonManagerProps {}
+
+// Utility function to format dates
+const formatDate = (date: Date): string => {
+  return date.toISOString().split('T')[0];
+};
 
 const SeasonManager: React.FC<SeasonManagerProps> = () => {
   // Consolidated state management
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [currentSeason, setCurrentSeason] = useState<Partial<Season>>({
     name: '',
-    start_date: new Date().toISOString(),
-    end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    start_date: new Date().toISOString().split('T')[0],
+    end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     is_active: false,
     is_qualification_round: false,
     minimum_score_percentage: 50
@@ -111,7 +104,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [openDialog, setOpenDialog] = useState(false);
   const [openQuestionsDialog, setOpenQuestionsDialog] = useState(false);
-  const [selectedSeasonId, setSelectedSeasonId] = useState<number | string | null>(null);
+  const [selectedSeasonId, setSelectedSeasonId] = useState<number | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<Question>({
     question_text: '',
@@ -125,10 +118,10 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
   const [tabValue, setTabValue] = useState(0);
 
   // Fetch seasons on component mount
-  const fetchSeasons = async () => {
+  const fetchSeasons = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get<SeasonsResponse>('/api/admin/seasons');
+      const response = await api.get<ApiResponse<Season[]>>(`/admin/seasons`);
       setSeasons(response.data.data);
       setError(null);
     } catch (err: unknown) {
@@ -142,31 +135,51 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
   
   useEffect(() => {
-    fetchSeasons().catch(console.error);
+    fetchSeasons();
   }, [fetchSeasons]);
   
   // Handle tab change
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
-  
-  // Handle dialog open/close
+
+  // Dialog handlers
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setError(null);
+  };
+
+  const handleCloseQuestionsDialog = () => {
+    setOpenQuestionsDialog(false);
+    setCurrentQuestion({
+      question_text: '',
+      options: ['', '', '', ''],
+      correct_answer: ''
+    });
+  };
+
+  const handleCloseQualifiedUsersDialog = () => {
+    setOpenQualifiedUsersDialog(false);
+    setQualifiedUsers([]);
+  };
+
+  // Handle opening the dialog
   const handleOpenDialog = (mode: 'create' | 'edit', season?: Season) => {
     setDialogMode(mode);
     if (mode === 'edit' && season) {
       setCurrentSeason({
         ...season,
-        start_date: season.start_date,
-        end_date: season.end_date
+        start_date: season.start_date.split('T')[0],
+        end_date: season.end_date.split('T')[0]
       });
     } else {
       setCurrentSeason({
         name: '',
-        start_date: new Date().toISOString(),
-        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        start_date: new Date().toISOString().split('T')[0],
+        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         is_active: false,
         is_qualification_round: false,
         minimum_score_percentage: 50
@@ -174,135 +187,176 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
     }
     setOpenDialog(true);
   };
-  
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
+
+  // Handle opening the questions dialog
+  const handleOpenQuestionsDialog = async (seasonId: number | string) => {
+    const numSeasonId = Number(seasonId);
+    setSelectedSeasonId(numSeasonId);
+    setQuestions([]);
+    setCurrentQuestion({
+      question_text: '',
+      options: ['', '', '', ''],
+      correct_answer: ''
+    });
+    
+    try {
+      const response = await api.get<ApiResponse<Question[]>>(`/admin/seasons/${numSeasonId}/questions`);
+      setQuestions(response.data.data);
+      setOpenQuestionsDialog(true);
+    } catch (err: unknown) {
+      console.error('Error fetching season questions:', err);
+      const apiError = err as ApiError;
+      const errorMessage = apiError.response?.data?.message || 
+                         apiError.response?.data?.error || 
+                         apiError.message || 
+                         'Failed to load questions';
+      setError(errorMessage);
+    }
   };
-  
+
+  // Handle opening qualified users dialog
+  const handleOpenQualifiedUsersDialog = async (seasonId: number | string) => {
+    const numSeasonId = Number(seasonId);
+    setQualifiedUsers([]);
+    
+    try {
+      const response = await api.get<ApiResponse<QualifiedUser[]>>(`/admin/seasons/${numSeasonId}/qualified-users`);
+      setQualifiedUsers(response.data.data);
+      setOpenQualifiedUsersDialog(true);
+    } catch (err: unknown) {
+      console.error('Error fetching qualified users:', err);
+      const apiError = err as ApiError;
+      const errorMessage = apiError.response?.data?.message || 
+                         apiError.response?.data?.error || 
+                         apiError.message || 
+                         'Failed to load qualified users';
+      setError(errorMessage);
+    }
+  };
+
+  // Handle question form changes
+  const handleQuestionChange = useCallback((field: keyof Question, value: string) => {
+    setCurrentQuestion(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  }, []);
+
+  const handleOptionChange = useCallback((index: number, value: string) => {
+    setCurrentQuestion(prev => ({
+      ...prev,
+      options: prev.options.map((option, i) => i === index ? value : option)
+    }));
+  }, []);
+
+  const handleSubmitQuestions = useCallback(async () => {
+    if (!selectedSeasonId) return;
+
+    // Validate question data
+    if (!currentQuestion.question_text.trim()) {
+      setError('Question text is required');
+      return;
+    }
+    
+    if (currentQuestion.options.some(option => !option.trim())) {
+      setError('All options must be filled');
+      return;
+    }
+    
+    if (!currentQuestion.correct_answer.trim()) {
+      setError('Correct answer is required');
+      return;
+    }
+
+    try {
+      await api.post<ApiResponse<void>>(`/admin/seasons/${selectedSeasonId}/questions`, { questions: [currentQuestion] });
+      const updatedQuestionsResponse = await api.get<Question[]>(`/seasons/${selectedSeasonId}/questions`);
+      setQuestions(updatedQuestionsResponse.data);
+      setCurrentQuestion({
+        question_text: '',
+        options: ['', '', '', ''],
+        correct_answer: ''
+      });
+      setError(null);
+    } catch (err: unknown) {
+      console.error('Error submitting questions:', err);
+      const apiError = err as ApiError;
+      const errorMessage = apiError.response?.data?.message || 
+                         apiError.response?.data?.error || 
+                         apiError.message || 
+                         'Failed to submit questions';
+      setError(errorMessage);
+    }
+  }, [selectedSeasonId, currentQuestion]);
+
   // Handle season form changes
-  const handleSeasonChange = (field: keyof Season, value: any) => {
+  const handleSeasonChange = useCallback((field: keyof Season, value: string | boolean | number) => {
     setCurrentSeason(prev => ({
       ...prev,
       [field]: value
     }));
-  };
-  
+  }, []);
+
   // Handle season form submission
-  const handleSubmitSeason = async () => {
+  const handleSubmitSeason = useCallback(async () => {
     if (!currentSeason) return;
     
     try {
-      // Log the raw currentSeason for debugging
-      console.log('Raw currentSeason:', JSON.parse(JSON.stringify(currentSeason)));
-      
-      // Ensure required fields are present
-      if (!currentSeason.name) throw new Error('Season name is required');
-      if (!currentSeason.start_date) throw new Error('Start date is required');
-      if (!currentSeason.end_date) throw new Error('End date is required');
-
-      // Format dates to ISO string without milliseconds
-      const formatDate = (date: Date | string): string => {
-        try {
-          const d = new Date(date);
-          if (isNaN(d.getTime())) throw new Error('Invalid date');
-          return d.toISOString().split('.')[0] + 'Z';
-        } catch (e) {
-          console.error('Error formatting date:', { date, error: e });
-          throw new Error(`Invalid date format: ${date}`);
-        }
-      };
+      // Validate required fields
+      if (!currentSeason.name?.trim()) {
+        setError('Season name is required');
+        return;
+      }
+      if (!currentSeason.start_date) {
+        setError('Start date is required');
+        return;
+      }
+      if (!currentSeason.end_date) {
+        setError('End date is required');
+        return;
+      }
 
       // Prepare season data
-      const seasonData = {
+      const seasonData: Omit<Season, 'id'> = {
         name: currentSeason.name,
-        start_date: formatDate(new Date(currentSeason.start_date!)),
-        end_date: formatDate(new Date(currentSeason.end_date!)),
-        is_active: currentSeason.is_active,
-        is_qualification_round: currentSeason.is_qualification_round,
-        minimum_score_percentage: currentSeason.minimum_score_percentage
+        start_date: currentSeason.start_date,
+        end_date: currentSeason.end_date,
+        is_active: currentSeason.is_active || false,
+        is_qualification_round: currentSeason.is_qualification_round || false,
+        minimum_score_percentage: currentSeason.minimum_score_percentage || 50,
+        description: currentSeason.description || '',
+        question_count: currentSeason.question_count || 0,
+        attempts_count: currentSeason.attempts_count || 0,
+        qualified_users_count: currentSeason.qualified_users_count || 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
       console.log('Submitting season data:', JSON.stringify(seasonData, null, 2));
       
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
+      if (dialogMode === 'create') {
+        await api.post<ApiResponse<Season>>(`/admin/seasons`, seasonData);
+      } else if (currentSeason.id) {
+        await api.put<ApiResponse<Season>>(`/admin/seasons/${currentSeason.id}`, seasonData);
+      } else {
+        throw new Error('Cannot update season: No season ID provided');
       }
       
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      };
+      // Refresh seasons
+      await fetchSeasons();
+      setOpenDialog(false);
+      setError(null);
       
-      let response;
-      try {
-        if (dialogMode === 'create') {
-          response = await apiClient.post('/api/admin/seasons', seasonData, { 
-            headers,
-            validateStatus: (status) => status < 500 // Don't throw on 4xx errors
-          });
-          console.log('Create season response:', response);
-        } else if (currentSeason.id) {
-          response = await apiClient.put(`/api/admin/seasons/${currentSeason.id}`, seasonData, { 
-            headers,
-            validateStatus: (status) => status < 500
-          });
-          console.log('Update season response:', response);
-        } else {
-          throw new Error('Cannot update season: No season ID provided');
-        }
-        
-        if (response.status >= 400) {
-          throw new Error(response.data?.message || `Request failed with status ${response.status}`);
-        }
-        
-        // Refresh seasons
-        await fetchSeasons();
-        setOpenDialog(false);
-        setError(null);
-        
-      } catch (requestError: unknown) {
-        console.error('API Request Error:', {
-          message: (requestError as ApiError).message,
-          response: (requestError as ApiError).response?.data,
-          status: (requestError as ApiError).response?.status,
-          config: {
-            url: (requestError as ApiError).config?.url,
-            method: (requestError as ApiError).config?.method,
-            data: (requestError as ApiError).config?.data
-          }
-        });
-        
-        const apiError = requestError as ApiError;
-        const errorMessage = apiError.response?.data?.message || 
-                           apiError.response?.data?.error || 
-                           apiError.message || 
-                           'Failed to submit season';
-        
-        setError(errorMessage);
-        throw new Error(errorMessage);
-      }
-    } catch (err: any) {
-      console.error('Error in handleSubmitSeason:', {
-        name: err.name,
-        message: err.message,
-        stack: err.stack,
-        ...(err.response && {
-          response: {
-            status: err.response.status,
-            statusText: err.response.statusText,
-            data: err.response.data
-          }
-        })
-      });
-      
-      // If we haven't set an error message yet, set a generic one
-      if (!error) {
-        setError(err.message || 'An unexpected error occurred');
-      }
+    } catch (err: unknown) {
+      console.error('Error submitting season:', err);
+      const apiError = err as ApiError;
+      const errorMessage = apiError.response?.data?.message || 
+                         apiError.response?.data?.error || 
+                         apiError.message || 
+                         'Failed to save season';
+      setError(errorMessage);
     }
-  };
+  }, [dialogMode, currentSeason, fetchSeasons]);
 
   // Handle season deletion
   const handleDeleteSeason = async (id: number | string) => {
@@ -312,33 +366,11 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
     
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-      
-      const numId = Number(id);
-      await apiClient.delete(`/api/admin/seasons/${numId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
-      
-      // Refresh seasons
+      await api.delete<ApiResponse<void>>(`/admin/seasons/${Number(id)}`);
       await fetchSeasons();
       setError(null);
     } catch (err: unknown) {
-      console.error('Error deleting season:', {
-        message: (err as ApiError).message,
-        response: (err as ApiError).response?.data,
-        status: (err as ApiError).response?.status,
-        config: {
-          url: (err as ApiError).config?.url,
-          method: (err as ApiError).config?.method
-        }
-      });
+      console.error('Error deleting season:', err);
       
       const apiError = err as ApiError;
       const errorMessage = apiError.response?.data?.message || 
@@ -352,109 +384,18 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
     }
   };
 
-  // Handle opening the questions dialog
-  const handleOpenQuestionsDialog = async (seasonId: number | string) => {
-    const numSeasonId = Number(seasonId);
-    setSelectedSeasonId(numSeasonId);
-    setQuestions([]);
-    setCurrentQuestion({
-      question_text: '',
-      options: ['', '', '', ''],
-      correct_answer: ''
-    });
-    try {
-      const response = await apiClient.get<QuestionsResponse>(`/api/admin/seasons/${numSeasonId}/questions`);
-      setQuestions(response.data.data);
-      setOpenQuestionsDialog(true);
-    } catch (err: any) {
-      console.error('Error fetching season questions:', err);
-      setError(err.message || 'Failed to load questions');
-    }
-  };
-
-  // Handle questions dialog
-  const handleCloseQuestionsDialog = () => {
-    setOpenQuestionsDialog(false);
-  };
-
-  // Handle question form changes
-  const handleQuestionChange = (field: string, value: any) => {
-    setCurrentQuestion(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleOptionChange = (index: number, value: string) => {
-    setCurrentQuestion(prev => {
-      const newOptions = [...prev.options];
-      newOptions[index] = value;
-      return {
-        ...prev,
-        options: newOptions
-      };
-    });
-  };
-
-  // Add question to list
-  const handleAddQuestion = () => {
-    if (!currentQuestion.question_text || !currentQuestion.correct_answer) {
-      return;
-    }
+  // Filter seasons based on tab selection
+  const getFilteredSeasons = () => {
+    if (!Array.isArray(seasons)) return [];
     
-    const tempQuestion: Question = {
-      ...currentQuestion,
-      id: questions.length + 1  // Temporary id generation
-    };
-    
-    setQuestions(prev => [...prev, tempQuestion]);
-    setCurrentQuestion({
-      question_text: '',
-      options: ['', '', '', ''],
-      correct_answer: '',
-      category: undefined,
-      difficulty: undefined
-    });
-  };
-
-  // Remove question from list
-  const handleRemoveQuestion = (index: number) => {
-    setQuestions(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Submit questions
-  const handleSubmitQuestions = async () => {
-    if (!selectedSeasonId) return;
-    
-    try {
-      await apiClient.post(`/api/admin/seasons/${selectedSeasonId}/questions`, {
-        questions: questions.map(q => q.id)
-      });
-      
-      handleCloseQuestionsDialog();
-      fetchSeasons(); // Refresh seasons list to update question count
-    } catch (err: any) {
-      console.error('Error adding questions to season:', err);
-      setError(err.message || 'Failed to add questions');
+    switch (tabValue) {
+      case 1: // Active Seasons
+        return seasons.filter(season => season.is_active);
+      case 2: // Qualification Rounds
+        return seasons.filter(season => season.is_qualification_round);
+      default: // All Seasons
+        return seasons;
     }
-  };
-
-  // Handle qualified users dialog
-  const handleOpenQualifiedUsersDialog = async (seasonId: number | string) => {
-    const numSeasonId = Number(seasonId);
-    setSelectedSeasonId(numSeasonId);
-    try {
-      const response = await apiClient.get<QualifiedUsersResponse>(`/api/admin/seasons/${numSeasonId}/qualified-users`);
-      setQualifiedUsers(response.data.data);
-      setOpenQualifiedUsersDialog(true);
-    } catch (err: any) {
-      console.error('Error fetching qualified users:', err);
-      setError(err.message || 'Failed to load qualified users');
-    }
-  };
-
-  const handleCloseQualifiedUsersDialog = () => {
-    setOpenQualifiedUsersDialog(false);
   };
 
   if (loading) {
@@ -481,7 +422,7 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
       </Box>
       
       {error && (
-        <Box sx={{ mb: 2 }}>
+        <Box sx={{ mb: 2, p: 2, bgcolor: 'error.light', borderRadius: 1 }}>
           <Typography color="error">{error}</Typography>
         </Box>
       )}
@@ -506,332 +447,163 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {(Array.isArray(seasons) ? seasons : [])
-              .filter(season => {
-                if (tabValue === 1) return season.is_active;
-                if (tabValue === 2) return season.is_qualification_round;
-                return true;
-              })
-              .map(season => (
-                <TableRow key={season.id}>
-                  <TableCell>
-                    <Typography variant="subtitle1">
-                      {season.name}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      {/* No description field in database */}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {new Date(season.start_date).toLocaleDateString()} - {new Date(season.end_date).toLocaleDateString()}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      {season.is_active && (
-                        <Chip 
-                          label="Active" 
-                          color="success" 
-                          size="small" 
-                          icon={<CheckIcon />} 
-                        />
-                      )}
-                      {season.is_qualification_round && (
-                        <Chip 
-                          label="Qualification" 
-                          color="primary" 
-                          size="small" 
-                        />
-                      )}
-                      <Tooltip title={`Minimum Score: ${season.minimum_score_percentage}%`}>
-                        <Chip 
-                          label={`${season.minimum_score_percentage}%`} 
-                          color="secondary" 
-                          size="small" 
-                        />
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
-                  <TableCell>{season.question_count}</TableCell>
-                  <TableCell>{season.attempts_count}</TableCell>
-                  <TableCell>{season.qualified_users_count}</TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Tooltip title="Edit Season">
-                        <IconButton 
-                          size="small" 
-                          color="primary" 
-                          onClick={() => handleOpenDialog('edit', season)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete Season">
-                        <IconButton 
-                          size="small" 
-                          color="error" 
-                          onClick={() => {
-                            if (typeof season.id === 'number') {
-                              handleDeleteSeason(season.id);
-                            }
-                          }}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Upload Questions">
-                        <IconButton 
-                          size="small" 
-                          color="primary" 
-                          onClick={() => handleOpenQuestionsDialog(season.id)}
-                        >
-                          <CloudUploadIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="View Qualified Users">
-                        <IconButton 
-                          size="small" 
-                          color="primary" 
-                          onClick={() => handleOpenQualifiedUsersDialog(season.id)}
-                        >
-                          <PeopleIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
+            {getFilteredSeasons().map(season => (
+              <TableRow key={season.id}>
+                <TableCell>{season.name}</TableCell>
+                <TableCell>{season.start_date} - {season.end_date}</TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    {season.is_active && (
+                      <Typography variant="caption" sx={{ bgcolor: 'success.light', px: 1, borderRadius: 1 }}>
+                        Active
+                      </Typography>
+                    )}
+                    {season.is_qualification_round && (
+                      <Typography variant="caption" sx={{ bgcolor: 'info.light', px: 1, borderRadius: 1 }}>
+                        Qualification
+                      </Typography>
+                    )}
+                    {!season.is_active && !season.is_qualification_round && (
+                      <Typography variant="caption" sx={{ bgcolor: 'grey.300', px: 1, borderRadius: 1 }}>
+                        Inactive
+                      </Typography>
+                    )}
+                  </Box>
+                </TableCell>
+                <TableCell>{season.question_count}</TableCell>
+                <TableCell>{season.attempts_count}</TableCell>
+                <TableCell>{season.qualified_users_count}</TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    <IconButton 
+                      size="small" 
+                      color="primary" 
+                      onClick={() => handleOpenDialog('edit', season)}
+                      title="Edit Season"
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton 
+                      size="small" 
+                      color="error" 
+                      onClick={() => handleDeleteSeason(season.id)}
+                      title="Delete Season"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton 
+                      size="small" 
+                      color="primary" 
+                      onClick={() => handleOpenQuestionsDialog(season.id)}
+                      title="Manage Questions"
+                    >
+                      <CloudUploadIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton 
+                      size="small" 
+                      color="primary" 
+                      onClick={() => handleOpenQualifiedUsersDialog(season.id)}
+                      title="View Qualified Users"
+                    >
+                      <PeopleIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </TableContainer>
       
-      {/* Season Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>
-          {dialogMode === 'create' ? 'Create New Season' : 'Edit Season'}
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField 
-              label="Season Name"
-              value={currentSeason.name || ''}
-              onChange={(e) => handleSeasonChange('name', e.target.value)}
-              fullWidth
-              required
-            />
-            
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <TextField
-                label="Start Date"
-                type="datetime-local"
-                value={new Date(currentSeason.start_date || new Date()).toISOString().slice(0, 16)}
-                onChange={(e) => handleSeasonChange('start_date', new Date(e.target.value).toISOString())}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-              />
-              
-              <TextField
-                label="End Date"
-                type="datetime-local"
-                value={new Date(currentSeason.end_date || new Date()).toISOString().slice(0, 16)}
-                onChange={(e) => handleSeasonChange('end_date', new Date(e.target.value).toISOString())}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-              />
-            </Box>
-            
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <FormControlLabel 
-                control={
-                  <Switch 
-                    checked={currentSeason.is_active || false}
-                    onChange={(e) => handleSeasonChange('is_active', e.target.checked)}
-                  />
-                } 
-                label="Active Season"
-              />
-              
-              <FormControlLabel 
-                control={
-                  <Switch 
-                    checked={currentSeason.is_qualification_round || false}
-                    onChange={(e) => handleSeasonChange('is_qualification_round', e.target.checked)}
-                  />
-                } 
-                label="Qualification Round"
-              />
-            </Box>
-            
-            <TextField 
-              label="Minimum Score Percentage"
-              type="number"
-              value={currentSeason.minimum_score_percentage || 50}
-              onChange={(e) => handleSeasonChange('minimum_score_percentage', parseInt(e.target.value))}
-              fullWidth
-              InputProps={{
-                inputProps: { min: 0, max: 100 }
-              }}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button 
-            variant="contained" 
-            onClick={handleSubmitSeason}
-            disabled={!currentSeason.name}
-          >
-            {dialogMode === 'create' ? 'Create' : 'Update'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
       {/* Questions Dialog */}
-      <Dialog open={openQuestionsDialog} onClose={handleCloseQuestionsDialog} maxWidth="md" fullWidth>
-        <DialogTitle>Upload Questions</DialogTitle>
+      <Dialog 
+        open={openQuestionsDialog} 
+        onClose={handleCloseQuestionsDialog} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>Manage Questions</DialogTitle>
         <DialogContent>
-          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Add a new question
-            </Typography>
-            
-            <TextField 
-              label="Question Text"
-              value={currentQuestion.question_text || ''}
-              onChange={(e) => handleQuestionChange('question_text', e.target.value)}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <TextField
               fullWidth
-              required
+              label="Question Text"
+              multiline
+              rows={3}
+              value={currentQuestion.question_text}
+              onChange={(e) => handleQuestionChange('question_text', e.target.value)}
             />
-            
-            <Typography variant="subtitle2" gutterBottom>
-              Options
-            </Typography>
-            
             {currentQuestion.options.map((option, index) => (
-              <TextField 
+              <TextField
                 key={index}
+                fullWidth
                 label={`Option ${index + 1}`}
                 value={option}
                 onChange={(e) => handleOptionChange(index, e.target.value)}
-                fullWidth
-                required
               />
             ))}
-            
-            <TextField 
-              label="Correct Answer"
-              value={currentQuestion.correct_answer || ''}
-              onChange={(e) => handleQuestionChange('correct_answer', e.target.value)}
+            <TextField
               fullWidth
-              required
-              helperText="Enter the exact text of the correct option"
+              label="Correct Answer"
+              value={currentQuestion.correct_answer}
+              onChange={(e) => handleQuestionChange('correct_answer', e.target.value)}
+              helperText="Enter the exact text of the correct answer"
             />
             
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <TextField 
-                label="Category"
-                value={currentQuestion.category || ''}
-                onChange={(e) => handleQuestionChange('category', e.target.value)}
-                fullWidth
-              />
-              
-              <TextField 
-                label="Difficulty"
-                value={currentQuestion.difficulty || ''}
-                onChange={(e) => handleQuestionChange('difficulty', e.target.value)}
-                fullWidth
-              />
-            </Box>
-            
-            <Button 
-              variant="contained" 
-              onClick={handleAddQuestion}
-              disabled={!currentQuestion.question_text || !currentQuestion.correct_answer}
-              sx={{ mt: 2 }}
-            >
-              Add Question
-            </Button>
+            {questions.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="h6" gutterBottom>Existing Questions</Typography>
+                {questions.map((q, index) => (
+                  <Box key={index} sx={{ mb: 2, p: 2, border: '1px solid #ddd', borderRadius: 1 }}>
+                    <Typography variant="body1" fontWeight="bold">{q.question_text}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Options: {q.options.join(', ')}
+                    </Typography>
+                    <Typography variant="body2" color="success.main">
+                      Correct: {q.correct_answer}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            )}
           </Box>
-          
-          {questions.length > 0 && (
-            <Box>
-              <Typography variant="h6" gutterBottom>
-                Questions to Add ({questions.length})
-              </Typography>
-              
-              <TableContainer component={Paper} sx={{ maxHeight: 300 }}>
-                <Table stickyHeader size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Question</TableCell>
-                      <TableCell>Correct Answer</TableCell>
-                      <TableCell>Category</TableCell>
-                      <TableCell>Difficulty</TableCell>
-                      <TableCell>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {questions.map((q, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{q.question_text}</TableCell>
-                        <TableCell>{q.correct_answer}</TableCell>
-                        <TableCell>{q.category || 'General'}</TableCell>
-                        <TableCell>{q.difficulty || 'Medium'}</TableCell>
-                        <TableCell>
-                          <IconButton 
-                            size="small" 
-                            color="error" 
-                            onClick={() => handleRemoveQuestion(index)}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Box>
-          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseQuestionsDialog}>Cancel</Button>
-          <Button 
-            variant="contained" 
-            onClick={handleSubmitQuestions}
-            disabled={questions.length === 0}
-          >
-            Upload Questions
+          <Button onClick={handleSubmitQuestions} variant="contained" color="primary">
+            Add Question
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* Qualified Users Dialog */}
-      <Dialog open={openQualifiedUsersDialog} onClose={handleCloseQualifiedUsersDialog} maxWidth="md" fullWidth>
+      <Dialog 
+        open={openQualifiedUsersDialog} 
+        onClose={handleCloseQualifiedUsersDialog} 
+        maxWidth="md" 
+        fullWidth
+      >
         <DialogTitle>Qualified Users</DialogTitle>
         <DialogContent>
           {qualifiedUsers.length === 0 ? (
-            <Typography sx={{ p: 2 }}>
+            <Typography sx={{ p: 2, textAlign: 'center' }}>
               No qualified users found for this season.
             </Typography>
           ) : (
-            <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
-              <Table stickyHeader>
+            <TableContainer component={Paper} sx={{ mt: 1 }}>
+              <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Rank</TableCell>
                     <TableCell>Username</TableCell>
                     <TableCell>Email</TableCell>
                     <TableCell>Score</TableCell>
                     <TableCell>Percentage</TableCell>
-                    <TableCell>Completed</TableCell>
+                    <TableCell>Completed At</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {qualifiedUsers.map((user, index) => (
+                  {qualifiedUsers.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell>{index + 1}</TableCell>
                       <TableCell>{user.username}</TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>{user.score}</TableCell>
@@ -845,7 +617,87 @@ const SeasonManager: React.FC<SeasonManagerProps> = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseQualifiedUsersDialog}>Close</Button>
+          <Button onClick={handleCloseQualifiedUsersDialog} color="primary">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Main Dialog */}
+      <Dialog 
+        open={openDialog} 
+        onClose={handleCloseDialog} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>{dialogMode === 'create' ? 'Create New Season' : 'Edit Season'}</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+            <TextField
+              fullWidth
+              label="Season Name"
+              value={currentSeason.name || ''}
+              onChange={(e) => handleSeasonChange('name', e.target.value)}
+            />
+            <TextField
+              fullWidth
+              type="date"
+              label="Start Date"
+              value={currentSeason.start_date || ''}
+              onChange={(e) => handleSeasonChange('start_date', e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              fullWidth
+              type="date"
+              label="End Date"
+              value={currentSeason.end_date || ''}
+              onChange={(e) => handleSeasonChange('end_date', e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={currentSeason.is_active || false}
+                  onChange={(e) => handleSeasonChange('is_active', e.target.checked)}
+                />
+              }
+              label="Active"
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={currentSeason.is_qualification_round || false}
+                  onChange={(e) => handleSeasonChange('is_qualification_round', e.target.checked)}
+                />
+              }
+              label="Qualification Round"
+            />
+            {currentSeason.is_qualification_round && (
+              <TextField
+                fullWidth
+                type="number"
+                label="Minimum Score Percentage"
+                value={currentSeason.minimum_score_percentage || 50}
+                onChange={(e) => handleSeasonChange('minimum_score_percentage', parseInt(e.target.value) || 50)}
+                inputProps={{ min: 0, max: 100 }}
+              />
+            )}
+            <TextField
+              fullWidth
+              label="Description (Optional)"
+              multiline
+              rows={3}
+              value={currentSeason.description || ''}
+              onChange={(e) => handleSeasonChange('description', e.target.value)}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button onClick={handleSubmitSeason} variant="contained" color="primary">
+            {dialogMode === 'create' ? 'Create' : 'Update'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

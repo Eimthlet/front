@@ -1,36 +1,60 @@
-// This file is deprecated. Please use the axios-based client in src/utils/api.ts instead.
-// This file is deprecated and should not be used in new code.
-// Please use apiClient.ts instead.
-
 import axios from 'axios';
 import { API_CONFIG } from '../config';
+import { ApiResponse, Season, Question, QualifiedUser, QuizResult } from '../types';
+
+// Extend Window interface to include onAuthError
+declare global {
+  interface Window {
+    onAuthError?: () => void;
+  }
+}
+
+interface AuthResponse {
+  token: string;
+  refreshToken: string;
+}
+
+// Memory-based token storage (replaces localStorage)
+class TokenManager {
+  private static token: string | null = null;
+  private static refreshToken: string | null = null;
+
+  static setTokens(token: string, refreshToken: string) {
+    this.token = token;
+    this.refreshToken = refreshToken;
+  }
+
+  static getToken(): string | null {
+    return this.token;
+  }
+
+  static getRefreshToken(): string | null {
+    return this.refreshToken;
+  }
+
+  static clearTokens() {
+    this.token = null;
+    this.refreshToken = null;
+  }
+}
 
 // Create axios instance with default config
 export const api = axios.create({
   baseURL: API_CONFIG.BASE_URL,
   timeout: API_CONFIG.TIMEOUT,
   headers: {
-    ...API_CONFIG.HEADERS,
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Credentials': 'true'
+    'Content-Type': 'application/json'
   },
-  withCredentials: API_CONFIG.WITH_CREDENTIALS,
-  xsrfCookieName: 'accessToken',
-  xsrfHeaderName: 'X-CSRF-Token'
+  withCredentials: API_CONFIG.WITH_CREDENTIALS
 });
 
-// Request interceptor for logging
+// Request interceptor for authentication
 api.interceptors.request.use(
   (config) => {
-    console.log('API Request Interceptor:', {
-      url: config.url,
-      method: config.method,
-      tokenExists: !!localStorage.getItem('token'),
-      tokenLength: localStorage.getItem('token')?.length,
-      tokenFirstChars: localStorage.getItem('token')?.substring(0, 10),
-      refreshTokenExists: !!localStorage.getItem('refreshToken'),
-      headers: config.headers
-    });
+    const token = TokenManager.getToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => {
@@ -39,77 +63,70 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for logging and error handling
+// Response interceptor for error handling
 api.interceptors.response.use(
   (response) => {
-    console.log('API Response:', {
-      url: response.config.url,
-      method: response.config.method,
-      status: response.status,
-      data: response.data
-    });
     return response;
   },
-  (error) => {
-    console.error('API Response Error:', {
-      url: error.config?.url,
-      method: error.config?.method,
-      status: error.response?.status,
-      data: error.response?.data,
-      error: error.message,
-      errorName: error.name,
-      errorMessage: error.message
-    });
-    return Promise.reject(error);
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // Handle 401 Unauthorized (token expired)
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        const refreshToken = TokenManager.getRefreshToken();
+        if (!refreshToken) {
+          throw new Error('No refresh token available');
+        }
+        
+        const refreshResponse = await api.post<AuthResponse>('/auth/refresh', { refreshToken });
+        TokenManager.setTokens(
+          refreshResponse.data.token, 
+          refreshResponse.data.refreshToken
+        );
+        
+        // Retry the original request
+        return api(originalRequest);
+      } catch (refreshError) {
+        console.error('Refresh token failed:', refreshError);
+        // Clear tokens and handle logout
+        TokenManager.clearTokens();
+        // Instead of redirecting, emit an event or call a callback
+        const onAuthError = (window as any).onAuthError;
+        if (onAuthError) {
+          onAuthError();
+        }
+        return Promise.reject(refreshError);
+      }
+    }
+    
+    // Handle other errors
+    if (error.response) {
+      const errorData = error.response.data;
+      throw new Error(errorData.error || errorData.message || 'API request failed');
+    }
+    
+    throw error;
   }
 );
 
-export interface User {
-  id: number;
-  username: string;
-  email: string;
-  role: 'admin' | 'user';
-  token: string;
-}
-
-export interface AuthResponse {
-  user: {
-    id: number;
-    username: string;
-    email: string;
-    role?: string;
-  };
-  token: string;
-  refreshToken: string;
-}
-
-export async function login(email: string, password: string): Promise<AuthResponse> {
+// Auth API
+export async function login(email: string, password: string): Promise<ApiResponse<AuthResponse>> {
   try {
-    const response = await fetch(`${API_CONFIG.BASE_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ email, password }),
-      credentials: 'include',
-      signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
-    });
+    const response = await api.post('/auth/login', { email, password });
+    const authData = response.data as AuthResponse;
     
-    const data = await response.json();
+    // Store tokens in memory
+    TokenManager.setTokens(authData.token, authData.refreshToken);
     
-    if (!response.ok) {
-      throw new Error(data.error || data.details || 'Login failed. Please try again.');
-    }
-    
-    return data;
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
-      throw new Error('Request timed out. Please check your internet connection.');
-    }
-    if (error.message) {
-      throw new Error(error.message);
-    }
-    throw new Error('Network error. Please check your connection and try again.');
+    return {
+      data: authData,
+      success: true
+    };
+  } catch (error) {
+    throw error;
   }
 }
 
@@ -119,213 +136,307 @@ export async function register(userData: {
   password: string;
   phone: string;
   amount: number;
-}): Promise<{ token: string; user: User }> {
+}): Promise<ApiResponse<AuthResponse>> {
   try {
-    const response = await fetch(`${API_CONFIG.BASE_URL}/api/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData),
-      credentials: 'include',
-      signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
-    });
+    const response = await api.post('/auth/register', userData);
+    const authData = response.data as AuthResponse;
     
-    const data = await response.json();
+    // Store tokens in memory
+    TokenManager.setTokens(authData.token, authData.refreshToken);
     
-    if (!response.ok) {
-      throw new Error(data.error || data.details || 'Registration failed. Please try again.');
-    }
-    
-    return data;
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
-      throw new Error('Request timed out. Please check your internet connection.');
-    }
-    if (error.message) {
-      throw new Error(error.message);
-    }
-    throw new Error('Network error. Please check your connection and try again.');
+    return {
+      data: authData,
+      success: true
+    };
+  } catch (error) {
+    throw error;
   }
 }
 
-export async function refreshToken(refreshToken: string): Promise<AuthResponse> {
+export async function refreshToken(refreshToken: string): Promise<ApiResponse<AuthResponse>> {
   try {
-    const response = await fetch(`${API_CONFIG.BASE_URL}/api/auth/refresh-token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-      credentials: 'include',
-      signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
-    });
+    const response = await api.post('/auth/refresh', { refreshToken });
+    const authData = response.data as AuthResponse;
     
-    const data = await response.json();
+    // Update stored tokens
+    TokenManager.setTokens(authData.token, authData.refreshToken);
     
-    if (!response.ok) {
-      throw new Error(data.error || 'Token refresh failed');
+    return {
+      data: authData,
+      success: true
+    };
+  } catch (error) {
+    throw error;
+  }
+}
+
+export function logout() {
+  TokenManager.clearTokens();
+}
+
+// Season API - Enhanced with better error handling
+export async function fetchAllSeasons(): Promise<ApiResponse<Season[]>> {
+  try {
+    const response = await api.get('/admin/seasons');
+    return {
+      data: response.data as Season[],
+      success: true
+    };
+  } catch (error) {
+    console.error('Error fetching seasons:', error);
+    throw error;
+  }
+}
+
+export async function fetchSeason(id: number): Promise<ApiResponse<Season>> {
+  try {
+    const response = await api.get(`/admin/seasons/${id}`);
+    return {
+      data: response.data as Season,
+      success: true
+    };
+  } catch (error) {
+    console.error(`Error fetching season ${id}:`, error);
+    throw error;
+  }
+}
+
+export async function createSeason(season: Omit<Season, 'id'>): Promise<ApiResponse<Season>> {
+  try {
+    // Validate season data before sending
+    if (!season.name?.trim()) {
+      throw new Error('Season name is required');
     }
-    
-    return data;
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
-      throw new Error('Request timed out. Please check your internet connection.');
+    if (!season.start_date || !season.end_date) {
+      throw new Error('Start date and end date are required');
     }
-    if (error.message) {
-      throw new Error(error.message);
+    if (new Date(season.start_date) >= new Date(season.end_date)) {
+      throw new Error('End date must be after start date');
     }
-    throw new Error('Network error during token refresh');
+
+    const response = await api.post('/admin/seasons', season);
+    return {
+      data: response.data as Season,
+      success: true
+    };
+  } catch (error) {
+    console.error('Error creating season:', error);
+    throw error;
   }
 }
 
-export async function fetchAdminData(endpoint: string) {
-  const token = localStorage.getItem('token');
-  const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/${endpoint}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Admin data fetch failed');
-  }
-
-  return response.json();
-}
-
-// Question management functions
-export interface Question {
-  id?: string;
-  question: string;
-  options: string[];
-  correctAnswer: string;
-  timeLimit: number;
-  category: string;
-  difficulty: string;
-}
-
-export async function addQuestion(question: Question): Promise<Question> {
-  const token = localStorage.getItem('token');
-  const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/questions`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(question),
-    signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to add question');
-  }
-
-  return response.json();
-}
-
-export async function editQuestion(question: Question): Promise<Question> {
-  const token = localStorage.getItem('token');
-  const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/questions/${question.id}`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(question),
-    signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to edit question');
-  }
-
-  return response.json();
-}
-
-export async function deleteQuestion(questionId: string): Promise<void> {
-  const token = localStorage.getItem('token');
-  const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/questions/${questionId}`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to delete question');
-  }
-}
-
-export async function fetchAllQuestions(): Promise<Question[]> {
-  const token = localStorage.getItem('token');
-  const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/questions`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to fetch questions');
-  }
-
-  return response.json();
-}
-
-export async function saveProgress(userId: number, score: number, total: number) {
-  const response = await fetch(`${API_CONFIG.BASE_URL}/api/progress`, {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
-    },
-    body: JSON.stringify({ userId, score, total }),
-    credentials: 'include',
-    signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to save progress');
-  }
-  
-  return response.json();
-}
-
-export async function fetchQuestions(): Promise<{data: {questions: Question[]}}> {
-  const token = localStorage.getItem('token');
-  if (!token) throw new Error('No authentication token');
-
-  const response = await fetch(`${API_CONFIG.BASE_URL}/api/questions`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to fetch questions');
-  }
-
-  const data = await response.json();
-  return {
-    data: {
-      questions: data.questions.map((q: any) => ({
-        ...q,
-        id: q.id.toString()
-      }))
+export async function updateSeason(id: number | string, season: Partial<Season>): Promise<ApiResponse<Season>> {
+  try {
+    // Validate season data if dates are provided
+    if (season.start_date && season.end_date) {
+      if (new Date(season.start_date) >= new Date(season.end_date)) {
+        throw new Error('End date must be after start date');
+      }
     }
-  };
+
+    const response = await api.put(`/admin/seasons/${id}`, season);
+    return {
+      data: response.data as Season,
+      success: true
+    };
+  } catch (error) {
+    console.error(`Error updating season ${id}:`, error);
+    throw error;
+  }
 }
+
+export async function deleteSeason(id: number | string): Promise<ApiResponse<void>> {
+  try {
+    await api.delete(`/admin/seasons/${id}`);
+    return {
+      data: undefined,
+      success: true
+    };
+  } catch (error) {
+    console.error(`Error deleting season ${id}:`, error);
+    throw error;
+  }
+}
+
+export async function fetchSeasonQuestions(id: number): Promise<ApiResponse<Question[]>> {
+  try {
+    const response = await api.get(`/admin/seasons/${id}/questions`);
+    return {
+      data: response.data as Question[],
+      success: true
+    };
+  } catch (error) {
+    console.error(`Error fetching questions for season ${id}:`, error);
+    throw error;
+  }
+}
+
+export async function addSeasonQuestions(id: number, questions: Question[]): Promise<ApiResponse<void>> {
+  try {
+    // Validate questions before sending
+    for (const question of questions) {
+      if (!question.question_text?.trim()) {
+        throw new Error('Question text is required for all questions');
+      }
+      if (!question.options || question.options.length < 2) {
+        throw new Error('At least 2 options are required for each question');
+      }
+      if (question.options.some(opt => !opt?.trim())) {
+        throw new Error('All options must have text');
+      }
+      if (!question.correct_answer?.trim()) {
+        throw new Error('Correct answer is required for all questions');
+      }
+      if (!question.options.includes(question.correct_answer)) {
+        throw new Error('Correct answer must match one of the provided options');
+      }
+    }
+
+    await api.post(`/admin/seasons/${id}/questions`, { questions });
+    return {
+      data: undefined,
+      success: true
+    };
+  } catch (error) {
+    console.error(`Error adding questions to season ${id}:`, error);
+    throw error;
+  }
+}
+
+export async function removeSeasonQuestion(seasonId: number, questionId: number): Promise<ApiResponse<void>> {
+  try {
+    await api.delete(`/admin/seasons/${seasonId}/questions/${questionId}`);
+    return {
+      data: undefined,
+      success: true
+    };
+  } catch (error) {
+    console.error(`Error removing question ${questionId} from season ${seasonId}:`, error);
+    throw error;
+  }
+}
+
+export async function fetchQualifiedUsers(seasonId: number): Promise<ApiResponse<QualifiedUser[]>> {
+  try {
+    const response = await api.get(`/admin/seasons/${seasonId}/qualified-users`);
+    return {
+      data: response.data as QualifiedUser[],
+      success: true
+    };
+  } catch (error) {
+    console.error(`Error fetching qualified users for season ${seasonId}:`, error);
+    throw error;
+  }
+}
+
+// Question API
+export async function fetchAllQuestions(): Promise<ApiResponse<Question[]>> {
+  try {
+    const response = await api.get('/admin/questions');
+    return {
+      data: response.data as Question[],
+      success: true
+    };
+  } catch (error) {
+    console.error('Error fetching all questions:', error);
+    throw error;
+  }
+}
+
+export async function createQuestion(question: Question): Promise<ApiResponse<Question>> {
+  try {
+    const response = await api.post('/admin/questions', question);
+    return {
+      data: response.data as Question,
+      success: true
+    };
+  } catch (error) {
+    console.error('Error creating question:', error);
+    throw error;
+  }
+}
+
+export async function updateQuestion(id: number, question: Partial<Question>): Promise<ApiResponse<Question>> {
+  try {
+    const response = await api.put(`/admin/questions/${id}`, question);
+    return {
+      data: response.data as Question,
+      success: true
+    };
+  } catch (error) {
+    console.error(`Error updating question ${id}:`, error);
+    throw error;
+  }
+}
+
+export async function deleteQuestion(id: number): Promise<ApiResponse<void>> {
+  try {
+    await api.delete(`/admin/questions/${id}`);
+    return {
+      data: undefined,
+      success: true
+    };
+  } catch (error) {
+    console.error(`Error deleting question ${id}:`, error);
+    throw error;
+  }
+}
+
+// Results API
+export async function fetchResults(userId: number, seasonId: number): Promise<ApiResponse<QuizResult[]>> {
+  try {
+    const response = await api.get(`/results/user/${userId}/season/${seasonId}`);
+    return {
+      data: response.data as QuizResult[],
+      success: true
+    };
+  } catch (error) {
+    console.error(`Error fetching results for user ${userId}, season ${seasonId}:`, error);
+    throw error;
+  }
+}
+
+export async function fetchCurrentSeason(): Promise<ApiResponse<Season>> {
+  try {
+    const response = await api.get('/current');
+    return {
+      data: response.data as Season,
+      success: true
+    };
+  } catch (error) {
+    console.error('Error fetching current season:', error);
+    throw error;
+  }
+}
+
+export async function saveProgress(userId: number, score: number, total: number): Promise<ApiResponse<void>> {
+  try {
+    await api.post('/progress', { userId, score, total });
+    return {
+      data: undefined,
+      success: true
+    };
+  } catch (error) {
+    console.error('Error saving progress:', error);
+    throw error;
+  }
+}
+
+export async function fetchQuestions(): Promise<ApiResponse<{ questions: Question[] }>> {
+  try {
+    const response = await api.get('/questions');
+    return {
+      data: response.data as { questions: Question[] },
+      success: true
+    };
+  } catch (error) {
+    console.error('Error fetching questions:', error);
+    throw error;
+  }
+}
+
+// Export the TokenManager for external access if needed
+export { TokenManager };
 
 // Export the api instance as default
 export default api;

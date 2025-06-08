@@ -1,24 +1,57 @@
+export interface ApiResponse<T> {
+  data: T;
+  status: number;
+  statusText: string;
+  headers: any;
+  config: any;
+}
+
+export interface ApiError {
+  response?: {
+    status: number;
+    data: {
+      message?: string;
+      error?: string;
+    };
+  };
+  message: string;
+  config?: {
+    url?: string;
+    method?: string;
+    data?: unknown;
+  };
+}
+
+export interface Season {
+  id?: string | number;
+  name: string;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  is_qualification_round: boolean;
+  minimum_score_percentage: number;
+  description?: string;
+  question_count: number;
+  attempts_count: number;
+  qualified_users_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Question {
-  id: string;
-  question: string;
+  id?: number;
+  question_text: string;
   options: string[];
-  correctAnswer: string;
-  explanation?: string;
+  correct_answer: string;
   category?: string;
   difficulty?: string;
-  timeLimit?: number; // in seconds
 }
 
-export interface User {
-  id: string;
+export interface QualifiedUser {
+  id: number;
   username: string;
-  isAdmin: boolean;
-}
-
-export interface QuizState {
-  currentQuestion: number;
+  email: string;
   score: number;
-  answers: Record<string, string>;
-  timeRemaining: number;
-  isComplete: boolean;
+  percentage_score: number;
+  completed_at: string;
 }
