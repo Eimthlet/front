@@ -120,12 +120,8 @@ const UserManagement: React.FC<UserManagementProps> = () => {
   const [editUser, setEditUser] = useState<Partial<User>>({});
   const [tabValue, setTabValue] = useState(0);
 
-  // Fetch users on component mount and when filters change
-  useEffect(() => {
-    fetchUsers();
-  }, [pagination.page, searchQuery, roleFilter, statusFilter]);
-
-  const fetchUsers = async () => {
+  // Memoize the fetchUsers function to prevent unnecessary re-renders
+  const fetchUsers = React.useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -156,7 +152,12 @@ const UserManagement: React.FC<UserManagementProps> = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, searchQuery, roleFilter, statusFilter]);
+
+  // Fetch users on component mount and when filters change
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const fetchUserDetails = async (userId: number) => {
     try {

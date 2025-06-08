@@ -5,7 +5,6 @@ import { theme } from './theme';
 import Quiz from './components/Quiz';
 import Navigation from './components/Navigation';
 import AuthForm from './components/AuthForm';
-import AdminPanel from './components/AdminPanel';
 import AdminDashboard from './components/AdminDashboard';
 import UserManagement from './components/UserManagement';
 import Leaderboard from './components/Leaderboard';

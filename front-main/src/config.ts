@@ -51,8 +51,10 @@ export const PAYMENT_CONFIG = {
 };
 
 // Export all configurations as default
-export default {
+const config = {
   API: API_CONFIG,
   AUTH: AUTH_CONFIG,
-  PAYMENT: PAYMENT_CONFIG
+  PAYMENT_CONFIG: PAYMENT_CONFIG
 };
+
+export { config };

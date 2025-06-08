@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
-import { jwtDecode } from 'jwt-decode';
 import { API_CONFIG, AUTH_CONFIG, PAYMENT_CONFIG } from '../config';
 import { Checkbox, FormControlLabel, Link, IconButton } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
