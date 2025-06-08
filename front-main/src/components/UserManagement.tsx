@@ -34,14 +34,7 @@ import SearchIcon from '@mui/icons-material/SearchOutlined';
 import RefreshIcon from '@mui/icons-material/RefreshOutlined';
 import api from '../utils/apiClient';
 
-// API Response Type
-interface ApiResponse<T> {
-  data: T;
-  message?: string;
-  error?: string;
-  status?: number;
-  statusText?: string;
-}
+// Response type for users API
 
 interface UsersApiResponse {
   users: User[];
