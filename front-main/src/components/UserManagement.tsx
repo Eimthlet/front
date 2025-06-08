@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -112,7 +112,24 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  
+  // Define error state interface and initialize state
+  interface ErrorState {
+    message: string;
+    details?: string;
+  }
+
+  const [error, setError] = useState<ErrorState | null>(null);
+  
+  // Helper function to set error state
+  const handleError = (message: string, details?: string) => {
+    setError({ message, details });
+  };
+  
+  // Helper function to clear error state
+  const clearError = () => {
+    setError(null);
+  };
   const [success, setSuccess] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationData>({
     total: 0,
@@ -131,50 +148,48 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
   const [tabValue, setTabValue] = useState(0);
 
   // Memoize the fetchUsers function to prevent unnecessary re-renders
-  const fetchUsers = React.useCallback(async () => {
+  const fetchUsers = useCallback(async (page = 1, limit = 10, search = '', role = '', status = '') => {
     try {
       setLoading(true);
-      setError(null);
+      clearError();
       
-      // Build query parameters
       const queryParams = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString()
+        page: page.toString(),
+        limit: limit.toString()
       });
       
-      if (searchQuery) queryParams.append('search', searchQuery);
-      if (roleFilter) queryParams.append('role', roleFilter);
-      if (statusFilter) queryParams.append('status', statusFilter);
+      if (search) queryParams.append('search', search);
+      if (role) queryParams.append('role', role);
+      if (status) queryParams.append('status', status);
       
       const apiUrl = `/admin/users?${queryParams.toString()}`;
       console.log('Fetching users from:', apiUrl);
       
-      // Get the token from localStorage
-      const token = localStorage.getItem('token');
-      console.log('Using auth token:', token ? 'Token exists' : 'No token found');
-
-      // Make the API call using the apiClient with proper typing
-      const { users = [], pagination: paginationData } = await api.get<UsersApiResponse>(apiUrl);
+      // Make the API call - the response is already unwrapped by apiClient
+      const response = await api.get<User[]>(apiUrl);
+      
+      // The backend returns a direct array of users
+      const users = Array.isArray(response) ? response : [];
+      const total = users.length;
+      
       console.log('API Response - Users:', users);
       console.log(`Found ${users.length} users`);
       
       setUsers(users);
       
-      if (paginationData) {
-        setPagination(prev => ({
-          ...prev,
-          ...paginationData,
-          total: paginationData.total || users.length,
-          page: paginationData.page || 1,
-          limit: paginationData.limit || prev.limit,
-          totalPages: paginationData.totalPages || 
-            Math.ceil((paginationData.total || users.length) / (paginationData.limit || prev.limit))
-        }));
-      }
-    } catch (err: unknown) {
+      // Update pagination with the correct total count
+      setPagination(prev => ({
+        ...prev,
+        total: total,
+        page: page,
+        totalPages: Math.ceil(total / limit)
+      }));
+    } catch (err) {
       console.error('Error fetching users:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch users';
-      setError(errorMessage);
+      handleError(
+        'Failed to fetch users',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
     } finally {
       setLoading(false);
     }
@@ -182,25 +197,37 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
 
   // Fetch users on component mount and when filters change
   useEffect(() => {
-    fetchUsers();
+    fetchUsers().catch(err => {
+      console.error('Error in fetchUsers effect:', err);
+    });
   }, [fetchUsers]);
 
   const fetchUserDetails = async (userId: number) => {
     try {
       setLoading(true);
-      setError(null);
+      clearError();
       
       const data = await api.get<UserDetail>(`/admin/users/${userId}`);
 
       if (data) {
         setSelectedUser(data);
+        setEditUser({
+          username: data.username,
+          email: data.email,
+          role: data.role,
+          status: data.status,
+          is_disqualified: data.is_disqualified
+        });
         setOpenUserDialog(true);
       } else {
         throw new Error('User data not found');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error fetching user details:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to fetch user details');
+      handleError(
+        'Failed to fetch user details',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
     } finally {
       setLoading(false);
     }
@@ -211,7 +238,7 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
     
     try {
       setLoading(true);
-      setError(null);
+      clearError();
       
       const userData = { ...editUser };
       const data = await api.put<UserResponse>(`/admin/users/${selectedUser.id}`, userData);
@@ -228,9 +255,12 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
       
       // Reset form
       setEditUser({});
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error updating user:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to update user');
+      handleError(
+        'Failed to update user',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
     } finally {
       setLoading(false);
     }
@@ -241,7 +271,7 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
     
     try {
       setLoading(true);
-      setError(null);
+      clearError();
       
       await api.post(`/admin/users/${selectedUser.id}/reset-password`, { newPassword });
       
@@ -250,9 +280,12 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
       
       // Reset form
       setNewPassword('');
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error resetting password:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to reset password');
+      handleError(
+        'Failed to reset password',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
     } finally {
       setLoading(false);
     }
@@ -263,7 +296,7 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
     
     try {
       setLoading(true);
-      setError(null);
+      clearError();
       
       await api.delete(`/admin/users/${selectedUser.id}?softDelete=true`);
       
@@ -276,9 +309,12 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
       
       setSuccess('User deactivated successfully');
       setOpenDeleteDialog(false);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error deactivating user:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to deactivate user');
+      handleError(
+        'Failed to deactivate user',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
     } finally {
       setLoading(false);
     }
@@ -298,7 +334,23 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
   };
 
   const handleViewUser = (user: User) => {
-    fetchUserDetails(user.id);
+    try {
+      setSelectedUser(user as UserDetail);
+      setEditUser({
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        is_disqualified: user.is_disqualified
+      });
+      setOpenUserDialog(true);
+    } catch (err) {
+      console.error('Error viewing user:', err);
+      handleError(
+        'Failed to view user details',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
+    }
   };
 
   const handleCloseUserDialog = () => {
@@ -323,8 +375,19 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
       </Typography>
       
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
+        <Alert 
+          severity="error" 
+          sx={{ mb: 2 }} 
+          onClose={() => setError(null)}
+        >
+          <div>
+            <div>{error.message}</div>
+            {error.details && (
+              <div style={{ marginTop: '8px', fontSize: '0.875rem' }}>
+                {error.details}
+              </div>
+            )}
+          </div>
         </Alert>
       )}
       
@@ -389,7 +452,10 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
         <Button 
           variant="outlined" 
           startIcon={<RefreshIcon />}
-          onClick={fetchUsers}
+          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+            e.preventDefault();
+            fetchUsers(1, pagination.limit, searchQuery, roleFilter, statusFilter);
+          }}
         >
           Refresh
         </Button>
