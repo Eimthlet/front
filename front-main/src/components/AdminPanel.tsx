@@ -23,8 +23,7 @@ import {
   TableHead,
   TableRow,
   IconButton,
-  Alert,
-  Snackbar
+  Alert
 } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
