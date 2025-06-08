@@ -35,11 +35,11 @@ import RefreshIcon from '@mui/icons-material/RefreshOutlined';
 import api from '../utils/apiClient';
 
 // Response type for users API
-
-interface UsersApiResponse {
-  users: User[];
-  pagination: PaginationData;
-}
+// Note: Currently using direct array response from API, keeping interface for future use
+// interface UsersApiResponse {
+//   users: User[];
+//   pagination: PaginationData;
+// }
 
 // Component Types
 interface User {
@@ -193,7 +193,7 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, searchQuery, roleFilter, statusFilter]);
+  }, []); // Removed dependencies since we're using parameters
 
   // Fetch users on component mount and when filters change
   useEffect(() => {
@@ -202,36 +202,8 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
     });
   }, [fetchUsers]);
 
-  const fetchUserDetails = async (userId: number) => {
-    try {
-      setLoading(true);
-      clearError();
-      
-      const data = await api.get<UserDetail>(`/admin/users/${userId}`);
-
-      if (data) {
-        setSelectedUser(data);
-        setEditUser({
-          username: data.username,
-          email: data.email,
-          role: data.role,
-          status: data.status,
-          is_disqualified: data.is_disqualified
-        });
-        setOpenUserDialog(true);
-      } else {
-        throw new Error('User data not found');
-      }
-    } catch (err) {
-      console.error('Error fetching user details:', err);
-      handleError(
-        'Failed to fetch user details',
-        err instanceof Error ? err.message : 'Unknown error occurred'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  // User details are handled in handleViewUser
+  // fetchUserDetails function removed as it was unused
 
   const handleUpdateUser = async () => {
     if (!selectedUser) return;
