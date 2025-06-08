@@ -13,8 +13,8 @@ import AdminDiagnostic from './components/AdminDiagnostic';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import { useAuth } from './contexts/AuthContext';
-import apiClient, { ApiResponse } from './utils/apiClient';
-import { Question } from './types';
+import { api } from './utils/api';
+import { Question as ApiQuestion } from './types';
 
 interface QualificationResponse {
   hasAttempted: boolean;
@@ -30,17 +30,52 @@ interface QualificationResponse {
 }
 
 interface QuestionsResponse {
-  questions: Question[];
+  questions: QuizQuestion[];
+}
+
+type QuizQuestion = {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  timeLimit?: number;
 }
 
 const App: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
 
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [qualification, setQualification] = useState<QualificationResponse | null>(null);
+  
+  // Helper type to narrow down the qualification response
+  type QualificationApiResponse = {
+    hasAttempted: boolean;
+    isQualified?: boolean;
+    qualifies_for_next_round?: boolean;
+    [key: string]: any; // Allow additional properties
+  };
+  
+  // Helper function to safely extract data from API response
+  const getResponseData = <T,>(response: any): T => {
+    // If the response is an Axios response object, return its data
+    if (response && typeof response === 'object' && 'data' in response) {
+      return response.data;
+    }
+    // Otherwise, assume it's already the data
+    return response;
+  };
+  
+  // Define the QuizQuestion type that matches what the Quiz component expects
+  interface QuizQuestion {
+    id: string;
+    question: string;
+    options: string[];
+    correctAnswer: string;
+    timeLimit?: number;
+  }
 
   useEffect(() => {
     const validateAndFetchData = async () => {
@@ -53,41 +88,63 @@ const App: React.FC = () => {
           return;
         }
         
-        // The response will be of type AxiosResponse<QualificationResponse | ApiResponse<QualificationResponse>>
-        const response = await apiClient.get<QualificationResponse | ApiResponse<QualificationResponse>>('/qualification');
+        // Get the response from the API
+        const response = await api.get<QualificationApiResponse>('/qualification');
         
-        // Handle both response formats
-        const responseData = response.data;
-        let qualificationData: QualificationResponse;
+        // Safely extract the data from the response
+        const responseData = getResponseData<QualificationApiResponse>(response);
         
-        // Type guard to check if the response is a direct QualificationResponse
-        const isDirectResponse = (data: any): data is QualificationResponse => {
-          return data && typeof data === 'object' && 
-                 ('isQualified' in data || 'qualifies_for_next_round' in data);
-        };
-        
-        // Type guard to check if the response is an ApiResponse
-        const isApiResponse = (data: any): data is ApiResponse<QualificationResponse> => {
-          return data && typeof data === 'object' && 'data' in data;
-        };
-        
-        if (isDirectResponse(responseData)) {
-          // Direct QualificationResponse
-          qualificationData = responseData as QualificationResponse;
-        } else if (isApiResponse(responseData)) {
-          // Wrapped in ApiResponse
-          qualificationData = responseData.data;
-        } else {
-          throw new Error('Unexpected response format from qualification endpoint');
+        // Validate the response structure
+        if (!responseData || typeof responseData !== 'object') {
+          throw new Error('Invalid response format from qualification endpoint');
         }
+        
+        // Create a properly typed qualification object
+        const qualificationData: QualificationResponse = {
+          hasAttempted: Boolean(responseData.hasAttempted),
+          isQualified: Boolean(
+            responseData.isQualified || 
+            responseData.qualifies_for_next_round
+          ),
+          // Include any additional properties that might be present
+          ...responseData
+        };
         
         setQualification(qualificationData);
         
         // Only fetch questions if user is qualified or hasn't attempted yet
         if (!qualificationData.hasAttempted || qualificationData.isQualified) {
           try {
-            const questionsResponse = await apiClient.get<QuestionsResponse>('/questions');
-            setQuestions(questionsResponse.questions || []);
+            // Get questions from the API
+            const questionsResponse = await api.get<ApiQuestion[] | QuestionsResponse>('/questions');
+            
+            // Safely extract the data from the response
+            const responseData = getResponseData<ApiQuestion[] | QuestionsResponse>(questionsResponse);
+            
+            // Handle both direct array response and wrapped response
+            const questions = Array.isArray(responseData) 
+              ? responseData 
+              : 'questions' in responseData && Array.isArray(responseData.questions) 
+                ? responseData.questions 
+                : [];
+                
+            // Map the API question format to the Quiz component's expected format
+            const mappedQuestions = questions.map((q) => {
+              // Check if this is an ApiQuestion (has question_text and correct_answer)
+              if ('question_text' in q && 'correct_answer' in q) {
+                return {
+                  id: q.id?.toString() || Math.random().toString(36).substr(2, 9),
+                  question: q.question_text,
+                  options: q.options,
+                  correctAnswer: q.correct_answer,
+                  timeLimit: 30 // Default time limit if not provided
+                };
+              }
+              // Otherwise, assume it's already in the correct QuizQuestion format
+              return q as QuizQuestion;
+            });
+            
+            setQuestions(mappedQuestions);
           } catch (apiError: any) {
             console.error('Error fetching questions:', apiError);
             setError(apiError.message || 'Failed to load questions');
@@ -114,7 +171,7 @@ const App: React.FC = () => {
 
   const handleQuizComplete = async (score: number) => {
     try {
-      await apiClient.post('/progress', { 
+      await api.post('/progress', { 
         userId: user?.id, 
         score, 
         total: questions.length 
