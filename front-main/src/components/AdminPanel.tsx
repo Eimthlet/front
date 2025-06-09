@@ -292,16 +292,19 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
         throw new Error('Please select the correct answer');
       }
 
+      // Submit the question - ensure all fields match backend expectations
+      const questionPayload = {
+        question_text: newQuestion.question_text || newQuestion.question || '',
+        options: newQuestion.options.filter(opt => opt.trim() !== ''), // Remove empty options
+        correct_answer: newQuestion.correct_answer || newQuestion.correctAnswer || '',
+        category: newQuestion.category || 'General',
+        difficulty: newQuestion.difficulty || 'Medium',
+        time_limit: Number(newQuestion.time_limit || newQuestion.timeLimit || 30) // Ensure number type
+      };
+
       // Submit the question - wrap in a questions array as expected by the server
       await api.post(`/admin/seasons/${selectedSeasonId}/questions`, { 
-        questions: [{
-          question_text: newQuestion.question_text || newQuestion.question, // Support both field names
-          options: newQuestion.options,
-          correct_answer: newQuestion.correct_answer || newQuestion.correctAnswer, // Support both field names
-          category: newQuestion.category,
-          difficulty: newQuestion.difficulty,
-          time_limit: newQuestion.time_limit || newQuestion.timeLimit // Include time limit if needed
-        }] 
+        questions: [questionPayload]
       });
       updateSuccess('Question added successfully!');
       await fetchQuestions();
