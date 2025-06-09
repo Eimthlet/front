@@ -34,13 +34,14 @@ const AdminDashboard: React.FC = () => {
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      const response = await apiClient.get<DashboardApiResponse>('/admin/dashboard-stats');
+      const response = await apiClient.get('/admin/dashboard-stats');
+      const responseData = response?.data || {};
       
       setStats({
-        totalUsers: response?.totalUsers || 0,
-        totalQuizzes: response?.totalQuizzes || 0,
-        averageScore: response?.averageScore || 0,
-        recentActivity: response?.recentActivity || []
+        totalUsers: responseData.totalUsers || 0,
+        totalQuizzes: responseData.totalQuizzes || 0,
+        averageScore: responseData.averageScore || 0,
+        recentActivity: responseData.recentActivity || []
       });
       setError(null);
     } catch (err) {
