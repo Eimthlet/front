@@ -225,23 +225,41 @@ export async function createSeason(season: SeasonCreateData): Promise<ApiRespons
       throw new Error('End date must be after start date');
     }
 
-    console.log('Sending request to /admin/seasons with data:', JSON.stringify(season, null, 2));
+    // Create a new object with only the fields we want to send
+    const payload = {
+      name: season.name.trim(),
+      start_date: season.start_date,
+      end_date: season.end_date,
+      is_active: season.is_active || false,
+      is_qualification_round: season.is_qualification_round || false,
+      minimum_score_percentage: season.minimum_score_percentage || 50
+    };
+
+    console.log('Sending request to /admin/seasons with data:', JSON.stringify(payload, null, 2));
     
-    // Ensure we're sending proper JSON
-    const response = await api({
-      method: 'post',
-      url: '/admin/seasons',
-      data: season,
+    // Ensure we're sending proper JSON with explicit headers
+    const response = await fetch(`${process.env.REACT_APP_API_URL || ''}/admin/seasons`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${TokenManager.getToken()}`
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload)
     });
     
+    const responseData = await response.json();
+    
     console.log('Received response status:', response.status);
-    console.log('Response data:', response.data);
+    console.log('Response data:', responseData);
+    
+    if (!response.ok) {
+      throw new Error(responseData.message || 'Failed to create season');
+    }
+    
     return {
-      data: response.data as Season,
+      data: responseData as Season,
       success: true
     };
   } catch (error) {
