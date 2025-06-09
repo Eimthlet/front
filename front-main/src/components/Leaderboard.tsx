@@ -59,10 +59,11 @@ const Leaderboard: React.FC = () => {
       setError(null);
       
       // Fetch leaderboard data
-      const response = await apiClient.get<LeaderboardResponse>('/leaderboard');
+      const response = await apiClient.get('/leaderboard');
+      const responseData = response?.data || {};
       
-      if (response && Array.isArray(response.leaderboard)) {
-        setLeaderboard(response.leaderboard);
+      if (responseData && Array.isArray(responseData.leaderboard)) {
+        setLeaderboard(responseData.leaderboard);
       } else {
         console.warn('Unexpected leaderboard response format:', response);
         setLeaderboard([]);

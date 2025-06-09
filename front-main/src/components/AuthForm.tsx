@@ -126,8 +126,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
   // Check for pending registration
   const checkPendingRegistration = async (emailToCheck: string): Promise<PendingRegistrationResponse | null> => {
     try {
-      const response = await apiClient.post<PendingRegistrationResponse>('/auth/check-pending-registration', { email: emailToCheck });
-      return response;
+      const response = await apiClient.post('/auth/check-pending-registration', { email: emailToCheck });
+      return response?.data || null;
     } catch (error) {
       console.error('Error checking pending registration:', error);
       return null;
@@ -137,12 +137,12 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
   // Resume payment for pending registration
   const resumePayment = async (originalTxRef: string, email: string): Promise<ResumePaymentResponse> => {
     try {
-      const response = await apiClient.post<ResumePaymentResponse>('/auth/resume-payment', {
+      const response = await apiClient.post('/auth/resume-payment', {
         tx_ref: 'TX' + Date.now() + Math.floor(Math.random() * 1000000),
         original_tx_ref: originalTxRef,
         email
       });
-      return response;
+      return response?.data;
     } catch (error) {
       console.error('Error resuming payment:', error);
       throw error;
@@ -259,9 +259,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
           email: string;
         }
         
-        const regResult = await apiClient.post<RegisterResponse>(endpoint, payload);
+        const response = await apiClient.post(endpoint, payload);
+        const regResult = response?.data;
         
-        if (!regResult || !regResult.tx_ref || !regResult.public_key) {
+        if (!regResult?.tx_ref || !regResult?.public_key) {
           setError('Registration initiation failed. Please try again.');
           setLoading(false);
           return;
@@ -269,14 +270,14 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
         
         // 2. Launch PayChangu inline payment popup
         const paychanguConfig: PayChanguConfig = {
-          public_key: regResult.public_key,
-          tx_ref: regResult.tx_ref,
-          amount: regResult.amount,
+          public_key: regResult.public_key as string,
+          tx_ref: regResult.tx_ref as string,
+          amount: regResult.amount as number,
           currency: PAYMENT_CONFIG.CURRENCY,
           callback_url: PAYMENT_CONFIG.CALLBACK_URL,
           return_url: PAYMENT_CONFIG.RETURN_URL,
           customer: {
-            email: regResult.email,
+            email: regResult.email as string,
             first_name: username,
             last_name: ''
           },
