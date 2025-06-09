@@ -286,16 +286,18 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     try {
       setIsLoading(true);
       clearError();
-      const response = await api.delete<ApiResponse<{ message: string }>>(`/admin/questions/${questionId}`);
       
-      // Fix: Handle the response properly based on your API structure
-      // Check if the response indicates success (adjust based on your actual API response structure)
-      if (response) {
-        await fetchQuestions();
-        updateSuccess('Question deleted successfully!');
-      } else {
-        throw new Error('Failed to delete question');
+      // Make sure to include the season ID in the URL
+      if (!selectedSeasonId) {
+        throw new Error('No season selected');
       }
+      
+      // Use the correct endpoint format based on the server implementation
+      await api.delete<ApiResponse<{ message: string }>>(`/admin/questions/${questionId}`);
+      
+      // Refresh the questions list after successful deletion
+      await fetchQuestions();
+      updateSuccess('Question deleted successfully!');
     } catch (error) {
       console.error('Error deleting question:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete question';
