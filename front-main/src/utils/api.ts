@@ -59,11 +59,6 @@ declare global {
   }
 }
 
-interface AuthResponse {
-  token: string;
-  refreshToken: string;
-}
-
 // TokenManager is now imported from TokenManager.ts
 
 // Use the apiClient for all API calls
