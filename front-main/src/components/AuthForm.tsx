@@ -19,6 +19,13 @@ interface ResumePaymentResponse {
   public_key: string;
   amount: number;
   email: string;
+}
+
+interface RegisterResponse {
+  tx_ref: string;
+  public_key: string;
+  amount: number;
+  email: string;
   phone: string;
   message: string;
 }
@@ -251,13 +258,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
         // 1. Send registration info to backend and get tx_ref, public_key, etc.
         const endpoint = '/auth/register';
         const payload = { username, email, password, phone, amount };
-        
-        interface RegisterResponse {
-          tx_ref: string;
-          public_key: string;
-          amount: number;
-          email: string;
-        }
         
         const response = await apiClient.post(endpoint, payload);
         const regResult = response?.data;

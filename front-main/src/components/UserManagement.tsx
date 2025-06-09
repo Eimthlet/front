@@ -93,10 +93,6 @@ interface PaginationData {
 
 // Using direct array response from API
 
-interface UserResponse {
-  user: User;
-}
-
 interface UserManagementProps {}
 
 const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {

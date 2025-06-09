@@ -96,13 +96,6 @@ interface QuizProps {
   onComplete: (score: number) => void;
 }
 
-interface QualificationResponse {
-  hasAttempted: boolean;
-  isQualified: boolean;
-  qualifies_for_next_round?: boolean;
-  message?: string;
-}
-
 const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
   const { user } = useAuth();
   const navigate = useNavigate();

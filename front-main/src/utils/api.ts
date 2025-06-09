@@ -1,4 +1,3 @@
-import * as types from '../types';
 import apiClient from './apiClient';
 import TokenManager from './TokenManager';
 
@@ -68,28 +67,6 @@ interface QualifiedUser {
   score: number;
   percentage_score: number;
   completed_at: string;
-}
-
-interface QuizResult {
-  id: number;
-  user_id: number;
-  season_id: number;
-  round_id: number;
-  score: number;
-  completed_at: string;
-  round_number: number;
-  min_score_to_qualify: number;
-}
-
-// Define auth related types
-interface AuthResponse {
-  token: string;
-  refreshToken: string;
-  user?: {
-    id: number;
-    username: string;
-    email: string;
-  };
 }
 
 interface QuestionCreateData {

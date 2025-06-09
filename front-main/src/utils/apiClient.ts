@@ -1,6 +1,5 @@
 import axios from 'axios';
 import TokenManager from './TokenManager';
-import type { ApiError } from '../types';
 
 // Define the AuthResponse interface here since it's not in types
 export interface AuthResponse {

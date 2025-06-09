@@ -19,15 +19,6 @@ interface AuthState {
   error: string | null;
 }
 
-// Represents the actual login response data structure
-interface LoginResponse {
-  success: boolean;
-  token: string;
-  refreshToken?: string;
-  user: User;
-  error?: string;
-}
-
 interface TokenCheckResponse {
   success: boolean;
   user?: User;

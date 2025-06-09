@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/apiClient';
-import type { ApiResponse } from '../types';
 import SeasonManager from './SeasonManager';
 import { 
   Box, 

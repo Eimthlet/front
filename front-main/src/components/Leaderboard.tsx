@@ -13,12 +13,6 @@ interface LeaderboardEntry {
   total_questions: string;
 }
 
-interface LeaderboardResponse {
-  leaderboard: LeaderboardEntry[];
-  userRank: number | null;
-  currentUserId: number;
-}
-
 const StyledToggleButton = styled(ToggleButton)(({ theme }) => ({
   '&.MuiToggleButton-root': {
     color: 'rgba(255, 255, 255, 0.6)',

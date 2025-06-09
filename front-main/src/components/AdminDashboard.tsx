@@ -16,13 +16,6 @@ interface DashboardStats {
   recentActivity: ActivityItem[];
 }
 
-interface DashboardApiResponse {
-  totalUsers: number;
-  totalQuizzes: number;
-  averageScore: number;
-  recentActivity: ActivityItem[];
-}
-
 const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,

@@ -8,23 +8,6 @@ interface TokenPayload {
   [key: string]: any;
 }
 
-interface RefreshTokenResponse {
-  token?: string;
-  message?: string;
-  user?: {
-    id: number;
-    email: string;
-    isAdmin: boolean;
-  };
-}
-
-interface UserInfoResponse {
-  id: number;
-  email: string;
-  isAdmin: boolean;
-  role?: string;
-}
-
 interface AdminStatusResponse {
   success: boolean;
   message: string;
@@ -180,7 +163,6 @@ export const fixAdminToken = async (): Promise<{ success: boolean; message: stri
         localStorage.setItem('token', responseData.token);
         console.log('Token refreshed successfully');
         return { success: true, message: 'Token refreshed successfully' };
-        return { success: false, message: response.message || 'Failed to refresh token' };
       }
     } catch (error) {
       console.error('Error refreshing token:', error);
