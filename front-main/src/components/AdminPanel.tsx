@@ -246,8 +246,16 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
         throw new Error('Please select the correct answer');
       }
 
-      // Submit the question
-      await api.post(`/admin/seasons/${selectedSeasonId}/questions`, newQuestion);
+      // Submit the question - wrap in a questions array as expected by the server
+      await api.post(`/admin/seasons/${selectedSeasonId}/questions`, { 
+        questions: [{
+          question_text: newQuestion.question,
+          options: newQuestion.options,
+          correct_answer: newQuestion.correctAnswer,
+          category: newQuestion.category,
+          difficulty: newQuestion.difficulty
+        }] 
+      });
       updateSuccess('Question added successfully!');
       await fetchQuestions();
       
