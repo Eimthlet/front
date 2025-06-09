@@ -1,4 +1,6 @@
 import * as types from '../types';
+import apiClient from './apiClient';
+import TokenManager from './TokenManager';
 
 // Define local types to avoid import issues
 interface IApiResponse<T = any> {
@@ -108,8 +110,6 @@ type AxiosResponse<T = any> = {
   headers: any;
   config: any;
 };
-import apiClient from './apiClient';
-import TokenManager from './TokenManager';
 
 // Extend Window interface to include onAuthError
 declare global {
