@@ -360,6 +360,10 @@ const SeasonManager: React.FC = () => {
       setLoading(true);
       setError('');
       
+      if (!selectedSeasonId) {
+        throw new Error('No season selected');
+      }
+      
       // Use question_text or fall back to question for backward compatibility
       const questionText = currentQuestion.question_text || currentQuestion.question || '';
       
@@ -429,7 +433,7 @@ const SeasonManager: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentQuestion, selectedSeasonId]);
+  }, [currentQuestion, selectedSeasonId, setLoading, setError, fetchQuestions]);
 
   // Delete handlers
   const handleDeleteSeason = useCallback(async (id: number | string) => {
