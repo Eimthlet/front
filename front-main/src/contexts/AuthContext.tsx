@@ -28,7 +28,7 @@ interface TokenCheckResponse {
 // Combined type for the context value, including state and action dispatchers
 interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<void>;
-  register: (userData: RegisterData) => Promise<void>;
+  register: (userData: RegisterData) => Promise<{ tx_ref: string; public_key: string; amount: number; email: string; phone: string; } | null>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -144,32 +144,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
   
   // Register function
-  const register = async (userData: RegisterData): Promise<void> => {
+  // Register function - initiates payment flow
+  const register = async (userData: RegisterData): Promise<{ tx_ref: string; public_key: string; amount: number; email: string; phone: string; } | null> => {
     setError(null);
     try {
+      console.log('Attempting to register and initiate payment with data:', userData);
       const response = await api.post('/auth/register', userData);
-      const responseData = response?.data || {};
+      const responseData = response?.data;
 
-      if (!responseData.success || !responseData.token || !responseData.user) {
-        throw new Error(responseData.error || 'Registration failed: Invalid response from server.');
+      console.log('Raw registration response:', responseData);
+
+      if (!responseData || !responseData.success || !responseData.tx_ref || !responseData.public_key) {
+        const errorMsg = responseData?.error || 'Registration failed: Invalid response from server. Missing tx_ref or public_key.';
+        console.error('Registration error:', errorMsg, 'Response Data:', responseData);
+        setError(errorMsg);
+        throw new Error(errorMsg);
       }
 
-      localStorage.setItem('token', responseData.token);
-      if (responseData.refreshToken) {
-        localStorage.setItem('refreshToken', responseData.refreshToken);
-      }
-
-      const { user } = response;
-      setUser(user);
-      setIsAuthenticated(true);
-      setIsAdmin(user.isAdmin);
-
-      navigate(user.isAdmin ? '/admin' : '/quiz');
+      // Return payment details instead of setting auth state
+      console.log('Registration initiated, proceeding to payment with:', responseData);
+      return {
+        tx_ref: responseData.tx_ref,
+        public_key: responseData.public_key,
+        amount: responseData.amount,
+        email: responseData.email,
+        phone: responseData.phone
+      };
 
     } catch (error: any) {
+      // Log the detailed error object if available
+      console.error('Full registration error object:', error);
       const normalizedError = handleApiError(error);
+      console.error('Normalized registration error:', normalizedError.message);
       setError(normalizedError.message);
-      throw normalizedError;
+      // Ensure the function calling register can catch this to prevent unhandled promise rejections
+      throw normalizedError; 
     }
   };
 

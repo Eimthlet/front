@@ -117,7 +117,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const navigate = useNavigate();
-  const { login: authLogin, isAdmin, error: authError, clearError } = useAuth();
+  const { login: authLogin, register: authRegister, isAdmin, error: authError, clearError } = useAuth();
 
   // Removed unused state variables
 
@@ -246,52 +246,60 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
       }
 
       try {
-        // 1. Send registration info to backend and get tx_ref, public_key, etc.
-        const endpoint = '/auth/register';
         const payload = { username, email, password, phone, amount };
-        
-        const response = await apiClient.post(endpoint, payload);
-        const regResult = response?.data;
-        
-        if (!regResult?.tx_ref || !regResult?.public_key) {
-          setError('Registration initiation failed. Please try again.');
+        console.log('AuthForm: Calling authRegister with payload:', payload);
+        const regResult = await authRegister(payload);
+
+        if (!regResult || !regResult.tx_ref || !regResult.public_key) {
+          // This case should ideally be handled by authRegister throwing an error,
+          // but as a fallback:
+          console.error('AuthForm: authRegister did not return expected payment details.', regResult);
+          setError(authError || 'Registration initiation failed. Please try again.');
           setLoading(false);
           return;
         }
         
-        // 2. Launch PayChangu inline payment popup
+        console.log('AuthForm: authRegister successful, payment details received:', regResult);
+
+        // Launch PayChangu inline payment popup
         const paychanguConfig: PayChanguConfig = {
-          public_key: regResult.public_key as string,
-          tx_ref: regResult.tx_ref as string,
-          amount: regResult.amount as number,
-          currency: PAYMENT_CONFIG.CURRENCY,
-          callback_url: PAYMENT_CONFIG.CALLBACK_URL,
-          return_url: PAYMENT_CONFIG.RETURN_URL,
+          public_key: regResult.public_key,
+          tx_ref: regResult.tx_ref,
+          amount: regResult.amount,
+          currency: PAYMENT_CONFIG.CURRENCY, // Make sure PAYMENT_CONFIG is correctly imported and provides CURRENCY
+          callback_url: PAYMENT_CONFIG.CALLBACK_URL, // Ensure this is the backend callback URL
+          return_url: PAYMENT_CONFIG.RETURN_URL,   // Ensure this is the frontend return URL after backend processing
           customer: {
-            email: regResult.email as string,
-            first_name: username,
-            last_name: ''
+            email: regResult.email,
+            first_name: username, // Or derive from username if needed
+            last_name: '' // Or derive from username if needed
           },
           customization: {
             title: 'Quiz Registration Payment',
-            description: 'Registration fee for quiz platform'
+            description: 'Complete your registration by making the payment.'
+            // logo: 'URL_TO_YOUR_LOGO' // Optional: Add your logo URL here
           },
           meta: {
-            uuid: generateUUID(),
-            response: 'Response'
+            uuid: generateUUID(), // Ensure generateUUID() is defined and works
+            response: 'standard' // As per PayChangu docs, often 'standard' or 'hosted'
           }
         };
-        console.log('PayChangu config:', paychanguConfig);
+
+        console.log('AuthForm: Constructed PayChangu config:', paychanguConfig);
+        
+        // Basic validation of constructed config before launching
         if (!paychanguConfig.public_key || !paychanguConfig.tx_ref || !paychanguConfig.amount || !paychanguConfig.customer.email) {
-          setError('Payment initiation failed. Please contact support.');
+          console.error('AuthForm: Critical payment config data missing before launching PayChangu.', paychanguConfig);
+          setError('Payment initiation failed due to missing configuration. Please contact support.');
           setLoading(false);
           return;
         }
+
         waitForPayChanguAndLaunch(paychanguConfig, setError, setLoading);
-        // 3. Show user a message to complete payment in popup
+        
         setError('Please complete payment in the popup. After payment, your registration will be finalized.');
-        setLoading(false);
-        return;
+        // setLoading(false); // setLoading(false) is called in waitForPayChanguAndLaunch on error, or payment popup takes over.
+        // No explicit return here, as waitForPayChanguAndLaunch handles the flow.
       } catch (err: any) {
         console.error('Registration error:', err);
         

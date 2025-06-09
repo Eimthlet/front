@@ -111,14 +111,14 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
   const [error, setError] = useState<ErrorState | null>(null);
   
   // Helper function to set error state
-  const handleError = (message: string, details?: string) => {
+  const handleError = useCallback((message: string, details?: string) => {
     setError({ message, details });
-  };
+  }, [setError]);
   
   // Helper function to clear error state
-  const clearError = () => {
+  const clearError = useCallback(() => {
     setError(null);
-  };
+  }, [setError]);
   const [success, setSuccess] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationData>({
     total: 0,
