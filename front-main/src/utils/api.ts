@@ -609,5 +609,8 @@ export async function saveProgress(userId: number, score: number, total: number)
   }
 }
 
+// Re-export TokenManager for backward compatibility
+export { TokenManager };
+
 // Export the api instance as default
 export default api;
