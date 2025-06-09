@@ -253,21 +253,29 @@ const SeasonManager: React.FC = () => {
       if (!currentSeason.end_date) {
         throw new Error('End date is required');
       }
+
+      // Ensure dates are valid
+      const startDate = new Date(currentSeason.start_date);
+      const endDate = new Date(currentSeason.end_date);
       
-      // Format dates to YYYY-MM-DD
-      const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toISOString().split('T')[0];
-      };
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        throw new Error('Invalid date format');
+      }
+      
+      if (startDate >= endDate) {
+        throw new Error('End date must be after start date');
+      }
       
       // Prepare the season data with all required fields
       const seasonData = {
         name: currentSeason.name.trim(),
-        start_date: formatDate(currentSeason.start_date),
-        end_date: formatDate(currentSeason.end_date),
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0],
         is_active: Boolean(currentSeason.is_active),
         is_qualification_round: Boolean(currentSeason.is_qualification_round),
-        minimum_score_percentage: Number(currentSeason.minimum_score_percentage) || 70,
+        minimum_score_percentage: currentSeason.is_qualification_round 
+          ? Math.min(100, Math.max(0, Number(currentSeason.minimum_score_percentage) || 50))
+          : 0,
         description: currentSeason.description?.trim() || ''
       };
       
