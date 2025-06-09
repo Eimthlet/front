@@ -206,8 +206,9 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
   useEffect(() => {
     const checkQualification = async () => {
       try {
-        // The API client now returns the data directly
-        const qualificationData = await api.get<QualificationResponse>('/qualification');
+        // The API client returns a response with data property
+        const response = await api.get('/qualification');
+        const qualificationData = response?.data;
         
         // Type guard to validate the response data structure
         if (!qualificationData || typeof qualificationData !== 'object') {
