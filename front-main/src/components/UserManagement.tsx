@@ -201,7 +201,6 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
       setLoading(true);
       clearError();
       
-      const userData = { ...editUser };
       const response = await api.put(`/admin/user/${editUser.id}`, { username: editUser.username, email: editUser.email, phone: editUser.phone, is_disqualified: editUser.is_disqualified, role: editUser.role });
       const updatedUser = response?.data?.user || {};
       
