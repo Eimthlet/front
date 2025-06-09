@@ -79,10 +79,10 @@ const App: React.FC = () => {
         }
         
         // Get the qualification data from the API
-        const response = await api.get<QualificationApiResponse>('/qualification');
+        const response = await api.get('/qualification');
         
-        // The API client now returns the data directly, but we'll add a safety check
-        const responseData = response && typeof response === 'object' ? response : null;
+        // The API client returns a response object with data property
+        const responseData = response?.data;
         
         // Validate the response structure
         if (!responseData) {
@@ -94,7 +94,7 @@ const App: React.FC = () => {
           hasAttempted: false,
           isQualified: false,
           // Include any additional properties that might be present
-          ...responseData
+          ...(responseData || {})
         };
         
         // Set the correct values from the response
@@ -115,12 +115,13 @@ const App: React.FC = () => {
         if (!qualificationData.hasAttempted || qualificationData.isQualified) {
           try {
             // Get questions from the API
-            const questionsData = await api.get<ApiQuestion[] | QuestionsResponse>('/questions');
+            const questionsResponse = await api.get('/questions');
+            const questionsData = questionsResponse?.data;
             
             // Handle both direct array response and wrapped response
             const questions = Array.isArray(questionsData) 
               ? questionsData 
-              : 'questions' in questionsData && Array.isArray(questionsData.questions) 
+              : questionsData && 'questions' in questionsData && Array.isArray(questionsData.questions) 
                 ? questionsData.questions 
                 : [];
                 
