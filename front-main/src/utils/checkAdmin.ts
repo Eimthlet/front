@@ -85,14 +85,16 @@ export const checkAdminStatus = async (): Promise<AdminStatusResponse> => {
     
     // Verify the token with the server
     try {
-      const checkTokenResponse = await api.get<{ valid: boolean; user?: { id: number; email: string; isAdmin: boolean } }>('/auth/check-token');
-      console.log('Token check response:', checkTokenResponse);
+      const checkTokenResponse = await api.get('/auth/check-token');
+      const checkTokenData = checkTokenResponse?.data || {};
+      console.log('Token check response:', checkTokenData);
       
-      if (checkTokenResponse.valid && checkTokenResponse.user?.isAdmin) {
+      if (checkTokenData.valid && checkTokenData.user?.isAdmin) {
         console.log('Server confirms admin status');
         // Verify with the server if the user is still an admin
         try {
-          const userInfo = await api.get<UserInfoResponse>('/auth/me');
+          const userInfoResponse = await api.get('/auth/me');
+          const userInfo = userInfoResponse?.data || {};
           console.log('User info from server:', userInfo);
           
           if (!userInfo || !(userInfo.isAdmin || (userInfo as any).role === 'admin')) {
@@ -167,15 +169,17 @@ export const fixAdminToken = async (): Promise<{ success: boolean; message: stri
     // Try to refresh the token
     try {
       console.log('Attempting to refresh token...');
-      const response = await api.post<RefreshTokenResponse>('/auth/refresh-token', { token });
+      const response = await api.post('/auth/refresh-token', { token });
+      const responseData = response?.data || {};
       
-      if (response.token) {
+      if (!responseData.token) {
+        console.error('No token in refresh response:', response);
+        return { success: false, message: responseData.message || 'Failed to refresh token' };
+      } else {
         // Save the new token
-        localStorage.setItem('token', response.token);
+        localStorage.setItem('token', responseData.token);
         console.log('Token refreshed successfully');
         return { success: true, message: 'Token refreshed successfully' };
-      } else {
-        console.error('No token in refresh response:', response);
         return { success: false, message: response.message || 'Failed to refresh token' };
       }
     } catch (error) {

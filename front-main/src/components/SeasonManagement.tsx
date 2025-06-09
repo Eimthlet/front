@@ -82,8 +82,9 @@ const SeasonManagement: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await api.get<Season[]>('/admin/seasons');
-      setSeasons(data);
+      const response = await api.get('/admin/seasons');
+      const data = Array.isArray(response?.data) ? response.data : [];
+      setSeasons(data as Season[]);
     } catch (err: any) {
       console.error('Error fetching seasons:', err);
       setError(err.message || 'Failed to fetch seasons');

@@ -157,11 +157,11 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
       const apiUrl = `/admin/users?${queryParams.toString()}`;
       console.log('Fetching users from:', apiUrl);
       
-      // Make the API call - the response is already unwrapped by apiClient
-      const response = await api.get<User[]>(apiUrl);
+      // Make the API call and handle the response
+      const response = await api.get(apiUrl);
       
-      // The backend returns a direct array of users
-      const users = Array.isArray(response) ? response : [];
+      // The backend returns the data in response.data
+      const users = Array.isArray(response?.data) ? response.data : [];
       const total = users.length;
       
       console.log('API Response - Users:', users);
@@ -205,12 +205,13 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
       clearError();
       
       const userData = { ...editUser };
-      const data = await api.put<UserResponse>(`/admin/users/${selectedUser.id}`, userData);
+      const response = await api.put(`/admin/users/${selectedUser.id}`, userData);
+      const updatedUser = response?.data?.user || {};
       
       // Update user in the list
       setUsers(prevUsers => 
         prevUsers.map(user => 
-          user.id === selectedUser.id ? { ...user, ...data.user } : user
+          user.id === selectedUser.id ? { ...user, ...updatedUser } : user
         )
       );
       

@@ -72,10 +72,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string): Promise<void> => {
     setError(null);
     try {
-      const response = await api.post<LoginResponse>('/auth/login', { email, password });
+      const response = await api.post('/auth/login', { email, password });
+      const responseData = response?.data || {};
 
-      if (!response.success || !response.token || !response.user) {
-        throw new Error(response.error || 'Login failed: Invalid response from server.');
+      if (!responseData.success || !responseData.token || !responseData.user) {
+        throw new Error(responseData.error || 'Login failed: Invalid response from server.');
       }
       
       localStorage.setItem('token', response.token);
@@ -100,15 +101,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (userData: RegisterData): Promise<void> => {
     setError(null);
     try {
-      const response = await api.post<LoginResponse>('/auth/register', userData);
+      const response = await api.post('/auth/register', userData);
+      const responseData = response?.data || {};
 
-      if (!response.success || !response.token || !response.user) {
-        throw new Error(response.error || 'Registration failed: Invalid response from server.');
+      if (!responseData.success || !responseData.token || !responseData.user) {
+        throw new Error(responseData.error || 'Registration failed: Invalid response from server.');
       }
 
-      localStorage.setItem('token', response.token);
-      if (response.refreshToken) {
-        localStorage.setItem('refreshToken', response.refreshToken);
+      localStorage.setItem('token', responseData.token);
+      if (responseData.refreshToken) {
+        localStorage.setItem('refreshToken', responseData.refreshToken);
       }
 
       const { user } = response;
@@ -150,8 +152,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check token function
   const checkToken = async (): Promise<TokenCheckResponse> => {
     try {
-      const response = await api.get<TokenCheckResponse>('/auth/check-token');
-      return response;
+      const response = await api.get('/auth/check-token');
+      return response?.data || { success: false, error: 'No response data' };
     } catch (error: any) {
       console.error('Token check error details:', error);
       return { success: false, error: handleApiError(error).message };
