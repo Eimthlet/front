@@ -63,13 +63,27 @@ const api: AxiosInstance = axios.create({
   baseURL: baseUrl,
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
   },
   withCredentials: true,
+  timeout: 10000, // 10 seconds timeout
 });
+
+// Log the base URL being used
+console.log('API Base URL:', baseUrl);
 
 // Add a request interceptor to include the auth token
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    console.log('Sending request to:', config.url);
+    console.log('Request config:', {
+      method: config.method,
+      baseURL: config.baseURL,
+      url: config.url,
+      data: config.data,
+      headers: config.headers
+    });
+    
     const token = TokenManager.getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -77,24 +91,39 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
 
 // Add a response interceptor to handle token refresh
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('Received response from:', response.config.url);
+    console.log('Response status:', response.status);
+    console.log('Response data:', response.data);
+    return response;
+  },
   async (error) => {
+    console.error('API Error:', {
+      message: error.message,
+      status: error.response?.status,
+      url: error.config?.url,
+      method: error.config?.method,
+      data: error.response?.data
+    });
+
     const originalRequest = error.config;
     
     // If the error status is 401 and we haven't tried to refresh the token yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest?._retry) {
+      console.log('Attempting to refresh token...');
       originalRequest._retry = true;
       
       try {
         const refreshToken = TokenManager.getRefreshToken();
         if (!refreshToken) {
-          // No refresh token available, redirect to login
+          console.log('No refresh token available, redirecting to login');
           TokenManager.clearTokens();
           window.location.href = '/login';
           return Promise.reject(error);

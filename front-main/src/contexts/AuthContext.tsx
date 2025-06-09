@@ -63,19 +63,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string): Promise<void> => {
     setError(null);
     try {
-      const response = await api.post('/auth/login', { email, password });
+      console.log('Attempting to log in with email:', email);
+      
+      // Basic validation
+      if (!email || !password) {
+        throw new Error('Email and password are required');
+      }
+      
+      const response = await api.post('/auth/login', { email, password })
+        .catch(error => {
+          console.error('Login API call failed:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status,
+            config: {
+              url: error.config?.url,
+              method: error.config?.method,
+              data: error.config?.data
+            }
+          });
+          throw error;
+        });
+        
       const responseData = response?.data || {};
+      console.log('Login response:', responseData);
 
       if (!responseData.success || !responseData.token || !responseData.user) {
+        console.error('Invalid login response:', responseData);
         throw new Error(responseData.error || 'Login failed: Invalid response from server.');
       }
       
-      localStorage.setItem('token', response.token);
-      if (response.refreshToken) {
-        localStorage.setItem('refreshToken', response.refreshToken);
+      localStorage.setItem('token', responseData.token);
+      if (responseData.refreshToken) {
+        localStorage.setItem('refreshToken', responseData.refreshToken);
       }
       
-      const { user } = response;
+      const { user } = responseData;
       setUser(user);
       setIsAuthenticated(true);
       setIsAdmin(user.isAdmin);
