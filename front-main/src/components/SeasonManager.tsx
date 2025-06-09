@@ -321,21 +321,15 @@ const SeasonManager: React.FC = () => {
         ? Math.min(100, Math.max(0, Number(season.minimum_score_percentage) || 50))
         : 50; // Default to 50 if not a qualification round
 
-      // Create the season data object with all required fields
-      const seasonData: Omit<Season, 'id'> = {
+      // Create the season data object with only the fields expected by the server
+      const seasonData = {
         name: season.name || '',
         start_date: season.start_date || '',
         end_date: season.end_date || '',
         is_active: Boolean(season.is_active),
         is_qualification_round: isQualificationRound,
         minimum_score_percentage: minimumScorePercentage,
-        // Optional fields with defaults
-        description: season.description,
-        question_count: 0,
-        attempts_count: 0,
-        qualified_users_count: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        description: season.description
       };
       
       console.log('Submitting season data:', seasonData);

@@ -201,7 +201,18 @@ export async function fetchSeason(id: number): Promise<ApiResponse<Season>> {
   }
 }
 
-export async function createSeason(season: Omit<Season, 'id'>): Promise<ApiResponse<Season>> {
+// Type for creating a new season (only requires essential fields)
+type SeasonCreateData = {
+  name: string;
+  start_date: string;
+  end_date: string;
+  is_active?: boolean;
+  is_qualification_round?: boolean;
+  minimum_score_percentage?: number;
+  description?: string;
+};
+
+export async function createSeason(season: SeasonCreateData): Promise<ApiResponse<Season>> {
   try {
     // Validate season data before sending
     if (!season.name?.trim()) {
@@ -225,7 +236,7 @@ export async function createSeason(season: Omit<Season, 'id'>): Promise<ApiRespo
   }
 }
 
-export async function updateSeason(id: number | string, season: Partial<Season>): Promise<ApiResponse<Season>> {
+export async function updateSeason(id: number | string, season: Partial<SeasonCreateData>): Promise<ApiResponse<Season>> {
   try {
     // Validate season data if dates are provided
     if (season.start_date && season.end_date) {
