@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { createSeason, updateSeason } from '../utils/api';
+import api from '../api';
+import { createSeason, updateSeason } from '../api';
 import {
   Box,
   Button,
@@ -29,10 +30,9 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PeopleIcon from '@mui/icons-material/People';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import api from '../utils/api';
 
 // Import the Season type from our types file
-import { Season as SeasonType } from '../types';
+import { type Season as SeasonType } from '../types';
 
 // TypeScript interfaces
 interface Season extends Omit<SeasonType, 'id'> {

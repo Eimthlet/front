@@ -452,8 +452,8 @@ export async function fetchQuestions(): Promise<ApiResponse<{ questions: Questio
   }
 }
 
-// Export the TokenManager for external access if needed
-export { TokenManager };
-
 // Export the api instance as default
 export default api;
+
+// Export TokenManager separately
+export { TokenManager };
