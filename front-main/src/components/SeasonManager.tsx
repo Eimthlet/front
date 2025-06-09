@@ -50,8 +50,10 @@ interface Season {
 interface Question {
   id?: number | string;
   question_text: string;
+  question?: string; // For backward compatibility
   options: string[];
   correct_answer: string;
+  correctAnswer?: string; // For backward compatibility
   season_id?: number | string;
 }
 
@@ -96,9 +98,12 @@ const SeasonManager: React.FC = () => {
   const [qualifiedUsers, setQualifiedUsers] = useState<QualifiedUser[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<Question>({
     question_text: '',
+    question: '', // For backward compatibility
     options: ['', '', '', ''],
-    correct_answer: ''
-  });
+    correct_answer: '',
+    correctAnswer: '', // For backward compatibility
+    season_id: undefined
+  } as Question); // Type assertion to handle the expanded interface
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -139,9 +144,12 @@ const SeasonManager: React.FC = () => {
     setOpenQuestionsDialog(false);
     setCurrentQuestion({
       question_text: '',
+      question: '', // For backward compatibility
       options: ['', '', '', ''],
-      correct_answer: ''
-    });
+      correct_answer: '',
+      correctAnswer: '', // For backward compatibility
+      season_id: undefined
+    } as Question); // Type assertion to handle the expanded interface
   };
 
   const handleCloseQualifiedUsersDialog = () => {
@@ -174,8 +182,8 @@ const SeasonManager: React.FC = () => {
       setSelectedSeasonId(Number(seasonId));
       
       // Fetch questions for the season
-      const questionsData = await api.get<Question[]>(`/admin/seasons/${seasonId}/questions`);
-      setQuestions(Array.isArray(questionsData) ? questionsData : []);
+      const questionsData = await fetchQuestions(seasonId);
+      setQuestions(questionsData);
       
       setOpenQuestionsDialog(true);
     } catch (err: any) {
@@ -186,6 +194,37 @@ const SeasonManager: React.FC = () => {
       setLoading(false);
     }
   }, []);
+
+  // Fetch questions for a season
+  const fetchQuestions = useCallback(async (seasonId: number | string) => {
+    try {
+      setLoading(true);
+      const questionsData = await api.get<Question[]>(`/admin/seasons/${seasonId}/questions`);
+      
+      // Map the response to ensure consistent field names
+      const normalizedQuestions = (Array.isArray(questionsData) ? questionsData : []).map(q => ({
+        ...q,
+        question: q.question || q.question_text,
+        question_text: q.question_text || q.question || '',
+        correctAnswer: q.correctAnswer || q.correct_answer,
+        correct_answer: q.correct_answer || q.correctAnswer || ''
+      }));
+      
+      setQuestions(normalizedQuestions);
+      return normalizedQuestions;
+    } catch (err: any) {
+      const error = err as ApiError;
+      console.error('Error fetching questions:', error);
+      setError(error.response?.data?.message || 'Failed to fetch questions');
+      setQuestions([]);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Alias for backward compatibility
+  const fetchQuestionsForSeason = fetchQuestions;
 
   // Handle view qualified users
   const handleViewQualifiedUsers = useCallback(async (seasonId: number | string) => {
@@ -220,10 +259,23 @@ const SeasonManager: React.FC = () => {
   }, []);
 
   const handleQuestionChange = useCallback((field: keyof Question, value: string) => {
-    setCurrentQuestion(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setCurrentQuestion(prev => {
+      // Map frontend field names to backend field names
+      const fieldMap: Record<string, string> = {
+        'question': 'question_text',
+        'correctAnswer': 'correct_answer',
+        'question_text': 'question_text',
+        'correct_answer': 'correct_answer'
+      };
+      
+      const backendField = fieldMap[field] || field;
+      
+      return {
+        ...prev,
+        [field]: value, // Keep original for form binding
+        [backendField]: value // Set backend field
+      };
+    });
   }, []);
 
   const handleOptionChange = useCallback((index: number, value: string) => {
@@ -266,11 +318,14 @@ const SeasonManager: React.FC = () => {
         throw new Error('End date must be after start date');
       }
       
+      // Format dates to YYYY-MM-DD
+      const formatDate = (date: Date) => date.toISOString().split('T')[0];
+      
       // Prepare the season data with all required fields
       const seasonData = {
         name: currentSeason.name.trim(),
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
+        start_date: formatDate(startDate),
+        end_date: formatDate(endDate),
         is_active: Boolean(currentSeason.is_active),
         is_qualification_round: Boolean(currentSeason.is_qualification_round),
         minimum_score_percentage: currentSeason.is_qualification_round 
@@ -307,40 +362,79 @@ const SeasonManager: React.FC = () => {
 
   const handleSubmitQuestions = useCallback(async () => {
     try {
-      if (!selectedSeasonId) return;
-      
       setLoading(true);
+      setError('');
       
+      // Use question_text or fall back to question for backward compatibility
+      const questionText = currentQuestion.question_text || currentQuestion.question || '';
+      
+      // Validate question data
+      if (!questionText.trim()) {
+        throw new Error('Question text is required');
+      }
+      
+      if (currentQuestion.options.some(opt => !opt.trim())) {
+        throw new Error('All options must be filled');
+      }
+      
+      // Use correct_answer or fall back to correctAnswer for backward compatibility
+      const correctAnswer = currentQuestion.correct_answer || currentQuestion.correctAnswer || '';
+      
+      if (!correctAnswer.trim()) {
+        throw new Error('Please select a correct answer');
+      }
+      
+      if (!selectedSeasonId) {
+        throw new Error('No season selected');
+      }
+      
+      // Prepare question data for the backend
+      const questionData = {
+        question_text: questionText,
+        question: questionText, // For backward compatibility
+        options: currentQuestion.options,
+        correct_answer: correctAnswer,
+        correctAnswer: correctAnswer, // For backward compatibility
+        season_id: selectedSeasonId
+      };
+      
+      // Send to the backend
       if (currentQuestion.id) {
-        await api.put<Question>(
-          `/admin/seasons/${selectedSeasonId}/questions/${currentQuestion.id}`,
-          currentQuestion
-        );
-        setSuccess('Question updated successfully');
+        await api.put(`/admin/questions/${currentQuestion.id}`, questionData);
       } else {
-        await api.post<Question>(
-          `/admin/seasons/${selectedSeasonId}/questions`,
-          currentQuestion
-        );
-        setSuccess('Question added successfully');
+        // Wrap in a questions array as expected by the server
+        await api.post(`/admin/seasons/${selectedSeasonId}/questions`, {
+          questions: [questionData]
+        });
       }
       
       // Refresh questions
-      const questionsData = await api.get<Question[]>(
-        `/admin/seasons/${selectedSeasonId}/questions`
-      );
-      setQuestions(Array.isArray(questionsData) ? questionsData : []);
+      await fetchQuestions(selectedSeasonId);
       
       // Reset form
       setCurrentQuestion({
         question_text: '',
+        question: '', // For backward compatibility
         options: ['', '', '', ''],
         correct_answer: '',
-        season_id: selectedSeasonId
-      });
+        correctAnswer: '', // For backward compatibility
+        season_id: undefined
+      } as Question); // Type assertion to handle the expanded interface
+      
+      // Refresh questions if we have a selected season
+      if (selectedSeasonId) {
+        await fetchQuestions(selectedSeasonId);
+      }
+      
+      setSuccess('Question saved successfully');
     } catch (err: any) {
       const error = err as ApiError;
-      setError(error.response?.data?.message || error.message || 'Failed to save question');
+      console.error('Error saving question:', error);
+      const errorMessage = error.response?.data?.message || 
+                         error.response?.data?.error || 
+                         error.message || 
+                         'Failed to save question';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

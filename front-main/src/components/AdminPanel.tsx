@@ -8,22 +8,25 @@ import {
   Button, 
   TextField, 
   Typography, 
+  Paper, 
   CircularProgress, 
+  Snackbar, 
+  Alert, 
+  Tabs, 
+  Tab, 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableContainer, 
+  TableHead, 
+  TableRow, 
+  IconButton, 
   FormControl, 
   InputLabel, 
   Select, 
   MenuItem, 
-  Tabs, 
-  Tab,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  Alert
+  SelectChangeEvent,
+  OutlinedInput
 } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -32,12 +35,17 @@ import DeleteIcon from '@mui/icons-material/Delete';
 // Define interfaces
 interface Question {
   id?: number;
-  question: string;
+  question_text: string;  // Backend uses question_text
   options: string[];
-  correctAnswer: string;
-  timeLimit: number;
+  correct_answer: string;  // Backend uses correct_answer
+  time_limit?: number;    // Optional as it's not in backend
   category: string;
   difficulty: string;
+  
+  // For backward compatibility with existing code
+  question?: string;
+  correctAnswer?: string;
+  timeLimit?: number;
 }
 
 interface ErrorState {
@@ -96,13 +104,12 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const [adminCheckFailed, setAdminCheckFailed] = useState(false);
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
-
-  const [newQuestion, setNewQuestion] = useState<Omit<Question, 'id'>>({
-    question: '',
+  const [newQuestion, setNewQuestion] = useState<Question>({
+    question_text: '',
     options: ['', '', '', ''],
-    correctAnswer: '',
-    timeLimit: 30,
-    category: 'General Knowledge',
+    correct_answer: '',
+    time_limit: 30,
+    category: 'General',
     difficulty: 'Medium'
   });
 
@@ -201,12 +208,43 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     setTabValue(newValue);
   };
 
-  // Handle input changes
+  // Handle input changes for text fields
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    
+    // Map frontend field names to backend field names
+    const fieldMap: Record<string, string> = {
+      'question': 'question_text',
+      'correctAnswer': 'correct_answer',
+      'timeLimit': 'time_limit'
+    };
+    
+    const backendField = fieldMap[name] || name;
+    
     setNewQuestion(prev => ({
       ...prev,
-      [name]: value
+      [name]: value, // Keep original for form binding
+      [backendField]: value // Set backend field
+    }));
+  };
+
+  // Handle select changes for Material-UI Select components
+  const handleSelectChange = (e: SelectChangeEvent<string>) => {
+    const { name, value } = e.target as { name: string; value: string };
+    
+    // Map frontend field names to backend field names
+    const fieldMap: Record<string, string> = {
+      'question': 'question_text',
+      'correctAnswer': 'correct_answer',
+      'timeLimit': 'time_limit'
+    };
+    
+    const backendField = fieldMap[name] || name;
+    
+    setNewQuestion(prev => ({
+      ...prev,
+      [name]: value, // Keep original for form binding
+      [backendField]: value // Set backend field
     }));
   };
 
@@ -214,10 +252,19 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...newQuestion.options];
     newOptions[index] = value;
-    setNewQuestion(prev => ({
-      ...prev,
-      options: newOptions
-    }));
+    
+    setNewQuestion(prev => {
+      // If the correct answer was the option being edited, update it
+      const currentCorrectAnswer = prev.correct_answer || prev.correctAnswer;
+      const shouldUpdateCorrectAnswer = currentCorrectAnswer === prev.options[index];
+      
+      return {
+        ...prev,
+        options: newOptions,
+        correct_answer: shouldUpdateCorrectAnswer ? value : prev.correct_answer,
+        correctAnswer: shouldUpdateCorrectAnswer ? value : prev.correctAnswer
+      };
+    });
   };
 
   // Handle form submission
@@ -249,11 +296,12 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       // Submit the question - wrap in a questions array as expected by the server
       await api.post(`/admin/seasons/${selectedSeasonId}/questions`, { 
         questions: [{
-          question_text: newQuestion.question,
+          question_text: newQuestion.question_text || newQuestion.question, // Support both field names
           options: newQuestion.options,
-          correct_answer: newQuestion.correctAnswer,
+          correct_answer: newQuestion.correct_answer || newQuestion.correctAnswer, // Support both field names
           category: newQuestion.category,
-          difficulty: newQuestion.difficulty
+          difficulty: newQuestion.difficulty,
+          time_limit: newQuestion.time_limit || newQuestion.timeLimit // Include time limit if needed
         }] 
       });
       updateSuccess('Question added successfully!');
@@ -261,11 +309,14 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       
       // Reset form
       setNewQuestion({
-        question: '',
+        question_text: '',  // Use backend field name
+        question: '',       // Keep for backward compatibility
         options: ['', '', '', ''],
-        correctAnswer: '',
-        timeLimit: 30,
-        category: 'General Knowledge',
+        correct_answer: '',  // Use backend field name
+        correctAnswer: '',   // Keep for backward compatibility
+        time_limit: 30,      // Use backend field name
+        timeLimit: 30,       // Keep for backward compatibility
+        category: 'General', // Match backend default
         difficulty: 'Medium'
       });
     } catch (error) {
@@ -407,8 +458,8 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
               <TextField
                 fullWidth
                 label="Question"
-                name="question"
-                value={newQuestion.question}
+                name="question_text"
+                value={newQuestion.question_text || ''}
                 onChange={handleInputChange}
                 margin="normal"
                 required
@@ -431,12 +482,10 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                 <Select
                   labelId="correct-answer-label"
                   id="correct-answer"
-                  value={newQuestion.correctAnswer}
-                  onChange={(e) => setNewQuestion(prev => ({
-                    ...prev,
-                    correctAnswer: e.target.value as string
-                  }))}
-                  label="Correct Answer"
+                  name="correctAnswer"
+                  value={newQuestion.correct_answer || newQuestion.correctAnswer || ''}
+                  onChange={handleSelectChange}
+                  input={<OutlinedInput label="Correct Answer" />}
                   required
                 >
                   {newQuestion.options.map((option, index) => (
@@ -450,6 +499,48 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                   ))}
                 </Select>
               </FormControl>
+
+              <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+                <FormControl fullWidth>
+                  <InputLabel>Category</InputLabel>
+                  <Select
+                    name="category"
+                    value={newQuestion.category || 'General'}
+                    onChange={handleSelectChange}
+                    input={<OutlinedInput label="Category" />}
+                  >
+                    <MenuItem value="General">General</MenuItem>
+                    <MenuItem value="Science">Science</MenuItem>
+                    <MenuItem value="History">History</MenuItem>
+                    <MenuItem value="Sports">Sports</MenuItem>
+                    <MenuItem value="Entertainment">Entertainment</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth>
+                  <InputLabel>Difficulty</InputLabel>
+                  <Select
+                    name="difficulty"
+                    value={newQuestion.difficulty || 'Medium'}
+                    onChange={handleSelectChange}
+                    input={<OutlinedInput label="Difficulty" />}
+                  >
+                    <MenuItem value="Easy">Easy</MenuItem>
+                    <MenuItem value="Medium">Medium</MenuItem>
+                    <MenuItem value="Hard">Hard</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <TextField
+                  fullWidth
+                  label="Time Limit (seconds)"
+                  name="timeLimit"
+                  type="number"
+                  value={newQuestion.time_limit || newQuestion.timeLimit || 30}
+                  onChange={handleInputChange}
+                  inputProps={{ min: 10, max: 300 }}
+                />
+              </Box>
 
               <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button 
