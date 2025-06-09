@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createSeason, updateSeason } from '../utils/api';
 import {
   Box,
   Button,
@@ -30,21 +31,12 @@ import PeopleIcon from '@mui/icons-material/People';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import api from '../utils/api';
 
+// Import the Season type from our types file
+import { Season as SeasonType } from '../types';
+
 // TypeScript interfaces
-interface Season {
-  id: number | string;
-  name: string;
-  start_date: string;
-  end_date: string;
-  is_active: boolean;
-  is_qualification_round: boolean;
-  minimum_score_percentage: number;
-  description?: string;
-  question_count: number;
-  attempts_count: number;
-  qualified_users_count: number;
-  created_at: string;
-  updated_at: string;
+interface Season extends Omit<SeasonType, 'id'> {
+  id?: string | number;  // Make id optional to match the API response
 }
 
 interface Question {
@@ -323,58 +315,48 @@ const SeasonManager: React.FC = () => {
       if (season.name) season.name = season.name.trim();
       if (season.description) season.description = season.description.trim();
 
-      // Validate required fields
-      if (!season.name) {
-        throw new Error('Season name is required');
-      }
-      if (!season.start_date) {
-        throw new Error('Start date is required');
-      }
-      if (!season.end_date) {
-        throw new Error('End date is required');
-      }
-
-      // Parse dates
-      const startDate = new Date(season.start_date);
-      const endDate = new Date(season.end_date);
-      
-      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-        throw new Error('Invalid date format. Please use YYYY-MM-DD format.');
-      }
-
-      if (startDate >= endDate) {
-        throw new Error('End date must be after start date');
-      }
-
-      // Format dates as YYYY-MM-DD strings
-      const formatDate = (date: Date) => date.toISOString().split('T')[0];
-
-      // Prepare season data according to backend expectations
+          // Prepare season data according to backend expectations
       const isQualificationRound = Boolean(season.is_qualification_round);
       const minimumScorePercentage = isQualificationRound 
         ? Math.min(100, Math.max(0, Number(season.minimum_score_percentage) || 50))
         : 50; // Default to 50 if not a qualification round
 
-      const seasonData = {
-        name: season.name,
-        start_date: formatDate(startDate),
-        end_date: formatDate(endDate),
+      // Create the season data object with all required fields
+      const seasonData: Omit<Season, 'id'> = {
+        name: season.name || '',
+        start_date: season.start_date || '',
+        end_date: season.end_date || '',
         is_active: Boolean(season.is_active),
         is_qualification_round: isQualificationRound,
         minimum_score_percentage: minimumScorePercentage,
-        description: season.description || ''
+        // Optional fields with defaults
+        description: season.description,
+        question_count: 0,
+        attempts_count: 0,
+        qualified_users_count: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
       
       console.log('Submitting season data:', seasonData);
       
       let response;
       if (dialogMode === 'create') {
-        response = await api.post<Season>('/admin/seasons', seasonData);
-        console.log('Season created:', response);
-        setSuccess('Season created successfully');
+        // Use the API client's createSeason function which handles validation
+        const response = await createSeason(seasonData);
+        if (response.success && response.data) {
+          console.log('Season created:', response.data);
+          setSuccess('Season created successfully');
+          // Refresh the seasons list
+          const seasonsResponse = await api.get<Season[]>('/admin/seasons');
+          setSeasons(Array.isArray(seasonsResponse) ? seasonsResponse : []);
+        } else {
+          throw new Error('Failed to create season');
+        }
       } else if (season.id) {
-        response = await api.put<Season>(`/admin/seasons/${season.id}`, seasonData);
-        console.log('Season updated:', response);
+        // For updates, use the API client's updateSeason function
+        const result = await updateSeason(season.id, seasonData);
+        console.log('Season updated:', result);
         setSuccess('Season updated successfully');
       }
       
