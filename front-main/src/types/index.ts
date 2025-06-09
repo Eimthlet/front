@@ -1,9 +1,11 @@
-export interface ApiResponse<T> {
+export interface ApiResponse<T = any> {
   data: T;
+  success: boolean;
+  error?: string;
   status: number;
   statusText: string;
-  headers: any;
-  config: any;
+  headers?: any;
+  config?: any;
 }
 
 export interface ApiError {

@@ -1,6 +1,8 @@
-import axios from 'axios';
-import { API_CONFIG } from '../config';
 import { ApiResponse, Season, Question, QualifiedUser, QuizResult } from '../types';
+import apiClient from './apiClient'; // Import the apiClient
+
+// Re-export the ApiResponse type for consistency
+export type { ApiResponse };
 
 // Extend Window interface to include onAuthError
 declare global {
@@ -15,8 +17,9 @@ interface AuthResponse {
 }
 
 // Token storage using localStorage for persistence
+// This should match the token storage in apiClient.ts
 class TokenManager {
-  private static readonly TOKEN_KEY = 'auth_token';
+  private static readonly TOKEN_KEY = 'token';
   private static readonly REFRESH_TOKEN_KEY = 'refresh_token';
 
   static setTokens(token: string, refreshToken: string) {
@@ -56,95 +59,53 @@ class TokenManager {
   }
 }
 
-// Create axios instance with default config
-export const api = axios.create({
-  baseURL: API_CONFIG.BASE_URL,
-  timeout: API_CONFIG.TIMEOUT,
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  withCredentials: API_CONFIG.WITH_CREDENTIALS
-});
+// Use the apiClient for all API calls
+// It handles request/response interception and token management
+const api = {
+  get: apiClient.get,
+  post: apiClient.post,
+  put: apiClient.put,
+  delete: apiClient.delete
+};
 
-// Request interceptor for authentication
-api.interceptors.request.use(
-  (config) => {
-    const token = TokenManager.getToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    console.error('API Request Error:', error);
-    return Promise.reject(error);
-  }
-);
+// Helper function to ensure consistent response format
+const formatResponse = <T>(data: T, status = 200, statusText = 'OK'): ApiResponse<T> => {
+  return {
+    data,
+    success: true,
+    status,
+    statusText,
+    headers: {},
+    config: {}
+  } as ApiResponse<T>;
+};
 
-// Response interceptor for error handling
-api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  async (error) => {
-    const originalRequest = error.config;
-    
-    // Handle 401 Unauthorized (token expired)
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      
-      try {
-        const refreshToken = TokenManager.getRefreshToken();
-        if (!refreshToken) {
-          throw new Error('No refresh token available');
-        }
-        
-        const refreshResponse = await api.post<AuthResponse>('/auth/refresh', { refreshToken });
-        TokenManager.setTokens(
-          refreshResponse.data.token, 
-          refreshResponse.data.refreshToken
-        );
-        
-        // Retry the original request
-        return api(originalRequest);
-      } catch (refreshError) {
-        console.error('Refresh token failed:', refreshError);
-        // Clear tokens and handle logout
-        TokenManager.clearTokens();
-        // Instead of redirecting, emit an event or call a callback
-        const onAuthError = (window as any).onAuthError;
-        if (onAuthError) {
-          onAuthError();
-        }
-        return Promise.reject(refreshError);
-      }
-    }
-    
-    // Handle other errors
-    if (error.response) {
-      const errorData = error.response.data;
-      throw new Error(errorData.error || errorData.message || 'API request failed');
-    }
-    
-    throw error;
-  }
-);
+// Helper function to format error response
+const formatError = <T>(error: any, defaultMessage = 'An error occurred'): ApiResponse<T> => {
+  const message = error.message || defaultMessage;
+  const status = error.status || 500;
+  const statusText = error.statusText || 'Error';
+  
+  return {
+    data: {} as T,
+    success: false,
+    error: message,
+    status,
+    statusText,
+    headers: error.headers || {},
+    config: error.config || {}
+  } as ApiResponse<T>;
+};
 
 // Auth API
 export async function login(email: string, password: string): Promise<ApiResponse<AuthResponse>> {
   try {
-    const response = await api.post('/auth/login', { email, password });
-    const authData = response.data as AuthResponse;
-    
-    // Store tokens in memory
-    TokenManager.setTokens(authData.token, authData.refreshToken);
-    
-    return {
-      data: authData,
-      success: true
-    };
-  } catch (error) {
-    throw error;
+    const response = await api.post<AuthResponse>('/auth/login', { email, password });
+    TokenManager.setTokens(response.token, response.refreshToken);
+    return formatResponse(response);
+  } catch (error: any) {
+    console.error('Login error:', error);
+    return formatError<AuthResponse>(error, 'Failed to login');
   }
 }
 
@@ -173,17 +134,17 @@ export async function register(userData: {
 
 export async function refreshToken(refreshToken: string): Promise<ApiResponse<AuthResponse>> {
   try {
-    const response = await api.post('/auth/refresh', { refreshToken });
-    const authData = response.data as AuthResponse;
-    
-    // Update stored tokens
-    TokenManager.setTokens(authData.token, authData.refreshToken);
-    
-    return {
-      data: authData,
-      success: true
-    };
-  } catch (error) {
+    const response = await api.post<AuthResponse>('/auth/refresh-token', { refreshToken });
+    TokenManager.setTokens(response.token, response.refreshToken);
+    return formatResponse(response);
+  } catch (error: any) {
+    console.error('Token refresh failed:', error);
+    // Clear tokens on refresh failure
+    TokenManager.clearTokens();
+    // Notify any auth error handlers
+    if (typeof window.onAuthError === 'function') {
+      window.onAuthError();
+    }
     throw error;
   }
 }
@@ -232,145 +193,72 @@ type SeasonCreateData = {
 
 export async function createSeason(season: SeasonCreateData): Promise<ApiResponse<Season>> {
   try {
-    // Validate season data before sending
-    if (!season.name?.trim()) {
-      throw new Error('Season name is required');
-    }
-    if (!season.start_date || !season.end_date) {
-      throw new Error('Start date and end date are required');
-    }
-    if (new Date(season.start_date) >= new Date(season.end_date)) {
-      throw new Error('End date must be after start date');
+    // Ensure required fields are present
+    if (!season.name || !season.start_date || !season.end_date) {
+      throw { message: 'Missing required season fields', status: 400 };
     }
 
-    // Create a new object with only the fields we want to send
+    // Validate dates
+    const startDate = new Date(season.start_date);
+    const endDate = new Date(season.end_date);
+    
+    if (startDate >= endDate) {
+      throw { message: 'End date must be after start date', status: 400 };
+    }
+
+    // Prepare the payload with default values for optional fields
     const payload = {
-      name: season.name.trim(),
+      name: season.name,
+      description: season.description || '',
       start_date: season.start_date,
       end_date: season.end_date,
-      is_active: season.is_active || false,
-      is_qualification_round: season.is_qualification_round || false,
-      minimum_score_percentage: season.minimum_score_percentage || 50
+      is_active: season.is_active ?? false,
+      is_qualification_round: season.is_qualification_round ?? false,
+      minimum_score_percentage: season.minimum_score_percentage || 0,
     };
 
-    console.log('Sending request to /admin/seasons with data:', JSON.stringify(payload, null, 2));
+    console.log('Creating season with payload:', payload);
     
-    // Ensure we're sending proper JSON with explicit headers
-    // Remove any trailing /api from the base URL if present
-    let baseUrl = process.env.REACT_APP_API_URL || '';
-    if (baseUrl.endsWith('/api')) {
-      baseUrl = baseUrl.substring(0, baseUrl.length - 4);
-    } else if (baseUrl.endsWith('/api/')) {
-      baseUrl = baseUrl.substring(0, baseUrl.length - 5);
-    }
+    // Use the apiClient for the request
+    const response = await api.post<Season>('/admin/seasons', payload);
+    console.log('Season created successfully:', response);
     
-    // Get the authentication token
-    const token = TokenManager.getToken();
-    if (!token) {
-      throw new Error('No authentication token found. Please log in again.');
-    }
-    
-    console.log('Using base URL:', baseUrl);
-    console.log('Using token:', token ? 'Token found' : 'No token');
-    
-    const response = await fetch(`${baseUrl}/admin/seasons`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      credentials: 'include',
-      body: JSON.stringify(payload)
-    });
-    
-    const responseData = await response.json();
-    
-    console.log('Received response status:', response.status);
-    console.log('Response data:', responseData);
-    
-    if (!response.ok) {
-      throw new Error(responseData.message || 'Failed to create season');
-    }
-    
-    return {
-      data: responseData as Season,
-      success: true
-    };
-  } catch (error) {
+    return formatResponse(response, 201, 'Created');
+  } catch (error: any) {
     console.error('Error creating season:', error);
-    throw error;
+    return formatError<Season>(error, 'Failed to create season');
   }
 }
 
 export async function updateSeason(id: number | string, season: Partial<SeasonCreateData>): Promise<ApiResponse<Season>> {
   try {
-    // Validate season data if dates are provided
-    if (season.start_date && season.end_date) {
-      if (new Date(season.start_date) >= new Date(season.end_date)) {
-        throw new Error('End date must be after start date');
-      }
+    // Validate dates if both are provided
+    if (season.start_date && season.end_date && new Date(season.start_date) >= new Date(season.end_date)) {
+      throw new Error('End date must be after start date');
     }
 
-    // Create a new object with only the fields we want to send
-    const payload = {
-      name: season.name?.trim(),
-      start_date: season.start_date,
-      end_date: season.end_date,
-      is_active: season.is_active,
-      is_qualification_round: season.is_qualification_round,
-      minimum_score_percentage: season.minimum_score_percentage,
-      description: season.description
-    };
+    // Only include fields that are provided and not undefined
+    const payload: Record<string, any> = {};
+    if (season.name !== undefined) payload.name = season.name.trim();
+    if (season.start_date !== undefined) payload.start_date = season.start_date;
+    if (season.end_date !== undefined) payload.end_date = season.end_date;
+    if (season.is_active !== undefined) payload.is_active = season.is_active;
+    if (season.is_qualification_round !== undefined) payload.is_qualification_round = season.is_qualification_round;
+    if (season.minimum_score_percentage !== undefined) payload.minimum_score_percentage = season.minimum_score_percentage;
+    if (season.description !== undefined) payload.description = season.description;
 
     console.log(`Sending request to /admin/seasons/${id} with data:`, JSON.stringify(payload, null, 2));
     
-    // Remove any trailing /api from the base URL if present
-    let baseUrl = process.env.REACT_APP_API_URL || '';
-    if (baseUrl.endsWith('/api')) {
-      baseUrl = baseUrl.substring(0, baseUrl.length - 4);
-    } else if (baseUrl.endsWith('/api/')) {
-      baseUrl = baseUrl.substring(0, baseUrl.length - 5);
-    }
-    
-    // Get the authentication token
-    const token = TokenManager.getToken();
-    if (!token) {
-      throw new Error('No authentication token found. Please log in again.');
-    }
-    
-    console.log('Using base URL:', baseUrl);
-    console.log('Using token:', token ? 'Token found' : 'No token');
-    
-    const response = await fetch(`${baseUrl}/admin/seasons/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      credentials: 'include',
-      body: JSON.stringify(payload)
-    });
-    
-    const responseData = await response.json();
-    
-    console.log('Received response status:', response.status);
-    console.log('Response data:', responseData);
-    
-    if (!response.ok) {
-      throw new Error(responseData.message || 'Failed to update season');
-    }
-    
-    return {
-      data: responseData as Season,
-      success: true
+    // Use the apiClient for consistent API handling
+    const response = await apiClient.put<Season>(`/admin/seasons/${id}`, payload);
+    // The apiClient already extracts the data property, so we can use it directly
+    return { 
+      data: response as Season,
+      success: true 
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error updating season ${id}:`, error);
-    throw error;
+    throw new Error(error.message || 'Failed to update season');
   }
 }
 

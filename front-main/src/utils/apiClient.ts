@@ -9,12 +9,12 @@ export interface ApiResponse<T = any> {
 }
 
 // Define the API client type - returns unwrapped data, not ApiResponse
-type ApiClient = {
-  get: <T = any>(url: string, config?: any) => Promise<T>;
-  post: <T = any, D = any>(url: string, data?: D, config?: any) => Promise<T>;
-  put: <T = any, D = any>(url: string, data?: D, config?: any) => Promise<T>;
-  delete: <T = any>(url: string, config?: any) => Promise<T>;
-};
+interface IApiClient {
+  get<T = any>(url: string, config?: any): Promise<T>;
+  post<T = any, D = any>(url: string, data?: D, config?: any): Promise<T>;
+  put<T = any, D = any>(url: string, data?: D, config?: any): Promise<T>;
+  delete<T = any>(url: string, config?: any): Promise<T>;
+}
 
 // Determine the API base URL based on the environment
 const getBaseUrl = () => {
@@ -40,7 +40,7 @@ const getBaseUrl = () => {
 const baseUrl = getBaseUrl().replace(/\/+$/, '');
 
 // Create a custom Axios instance
-const apiClient = axios.create({
+const axiosInstance = axios.create({
   baseURL: baseUrl,
   timeout: 30000,
   withCredentials: true,
@@ -50,17 +50,8 @@ const apiClient = axios.create({
   }
 });
 
-// Helper function to extract data from API response
-const extractApiData = <T,>(response: any): T => {
-  // Handle both wrapped ApiResponse and direct response
-  if (response && typeof response === 'object' && 'data' in response) {
-    return response.data;
-  }
-  return response;
-};
-
-// Request interceptor
-apiClient.interceptors.request.use(
+// Request interceptor to add auth token and handle URLs
+axiosInstance.interceptors.request.use(
   (config) => {
     // Add token to request if available
     const token = localStorage.getItem('token');
@@ -110,9 +101,9 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor
-apiClient.interceptors.response.use(
-  (response: any) => {
+// Response interceptor to handle errors and logging
+axiosInstance.interceptors.response.use(
+  (response) => {
     // Log the response for debugging
     console.log('[Response]', response.config.method?.toUpperCase(), response.config.url, response.status);
     return response;
@@ -142,47 +133,28 @@ apiClient.interceptors.response.use(
   }
 );
 
+// Helper function to extract data from API response
+function extractApiData<T>(response: any): T {
+  // Handle both direct data and nested data property
+  if (response && typeof response === 'object' && 'data' in response) {
+    return response.data as T;
+  }
+  return response as T;
+}
+
 // Create typed API methods that return unwrapped data
-const api: ApiClient = {
+const api: IApiClient = {
   get: <T = any>(url: string, config?: any) => 
-    new Promise<T>((resolve, reject) => {
-      apiClient.get<T>(url, config)
-        .then((response) => {
-          const data = extractApiData<T>(response.data);
-          resolve(data);
-        })
-        .catch(reject);
-    }),
+    axiosInstance.get<T>(url, config).then(response => response.data),
     
   post: <T = any, D = any>(url: string, data?: D, config?: any) => 
-    new Promise<T>((resolve, reject) => {
-      apiClient.post<T>(url, data, config)
-        .then((response) => {
-          const responseData = extractApiData<T>(response.data);
-          resolve(responseData);
-        })
-        .catch(reject);
-    }),
+    axiosInstance.post<T>(url, data, config).then(response => response.data),
     
   put: <T = any, D = any>(url: string, data?: D, config?: any) => 
-    new Promise<T>((resolve, reject) => {
-      apiClient.put<T>(url, data, config)
-        .then((response) => {
-          const responseData = extractApiData<T>(response.data);
-          resolve(responseData);
-        })
-        .catch(reject);
-    }),
+    axiosInstance.put<T>(url, data, config).then(response => response.data),
     
   delete: <T = any>(url: string, config?: any) => 
-    new Promise<T>((resolve, reject) => {
-      apiClient.delete<T>(url, config)
-        .then((response) => {
-          const responseData = extractApiData<T>(response.data);
-          resolve(responseData);
-        })
-        .catch(reject);
-    })
-};
+    axiosInstance.delete<T>(url, config).then(response => response.data)
+} as IApiClient;
 
 export default api;
