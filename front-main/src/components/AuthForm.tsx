@@ -346,9 +346,13 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
       
       // After successful login, navigate to the appropriate page based on user role
       // The isAdmin state will be updated by the authLogin function
+      // Navigation is now primarily handled by App.tsx based on `user` state change from AuthContext.
+      // The navigation here is likely redundant and might conflict.
+      /*
       setTimeout(() => {
         navigate(isAdmin ? '/admin' : '/quiz', { replace: true });
-      }, 500); // Small delay to ensure state is updated
+      }, 500); 
+      */
     } catch (err: any) {
       console.error('Authentication error:', err);
       
