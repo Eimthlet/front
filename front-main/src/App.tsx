@@ -1,19 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { ThemeProvider, CssBaseline, Box, Typography, Button } from '@mui/material';
-import { theme } from './theme';
+import { ThemeProvider, CssBaseline, Box, Typography, CircularProgress, Button } from '@mui/material';
+import { useAuth } from './contexts/AuthContext';
+import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
 import Quiz from './components/Quiz';
-import Navigation from './components/Navigation';
 import AuthForm from './components/AuthForm';
+import api from './utils/api';
+import { theme } from './theme';
+import Navigation from './components/Navigation';
 import AdminDashboard from './components/AdminDashboard';
 import UserManagement from './components/UserManagement';
 import Leaderboard from './components/Leaderboard';
-import AdminDiagnostic from './components/AdminDiagnostic';
-import AdminPanel from './components/AdminPanel';
-import ProtectedRoute from './components/ProtectedRoute';
-import Layout from './components/Layout';
-import { useAuth } from './contexts/AuthContext';
-import api from './api';
+
+// Internal question format from API
+interface ApiQuestion {
+  id: string | number;
+  question_text?: string;
+  question?: string;
+  options: string[];
+  correct_answer?: string | number;
+  correctAnswer?: string;
+  timeLimit?: number;
+  explanation?: string;
+}
+
+// Quiz component's expected question format
+interface QuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  timeLimit?: number;
+  explanation?: string;
+}
 
 interface QualificationResponse {
   hasAttempted: boolean;
@@ -28,267 +48,190 @@ interface QualificationResponse {
   completed_at?: string;
 }
 
-type QuizQuestion = {
-  id: string;
-  question: string;
-  options: string[];
-  correctAnswer: string;
-  timeLimit?: number;
-}
-
 const App: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
-
-  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [questions, setQuestions] = useState<ApiQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [qualification, setQualification] = useState<QualificationResponse | null>(null);
 
-  useEffect(() => {
-    const validateAndFetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        if (!user) {
-          setLoading(false);
-          return;
-        }
-        
-        // Get the qualification data from the API
-        const response = await api.get('/qualification');
-        
-        // The API client returns a response object with data property
-        const responseData = response?.data;
-        
-        // Validate the response structure
-        if (!responseData) {
-          throw new Error('Invalid response format from qualification endpoint');
-        }
-        
-        // Create a properly typed qualification object
-        const qualificationData: QualificationResponse = {
-          hasAttempted: false,
-          isQualified: false,
-          // Include any additional properties that might be present
-          ...(responseData || {})
+  const fetchQualification = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+      
+      // Get the qualification data from the API
+      const response = await api.get('/qualification');
+      const responseData = response?.data;
+      
+      if (responseData && typeof responseData === 'object') {
+        const qualData = {
+          hasAttempted: Boolean(responseData.hasAttempted),
+          isQualified: Boolean(responseData.isQualified || responseData.qualifies_for_next_round),
+          message: responseData.message,
+          ...responseData
         };
         
-        // Set the correct values from the response
-        if ('hasAttempted' in responseData) {
-          qualificationData.hasAttempted = Boolean(responseData.hasAttempted);
-        }
-        
-        if ('isQualified' in responseData || 'qualifies_for_next_round' in responseData) {
-          qualificationData.isQualified = Boolean(
-            (responseData as any).isQualified || 
-            (responseData as any).qualifies_for_next_round
-          );
-        }
-        
-        setQualification(qualificationData);
+        setQualification(qualData);
         
         // Only fetch questions if user is qualified or hasn't attempted yet
-        if (!qualificationData.hasAttempted || qualificationData.isQualified) {
+        if (!qualData.hasAttempted || qualData.isQualified) {
           try {
-            // Get questions from the API
             const questionsResponse = await api.get('/questions');
             const questionsData = questionsResponse?.data;
             
-            // Handle both direct array response and wrapped response
-            const questions = Array.isArray(questionsData) 
+            const fetchedQuestions = Array.isArray(questionsData) 
               ? questionsData 
-              : questionsData && 'questions' in questionsData && Array.isArray(questionsData.questions) 
-                ? questionsData.questions 
-                : [];
-                
-            // Map the API question format to the Quiz component's expected format
-            const mappedQuestions = questions.map((q) => {
-              // Check if this is an ApiQuestion (has question_text and correct_answer)
-              if ('question_text' in q && 'correct_answer' in q) {
-                return {
-                  id: q.id?.toString() || Math.random().toString(36).substr(2, 9),
-                  question: q.question_text,
-                  options: q.options,
-                  correctAnswer: q.correct_answer,
-                  timeLimit: 30 // Default time limit if not provided
-                };
-              }
-              // Otherwise, assume it's already in the correct QuizQuestion format
-              return q as QuizQuestion;
-            });
-            
-            setQuestions(mappedQuestions);
-          } catch (apiError: any) {
-            console.error('Error fetching questions:', apiError);
-            setError(apiError.message || 'Failed to load questions');
-            setQuestions([]);
+              : questionsData?.questions || [];
+              
+            setQuestions(fetchedQuestions);
+          } catch (err) {
+            console.error('Error fetching questions:', err);
+            setError('Failed to load questions');
           }
         }
-      } catch (err: any) {
-        console.error('Failed to fetch data:', err);
-        setError(err.message || 'Failed to load data');
-        
-        // If unauthorized, clear tokens and redirect to login
-        if (err.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
-          navigate('/login');
-        }
-      } finally {
-        setLoading(false);
+      } else {
+        setQualification({
+          hasAttempted: false,
+          isQualified: false,
+          message: 'Could not determine qualification status'
+        });
       }
-    };
-
-    validateAndFetchData();
-  }, [navigate, user]);
-
-  const handleQuizComplete = async (score: number) => {
-    try {
-      await api.post('/progress', { 
-        userId: user?.id, 
-        score, 
-        total: questions.length 
-      });
     } catch (err) {
-      console.error('Error submitting quiz progress:', err);
+      console.error('Error fetching qualification:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load qualification data');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    fetchQualification();
+  }, [fetchQualification]);
+
+  const handleQuizComplete = useCallback(async (score: number) => {
+    try {
+      setLoading(true);
+      await api.post('/quiz/submit', { score });
+      await fetchQualification(); // Refresh qualification status
+    } catch (err) {
+      console.error('Error submitting quiz:', err);
+      setError('Failed to submit quiz results');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchQualification]);
+
+  // Render loading state
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // Render error state
+  if (error) {
+    return (
+      <Box p={4}>
+        <Typography color="error" variant="h6">
+          {error}
+        </Typography>
+        <Button onClick={fetchQualification} variant="contained" sx={{ mt: 2 }}>
+          Retry
+        </Button>
+      </Box>
+    );
+  }
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)'
-      }}>
-        <Navigation />
-        <Box component="main" sx={{ 
-          flexGrow: 1,
-          '& .MuiButton-contained': {
-            background: 'rgba(255, 255, 255, 0.1)',
-            color: '#fff',
-            '&:hover': {
-              background: 'rgba(255, 255, 255, 0.2)',
-            },
-            textTransform: 'none',
-          },
-          '& .MuiTypography-root': {
-            color: '#fff',
-          },
-          '& .MuiCard-root': {
-            background: 'rgba(18, 18, 18, 0.8)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
-          }
-        }}>
-          <Routes>
-            {/* Auth routes */}
-            <Route path="/login" element={
-              user ? <Navigate to={isAdmin ? '/admin' : '/quiz'} replace /> : <AuthForm mode="login" />
-            } />
-            <Route path="/register" element={
-              user ? <Navigate to={isAdmin ? '/admin' : '/quiz'} replace /> : <AuthForm mode="register" />
-            } />
-
-            {/* Protected admin routes - must come first */}
-            <Route path="/admin/*" element={
-              <ProtectedRoute requiredAdmin>
-                <Layout>
-                  <Routes>
-                    <Route path="" element={<AdminDashboard />} />
-                    <Route path="users" element={<UserManagement />} />
-                    <Route path="diagnostic" element={<AdminDiagnostic />} />
-                    <Route path="panel" element={<AdminPanel />} />
-                    <Route path="*" element={<Navigate to="" replace />} />
-                  </Routes>
-                </Layout>
-              </ProtectedRoute>
-            } />
-
-            {/* Protected user routes */}
-            <Route path="/quiz" element={
-              <ProtectedRoute>
-                <Layout>
-                  {loading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-                      <Typography variant="h5" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                        Loading questions...
-                      </Typography>
-                    </Box>
-                  ) : error ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-                      <Typography variant="h5" sx={{ color: '#ff6b6b' }}>
-                        {error}
-                      </Typography>
-                    </Box>
-                  ) : qualification?.hasAttempted && !qualification.isQualified ? (
-                    <Box sx={{ textAlign: 'center', mt: 10 }}>
-                      <Typography variant="h4" sx={{ color: '#ff6b6b', mb: 2 }}>
-                        Quiz Access Restricted
-                      </Typography>
-                      <Typography variant="h6" sx={{ color: 'rgba(255, 255, 255, 0.8)', mb: 3 }}>
-                        You have already attempted the quiz for this season.
-                      </Typography>
-                      <Box sx={{ background: 'rgba(0,0,0,0.2)', p: 3, borderRadius: 2, maxWidth: '500px', mx: 'auto' }}>
-                        <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 2 }}>
-                          Your Score: {qualification.score}
-                        </Typography>
-                        <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                          Required Score: {qualification.minimumRequired}
-                        </Typography>
-                      </Box>
-                      <Button 
-                        variant="contained" 
-                        sx={{ mt: 4, background: 'rgba(255,255,255,0.1)' }}
-                        onClick={() => navigate('/leaderboard')}
-                      >
-                        View Leaderboard
-                      </Button>
-                    </Box>
-                  ) : questions.length > 0 ? (
-                    <Quiz questions={questions} onComplete={handleQuizComplete} />
-                  ) : (
-                    <Box sx={{ textAlign: 'center', mt: 10 }}>
-                      <Typography variant="h4" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                        No questions available
-                      </Typography>
-                      <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
-                        Please wait for the next quiz season
-                      </Typography>
-                    </Box>
-                  )}
-                </Layout>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/leaderboard" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Leaderboard />
-                </Layout>
-              </ProtectedRoute>
-            } />
-
-            {/* Default routes */}
-            <Route path="/" element={
-              !user ? <Navigate to="/login" replace /> :
-              isAdmin ? <Navigate to="/admin" replace /> :
-              <Navigate to="/leaderboard" replace />
-            } />
-            
-            {/* Catch-all route */}
-            <Route path="*" element={
-              !user ? <Navigate to="/login" replace /> :
-              isAdmin ? <Navigate to="/admin" replace /> :
-              <Navigate to="/quiz" replace />
-            } />
-          </Routes>
-        </Box>
+      <Navigation />
+      <Box component="main" sx={{ p: 3 }}>
+        <Routes>
+          <Route path="/login" element={!user ? <AuthForm mode="login" /> : <Navigate to="/" replace />} />
+          
+          <Route path="/admin" element={
+            <ProtectedRoute requiredAdmin={true}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/admin/users" element={
+            <ProtectedRoute requiredAdmin={true}>
+              <UserManagement />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/quiz" element={
+            <ProtectedRoute>
+              <Layout>
+                {qualification?.hasAttempted && !qualification?.isQualified ? (
+                  <Box textAlign="center" mt={10}>
+                    <Typography variant="h5" color="error" gutterBottom>
+                      Quiz Attempted
+                    </Typography>
+                    <Typography variant="body1" mb={4}>
+                      {qualification.message || 'You have already attempted this quiz.'}
+                    </Typography>
+                    <Button 
+                      variant="contained" 
+                      color="primary" 
+                      onClick={() => navigate('/leaderboard')}
+                    >
+                      View Leaderboard
+                    </Button>
+                  </Box>
+                ) : questions.length > 0 ? (
+                  <Quiz 
+                    questions={questions.map(q => ({
+                      id: q.id.toString(),
+                      question: q.question || q.question_text || 'No question text',
+                      options: q.options,
+                      correctAnswer: q.correctAnswer || q.correct_answer?.toString() || '',
+                      timeLimit: q.timeLimit,
+                      explanation: q.explanation
+                    }))} 
+                    onComplete={handleQuizComplete} 
+                  />
+                ) : (
+                  <Box textAlign="center" mt={10}>
+                    <Typography variant="h5" gutterBottom>
+                      No Questions Available
+                    </Typography>
+                    <Typography variant="body1">
+                      There are no questions available at the moment. Please check back later.
+                    </Typography>
+                  </Box>
+                )}
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/leaderboard" element={
+            <ProtectedRoute>
+              <Layout>
+                <Leaderboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/" element={
+            <Navigate to={user ? (isAdmin ? '/admin' : '/quiz') : '/login'} replace />
+          } />
+          
+          <Route path="*" element={
+            <Navigate to="/" replace />
+          } />
+        </Routes>
       </Box>
     </ThemeProvider>
   );
