@@ -332,7 +332,17 @@ const SeasonManager: React.FC = () => {
         description: season.description
       };
       
-      console.log('Submitting season data:', seasonData);
+      // Add detailed logging
+      console.log('Raw season state:', JSON.stringify(season, null, 2));
+      console.log('Processed season data:', JSON.stringify(seasonData, null, 2));
+      console.log('Field checks:', {
+        hasName: !!season.name,
+        hasStartDate: !!season.start_date,
+        hasEndDate: !!season.end_date,
+        nameValue: season.name,
+        startDateValue: season.start_date,
+        endDateValue: season.end_date
+      });
       
       if (dialogMode === 'create') {
         // Use the API client's createSeason function which handles validation

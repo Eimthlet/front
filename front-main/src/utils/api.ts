@@ -225,7 +225,9 @@ export async function createSeason(season: SeasonCreateData): Promise<ApiRespons
       throw new Error('End date must be after start date');
     }
 
+    console.log('Sending request to /admin/seasons with data:', JSON.stringify(season, null, 2));
     const response = await api.post('/admin/seasons', season);
+    console.log('Received response:', response.status, response.data);
     return {
       data: response.data as Season,
       success: true
