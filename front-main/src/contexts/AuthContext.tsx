@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/apiClient';
-import { handleApiError } from '../utils/apiErrorHandler';
+import { handleApiError, NormalizedApiError } from '../utils/apiErrorHandler';
 
 // Define User and AuthContextType interfaces locally
 interface User {
@@ -20,9 +20,10 @@ interface AuthState {
 }
 
 interface TokenCheckResponse {
-  success: boolean;
+  isAuthenticated: boolean; // Changed from success
   user?: User;
   error?: string;
+  code?: string; // Added to match backend error response
 }
 
 // Combined type for the context value, including state and action dispatchers
@@ -208,10 +209,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const checkToken = async (): Promise<TokenCheckResponse> => {
     try {
       const response = await api.get('/auth/check-token');
-      return response?.data || { success: false, error: 'No response data' };
+      // Backend returns isAuthenticated directly, not nested under 'data' for this specific helper
+      // and also doesn't use a 'success' field for this endpoint.
+      return response?.data || { isAuthenticated: false, error: 'No response data from /auth/check-token' };
     } catch (error: any) {
       console.error('Token check error details:', error);
-      return { success: false, error: handleApiError(error).message };
+      const apiError: NormalizedApiError = handleApiError(error);
+      return { 
+        isAuthenticated: false, 
+        error: apiError.message, 
+        code: apiError.code // Now safe to access directly
+      };
     }
   };
 
@@ -222,7 +230,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const token = localStorage.getItem('token');
         if (token) {
           const response = await checkToken();
-          if (response.success && response.user) {
+          if (response.isAuthenticated && response.user) {
             setUser(response.user);
             setIsAuthenticated(true);
             setIsAdmin(response.user.isAdmin || false);

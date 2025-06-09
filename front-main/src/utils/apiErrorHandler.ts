@@ -10,7 +10,14 @@ type AxiosErrorType = Error & {
   code?: string;
 };
 
-export function handleApiError(error: unknown): Error {
+// Define a more specific error structure that includes an optional code
+export interface NormalizedApiError {
+  message: string;
+  code?: string; // e.g., 'ECONNABORTED', 'INVALID_CREDENTIALS', etc.
+  status?: number; // HTTP status code, if applicable
+}
+
+export function handleApiError(error: unknown): NormalizedApiError {
   // Handle standard Error objects
   if (error instanceof Error) {
     // Check for axios error structure
@@ -19,14 +26,17 @@ export function handleApiError(error: unknown): Error {
     if (axiosError.isAxiosError) {
       // Handle standardized error responses
       const errorData = axiosError.response?.data?.data || axiosError.response?.data;
-      return new Error(
-        errorData?.error || 
-        errorData?.message || 
-        axiosError.message ||
-        'An unknown API error occurred'
-      );
+      return {
+        message: errorData?.error || 
+                 errorData?.message || 
+                 axiosError.message ||
+                 'An unknown API error occurred',
+        code: axiosError.code, // Preserve Axios error code if present
+        status: axiosError.response?.status
+      };
     }
-    return new Error(error.message);
+    // If it's a standard Error but not an Axios error, it might not have a specific code or status
+      return { message: error.message };
   }
 
   // Handle plain objects with error info
@@ -35,7 +45,7 @@ export function handleApiError(error: unknown): Error {
     
     // Network errors (no response)
     if (!err.response) {
-      return new Error(err.message || 'Network error - please check your connection');
+      return { message: err.message || 'Network error - please check your connection', code: err.code }; // Preserve code if it's a network error with a code
     }
 
     const errorData = err.response.data?.data || err.response.data;
@@ -43,22 +53,22 @@ export function handleApiError(error: unknown): Error {
     
     // Standard error responses
     if (errorData?.error) {
-      return new Error(errorData.error);
+      return { message: errorData.error, status };
     }
     
     if (errorData?.message) {
-      return new Error(errorData.message);
+      return { message: errorData.message, status };
     }
     
     // HTTP status code based errors
     switch (status) {
-      case 401: return new Error('Please login again');
-      case 403: return new Error('You don\'t have permission for this action');
-      case 404: return new Error('Requested resource not found');
-      case 500: return new Error('Server error - please try again later');
-      default: return new Error(err.message || `Request failed with status ${status}`);
+      case 401: return { message: 'Please login again', status: 401, code: 'UNAUTHENTICATED' };
+      case 403: return { message: 'You don\'t have permission for this action', status: 403, code: 'FORBIDDEN' };
+      case 404: return { message: 'Requested resource not found', status: 404, code: 'NOT_FOUND' };
+      case 500: return { message: 'Server error - please try again later', status: 500, code: 'SERVER_ERROR' };
+      default: return { message: err.message || `Request failed with status ${status}`, status, code: 'HTTP_ERROR' };
     }
   }
 
-  return new Error('An unknown error occurred');
+  return { message: 'An unknown error occurred', code: 'UNKNOWN_ERROR' };
 }
