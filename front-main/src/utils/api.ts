@@ -14,27 +14,45 @@ interface AuthResponse {
   refreshToken: string;
 }
 
-// Memory-based token storage (replaces localStorage)
+// Token storage using localStorage for persistence
 class TokenManager {
-  private static token: string | null = null;
-  private static refreshToken: string | null = null;
+  private static readonly TOKEN_KEY = 'auth_token';
+  private static readonly REFRESH_TOKEN_KEY = 'refresh_token';
 
   static setTokens(token: string, refreshToken: string) {
-    this.token = token;
-    this.refreshToken = refreshToken;
+    try {
+      localStorage.setItem(this.TOKEN_KEY, token);
+      localStorage.setItem(this.REFRESH_TOKEN_KEY, refreshToken);
+    } catch (error) {
+      console.error('Error saving tokens to localStorage:', error);
+    }
   }
 
   static getToken(): string | null {
-    return this.token;
+    try {
+      return localStorage.getItem(this.TOKEN_KEY);
+    } catch (error) {
+      console.error('Error getting token from localStorage:', error);
+      return null;
+    }
   }
 
   static getRefreshToken(): string | null {
-    return this.refreshToken;
+    try {
+      return localStorage.getItem(this.REFRESH_TOKEN_KEY);
+    } catch (error) {
+      console.error('Error getting refresh token from localStorage:', error);
+      return null;
+    }
   }
 
   static clearTokens() {
-    this.token = null;
-    this.refreshToken = null;
+    try {
+      localStorage.removeItem(this.TOKEN_KEY);
+      localStorage.removeItem(this.REFRESH_TOKEN_KEY);
+    } catch (error) {
+      console.error('Error clearing tokens from localStorage:', error);
+    }
   }
 }
 
