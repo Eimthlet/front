@@ -171,7 +171,7 @@ api.interceptors.response.use(
         }
         
         // Try to refresh the token
-        const response = await axios.post(`${baseUrl}/auth/refresh-token`, { refreshToken });
+        const response = await axios.post(`${baseUrl}/auth/refresh`, { refreshToken });
         
         // Cast the response data to AuthResponse
         const authResponse = response.data as AuthResponse;

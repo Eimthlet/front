@@ -167,7 +167,7 @@ export async function register(userData: {
 
 export async function refreshToken(refreshToken: string) {
   try {
-    const response = await api.post('/auth/refresh-token', { refreshToken });
+    const response = await api.post('/auth/refresh', { refreshToken });
     
     // Save new tokens
     if (response.data?.token && response.data?.refreshToken) {

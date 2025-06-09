@@ -25,15 +25,12 @@ interface AdminStatusResponse {
  */
 export const checkAdminStatus = async (): Promise<AdminStatusResponse> => {
   try {
-    // Get the current token from localStorage
     const token = localStorage.getItem('token');
-    
     if (!token) {
       console.error('No authentication token found in localStorage');
       return { success: false, message: 'No token found' };
     }
-    
-    // Decode the token to check if isAdmin is set
+
     let decodedToken: TokenPayload;
     try {
       decodedToken = JSON.parse(atob(token.split('.')[1]));
@@ -41,98 +38,60 @@ export const checkAdminStatus = async (): Promise<AdminStatusResponse> => {
       console.error('Failed to parse JWT token:', e);
       return { success: false, message: 'Invalid token format' };
     }
-    
-    console.log('Decoded token:', decodedToken);
-    
-    // Check if token is expired
+
     if (decodedToken.exp && decodedToken.exp < Date.now() / 1000) {
       console.log('Token expired');
-      return { 
-        success: false, 
-        message: 'Token expired', 
-        userId: decodedToken.id, 
-        email: decodedToken.email 
-      };
-    }
-    
-    // Check if user is admin in the token
-    if (!decodedToken.isAdmin) {
-      console.log('User is not an admin according to token');
-      return { 
-        success: false, 
-        message: 'User does not have admin privileges',
+      return {
+        success: false,
+        message: 'Token expired',
         userId: decodedToken.id,
         email: decodedToken.email
       };
     }
+
+    // Even if local token says admin, we must verify with the server.
+    // The /auth/check-token endpoint is the source of truth.
+    const serverVerification = await api.get('/auth/check-token');
     
-    // Verify the token with the server
-    try {
-      const checkTokenResponse = await api.get('/auth/check-token');
-      const checkTokenData = checkTokenResponse?.data || {};
-      console.log('Token check response:', checkTokenData);
-      
-      if (checkTokenData.valid && checkTokenData.user?.isAdmin) {
-        console.log('Server confirms admin status');
-        // Verify with the server if the user is still an admin
-        try {
-          const userInfoResponse = await api.get('/auth/me');
-          const userInfo = userInfoResponse?.data || {};
-          console.log('User info from server:', userInfo);
-          
-          if (!userInfo || !(userInfo.isAdmin || (userInfo as any).role === 'admin')) {
-            console.log('Server does not recognize user as admin');
-            return { 
-              success: false, 
-              message: 'User is not recognized as an admin by the server',
-              userId: userInfo?.id,
-              email: userInfo?.email,
-              user: userInfo
-            };
-          }
-          console.log('User is confirmed as admin by server');
-          return { 
-            success: true, 
-            message: 'User is an admin',
-            userId: userInfo.id,
-            email: userInfo.email,
-            user: userInfo
-          };
-        } catch (error) {
-          console.error('Error verifying admin status with server:', error);
-          // If we can't verify with /me, fall back to the check-token response
-          return { 
-            success: true, 
-            message: 'User is an admin (verified by token check)',
-            userId: checkTokenResponse.user?.id,
-            email: checkTokenResponse.user?.email,
-            user: checkTokenResponse.user
-          };
-        }
+    if (serverVerification && serverVerification.success && serverVerification.user) {
+      if (serverVerification.user.isAdmin || (serverVerification.user as any).role === 'admin') {
+        console.log('Admin status confirmed by /auth/check-token');
+        return {
+          success: true,
+          message: 'User is an admin',
+          userId: serverVerification.user.id,
+          email: serverVerification.user.email,
+          user: serverVerification.user
+        };
       } else {
-        console.error('Server does not confirm admin status');
-        return { 
-          success: false, 
-          message: 'Server does not confirm admin status',
-          userId: decodedToken.id,
-          email: decodedToken.email
+        console.log('/auth/check-token response indicates user is NOT admin.');
+        return {
+          success: false,
+          message: 'User is not an admin (verified by server)',
+          userId: serverVerification.user.id,
+          email: serverVerification.user.email,
+          user: serverVerification.user
         };
       }
-    } catch (error) {
-      console.error('Error verifying token with server:', error);
-      return { 
-        success: false, 
-        message: 'Error verifying admin status with server',
-        userId: decodedToken?.id,
-        email: decodedToken?.email
+    } else {
+      console.log('/auth/check-token call failed or did not return expected data.');
+      const errorMessage = serverVerification?.message || 'Server validation failed or returned unexpected data.';
+      return {
+        success: false,
+        message: errorMessage,
+        userId: decodedToken.id, // Fallback to decoded token for user info if server call fails
+        email: decodedToken.email
       };
     }
-  } catch (error) {
-    console.error('Error checking admin status:', error);
-    return { 
-      success: false, 
-      message: error instanceof Error ? error.message : 'Unknown error occurred'
-    };
+  } catch (error: any) {
+    console.error('Error in checkAdminStatus:', error);
+    let message = 'An unexpected error occurred during admin status check.';
+    if (error.response && error.response.data && error.response.data.message) {
+      message = error.response.data.message;
+    } else if (error.message) {
+      message = error.message;
+    }
+    return { success: false, message };
   }
 };
 
@@ -140,44 +99,58 @@ export const checkAdminStatus = async (): Promise<AdminStatusResponse> => {
  * Attempts to fix admin token issues by refreshing the token
  */
 export const fixAdminToken = async (): Promise<{ success: boolean; message: string }> => {
+  const localRefreshToken = localStorage.getItem('refreshToken'); // Assuming refresh token is stored separately
+
+  if (!localRefreshToken) {
+    console.error('No refresh token found in localStorage for fixAdminToken');
+    // Attempt to use current 'token' as refresh token if 'refreshToken' isn't found, for backward compatibility or specific scenarios
+    const currentTokenAsRefreshToken = localStorage.getItem('token');
+    if (!currentTokenAsRefreshToken) {
+        return { success: false, message: 'No refresh token or current token available to attempt refresh.' };
+    }
+    // If we proceed with currentTokenAsRefreshToken, log it for clarity
+    console.warn('Attempting token refresh using current access token as refresh token. This might not be standard practice.');
+    // Fallthrough to use currentTokenAsRefreshToken if localRefreshToken is null
+  }
+
+  const tokenToRefresh = localRefreshToken || localStorage.getItem('token');
+  if (!tokenToRefresh) {
+    // This case should ideally be caught by the above, but as a safeguard:
+    return { success: false, message: 'No token available to attempt refresh.' };
+  }
+
   try {
-    // Get the current token from localStorage
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-      console.error('No token found in localStorage');
-      return { success: false, message: 'No authentication token found' };
-    }
-    
-    // Try to refresh the token
-    try {
-      console.log('Attempting to refresh token...');
-      const response = await api.post('/auth/refresh-token', { token });
-      const responseData = response?.data || {};
-      
-      if (!responseData.token) {
-        console.error('No token in refresh response:', response);
-        return { success: false, message: responseData.message || 'Failed to refresh token' };
-      } else {
-        // Save the new token
-        localStorage.setItem('token', responseData.token);
-        console.log('Token refreshed successfully');
-        return { success: true, message: 'Token refreshed successfully' };
+    console.log('Attempting to refresh token...');
+    // apiClient.post already unwraps data, so response is the data object
+    const responseData = await api.post('/auth/refresh', { refreshToken: tokenToRefresh });
+
+    if (responseData && responseData.token) {
+      localStorage.setItem('token', responseData.token);
+      // Backend should also return a new refresh token, which should be stored
+      if (responseData.refreshToken) {
+        localStorage.setItem('refreshToken', responseData.refreshToken);
       }
-    } catch (error) {
-      console.error('Error refreshing token:', error);
-      
-      return { 
-        success: true, 
-        message: 'Token refreshed and verified as admin' 
-      };
+      console.log('Token refreshed successfully');
+      // Optionally, re-check admin status here if critical
+      // const adminStatus = await checkAdminStatus();
+      // if(adminStatus.success) ...
+      return { success: true, message: 'Token refreshed successfully.' };
+    } else {
+      console.error('Token refresh call succeeded but no new token in response:', responseData);
+      return { success: false, message: responseData?.message || 'Failed to refresh token: No new token received.' };
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error refreshing token:', error);
-    return { 
-      success: false, 
-      message: error instanceof Error ? error.message : 'Failed to refresh token' 
-    };
+    let message = 'Failed to refresh token.';
+    if (error.response && error.response.data && error.response.data.message) {
+      message = error.response.data.message;
+    } else if (error.message) {
+      message = error.message;
+    }
+    // If refresh fails (e.g. invalid refresh token), clear stored tokens to force re-login
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    return { success: false, message };
   }
 };
 

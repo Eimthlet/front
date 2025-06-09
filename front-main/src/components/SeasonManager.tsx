@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import api, { createSeason, updateSeason } from '../api';
+import apiClient from '../utils/apiClient';
 import {
   Box,
   Button,
@@ -106,7 +106,7 @@ const SeasonManager: React.FC = () => {
       try {
         setLoading(true);
         setError('');
-        const response = await api.get('/admin/seasons');
+        const response = await apiClient.get('/admin/seasons');
         const data = Array.isArray(response?.data) ? response.data : [];
         setSeasons(data);
       } catch (err: any) {
@@ -171,7 +171,7 @@ const SeasonManager: React.FC = () => {
   const fetchQuestions = useCallback(async (seasonId: number | string) => {
     try {
       setLoading(true);
-      const response = await api.get(`/admin/seasons/${seasonId}/questions`);
+      const response = await apiClient.get(`/admin/seasons/${seasonId}/questions`);
       const questionsData = Array.isArray(response?.data) ? response.data : [];
       
       // Map the response to ensure consistent field names
@@ -221,7 +221,7 @@ const SeasonManager: React.FC = () => {
       setSelectedSeasonId(Number(seasonId));
       
       // Fetch qualified users for the season
-      const usersResponse = await api.get(`/admin/seasons/${seasonId}/qualified-users`);
+      const usersResponse = await apiClient.get(`/admin/seasons/${seasonId}/qualified-users`);
       const usersData = Array.isArray(usersResponse?.data) ? usersResponse.data : [];
       setQualifiedUsers(usersData as QualifiedUser[]);
       
@@ -310,65 +310,64 @@ const SeasonManager: React.FC = () => {
       setLoading(true);
       setError('');
 
-      // Create a copy of currentSeason with trimmed strings
-      const season = { ...currentSeason };
+      // Create a copy of currentSeason to avoid direct mutation for payload prep
+      const seasonInput = { ...currentSeason };
       
       // Trim string fields
-      if (season.name) season.name = season.name.trim();
-      if (season.description) season.description = season.description.trim();
+      if (seasonInput.name) seasonInput.name = seasonInput.name.trim();
+      if (seasonInput.description) seasonInput.description = seasonInput.description.trim();
 
-          // Prepare season data according to backend expectations
-      const isQualificationRound = Boolean(season.is_qualification_round);
+      // Validation for required fields
+      if (!seasonInput.name || !seasonInput.start_date || !seasonInput.end_date) {
+        setError('Season Name, Start Date, and End Date are required.');
+        // setLoading(false); // setLoading would be in the finally block
+        return;
+      }
+
+      const isQualificationRound = Boolean(seasonInput.is_qualification_round);
       const minimumScorePercentage = isQualificationRound 
-        ? Math.min(100, Math.max(0, Number(season.minimum_score_percentage) || 50))
-        : 50; // Default to 50 if not a qualification round
+        ? Math.min(100, Math.max(0, Number(seasonInput.minimum_score_percentage) || 50))
+        : 50;
 
-      // Create the season data object with only the fields expected by the server
-      const seasonData = {
-        name: season.name || '',
-        start_date: season.start_date || '',
-        end_date: season.end_date || '',
-        is_active: Boolean(season.is_active),
+      const seasonPayload = {
+        name: seasonInput.name,
+        start_date: seasonInput.start_date,
+        end_date: seasonInput.end_date,
+        is_active: Boolean(seasonInput.is_active),
         is_qualification_round: isQualificationRound,
         minimum_score_percentage: minimumScorePercentage,
-        description: season.description
+        description: seasonInput.description || '',
       };
       
-      // Add detailed logging
-      console.log('Raw season state:', JSON.stringify(season, null, 2));
-      console.log('Processed season data:', JSON.stringify(seasonData, null, 2));
-      console.log('Field checks:', {
-        hasName: !!season.name,
-        hasStartDate: !!season.start_date,
-        hasEndDate: !!season.end_date,
-        nameValue: season.name,
-        startDateValue: season.start_date,
-        endDateValue: season.end_date
-      });
-      
+      console.log('Submitting season data:', JSON.stringify(seasonPayload, null, 2));
+
+      let response;
       if (dialogMode === 'create') {
-        // Use the API client's createSeason function which handles validation
-        const response = await createSeason(seasonData);
-        if (response.success && response.data) {
-          console.log('Season created:', response.data);
+        response = await apiClient.post('/admin/seasons', seasonPayload);
+        if (response?.success) {
           setSuccess('Season created successfully');
-          // Refresh the seasons list
-          const seasonsResponse = await api.get('/admin/seasons');
-          const seasonsData = Array.isArray(seasonsResponse?.data) ? seasonsResponse.data : [];
-          setSeasons(seasonsData);
         } else {
-          throw new Error('Failed to create season');
+          throw new Error(response?.message || 'Failed to create season');
         }
-      } else if (season.id) {
-        // For updates, use the API client's updateSeason function
-        const result = await updateSeason(season.id, seasonData);
-        console.log('Season updated:', result);
-        setSuccess('Season updated successfully');
+      } else {
+        // Ensure ID is present for update
+        if (!currentSeason.id) { // Check currentSeason.id as it's the authoritative ID from the state for an item being edited
+          setError('Season ID is missing for update.');
+          // setLoading(false); // setLoading would be in the finally block
+          return;
+        }
+        response = await apiClient.put(`/admin/seasons/${currentSeason.id}`, seasonPayload);
+        if (response?.success) {
+          setSuccess('Season updated successfully');
+        } else {
+          throw new Error(response?.message || 'Failed to update season');
+        }
       }
-      
-      // Refresh seasons
-      const refreshResponse = await api.get('/admin/seasons');
-      const refreshedSeasons = Array.isArray(refreshResponse?.data) ? refreshResponse.data : [];
+
+      // Refresh seasons list
+      const refreshResponse = await apiClient.get('/admin/seasons');
+      // apiClient.get already returns the data property directly
+      const refreshedSeasons = Array.isArray(refreshResponse) ? refreshResponse : []; 
       setSeasons(refreshedSeasons);
       
       handleCloseDialog();
@@ -429,10 +428,10 @@ const SeasonManager: React.FC = () => {
       
       // Send to the backend
       if (currentQuestion.id) {
-        await api.put(`/admin/questions/${currentQuestion.id}`, questionData);
+        await apiClient.put(`/admin/questions/${currentQuestion.id}`, questionData);
       } else {
         // Wrap in a questions array as expected by the server
-        await api.post(`/admin/seasons/${selectedSeasonId}/questions`, {
+        await apiClient.post(`/admin/seasons/${selectedSeasonId}/questions`, {
           questions: [questionData]
         });
       }
@@ -465,16 +464,43 @@ const SeasonManager: React.FC = () => {
     }
   }, [currentQuestion, selectedSeasonId, setLoading, setError, fetchQuestions]);
 
+  const handleDeleteQuestion = useCallback(async (questionId: number | string) => {
+    if (!selectedSeasonId) {
+      setError('No season selected to refresh questions from.');
+      return;
+    }
+    if (!window.confirm('Are you sure you want to delete this question?')) return;
+
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+
+      await apiClient.delete(`/admin/questions/${questionId}`);
+      setSuccess('Question deleted successfully.');
+
+      // Refresh questions for the current season
+      await fetchQuestions(selectedSeasonId);
+
+    } catch (err: any) {
+      const error = err as ApiError;
+      console.error('Error deleting question:', error);
+      setError(error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to delete question.');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedSeasonId, fetchQuestions, setLoading, setError, setSuccess]);
+
   // Delete handlers
   const handleDeleteSeason = useCallback(async (id: number | string) => {
     if (!window.confirm('Are you sure you want to delete this season?')) return;
     
     try {
       setLoading(true);
-      await api.delete(`/admin/seasons/${id}`);
+      await apiClient.delete(`/admin/seasons/${id}`);
       
       // Refresh seasons
-      const refreshResponse = await api.get('/admin/seasons');
+      const refreshResponse = await apiClient.get('/admin/seasons');
       const refreshedSeasons = Array.isArray(refreshResponse?.data) ? refreshResponse.data : [];
       setSeasons(refreshedSeasons);
       
@@ -686,14 +712,25 @@ const SeasonManager: React.FC = () => {
               <Box sx={{ mt: 2 }}>
                 <Typography variant="h6" gutterBottom>Existing Questions</Typography>
                 {questions.map((q, index) => (
-                  <Box key={index} sx={{ mb: 2, p: 2, border: '1px solid #ddd', borderRadius: 1 }}>
-                    <Typography variant="body1" fontWeight="bold">{q.question_text}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Options: {q.options.join(', ')}
-                    </Typography>
-                    <Typography variant="body2" color="success.main">
-                      Correct: {q.correct_answer}
-                    </Typography>
+                  <Box key={q.id || index} sx={{ mb: 1, p: 1, border: '1px solid #ddd', borderRadius: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Typography variant="body1" fontWeight="bold">{q.question_text || q.question}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Options: {Array.isArray(q.options) ? q.options.join(', ') : ''}
+                      </Typography>
+                      <Typography variant="body2" color="success.main">
+                        Correct: {q.correct_answer || q.correctAnswer}
+                      </Typography>
+                    </Box>
+                    <IconButton 
+                      size="small" 
+                      color="error" 
+                      onClick={() => q.id && handleDeleteQuestion(q.id)}
+                      title="Delete Question"
+                      disabled={!q.id}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
                   </Box>
                 ))}
               </Box>

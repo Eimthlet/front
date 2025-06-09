@@ -42,6 +42,7 @@ interface User {
   id: number;
   username: string;
   email: string;
+  phone?: string;
   role: string;
   status: string;
   is_disqualified: boolean;
@@ -201,7 +202,7 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
       clearError();
       
       const userData = { ...editUser };
-      const response = await api.put(`/admin/users/${selectedUser.id}`, userData);
+      const response = await api.put(`/admin/user/${editUser.id}`, { username: editUser.username, email: editUser.email, phone: editUser.phone, is_disqualified: editUser.is_disqualified, role: editUser.role });
       const updatedUser = response?.data?.user || {};
       
       // Update user in the list
@@ -234,7 +235,7 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
       setLoading(true);
       clearError();
       
-      await api.post(`/admin/users/${selectedUser.id}/reset-password`, { newPassword });
+      await api.post(`/admin/user/${selectedUser.id}/reset-password`, { newPassword });
       
       setSuccess('Password reset successfully');
       setOpenPasswordDialog(false);
@@ -259,21 +260,19 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
       setLoading(true);
       clearError();
       
-      await api.delete(`/admin/users/${selectedUser.id}?softDelete=true`);
+      await api.delete(`/admin/user/${selectedUser.id}`);
       
       // Remove user from the list or update status
       setUsers(prevUsers => 
-        prevUsers.map(user => 
-          user.id === selectedUser.id ? { ...user, status: 'inactive' } : user
-        )
+        prevUsers.filter(user => user.id !== selectedUser.id)
       );
       
-      setSuccess('User deactivated successfully');
+      setSuccess('User deleted successfully');
       setOpenDeleteDialog(false);
     } catch (err) {
-      console.error('Error deactivating user:', err);
+      console.error('Error deleting user:', err);
       handleError(
-        'Failed to deactivate user',
+        'Failed to delete user',
         err instanceof Error ? err.message : 'Unknown error occurred'
       );
     } finally {
@@ -525,9 +524,7 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
       <Dialog open={openUserDialog} onClose={handleCloseUserDialog} maxWidth="md" fullWidth>
         {selectedUser && (
           <>
-            <DialogTitle>
-              User Details: {selectedUser.username}
-            </DialogTitle>
+            <DialogTitle>{editUser.id ? `Edit User: ${editUser.username}` : (selectedUser ? `View User Details: ${selectedUser.username}` : 'User Details')}</DialogTitle>
             <DialogContent>
               <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
                 <Tabs value={tabValue} onChange={handleTabChange}>
@@ -540,18 +537,53 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
               {tabValue === 0 && (
                 <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
                   <TextField
+                    margin="dense"
+                    label="Phone Number"
+                    type="text"
+                    fullWidth
+                    value={editUser.phone || ''}
+                    onChange={(e) => editUser.id && setEditUser({ ...editUser, phone: e.target.value })}
+                    InputProps={{
+                      readOnly: !editUser.id,
+                    }}
+                    disabled={!editUser.id}
+                  />
+                  {editUser.id && (
+                    <FormControl fullWidth margin="dense">
+                      <InputLabel id="role-select-label">Role</InputLabel>
+                      <Select
+                        labelId="role-select-label"
+                        value={editUser.role || 'user'}
+                        label="Role"
+                        onChange={(e) => setEditUser({ ...editUser, role: e.target.value as string })}
+                      >
+                        <MenuItem value="user">User</MenuItem>
+                        <MenuItem value="admin">Admin</MenuItem>
+                        {/* Add other roles if they exist */}
+                      </Select>
+                    </FormControl>
+                  )}
+                  <TextField
                     label="Username"
                     fullWidth
                     margin="normal"
                     defaultValue={selectedUser.username}
-                    onChange={(e) => setEditUser({ ...editUser, username: e.target.value })}
+                    onChange={(e) => editUser.id && setEditUser({ ...editUser, username: e.target.value })}
+                    InputProps={{
+                      readOnly: !editUser.id, // Make read-only if just viewing
+                    }}
+                    disabled={!editUser.id}
                   />
                   <TextField
-                    label="Email"
+                    label="Email Address"
                     fullWidth
                     margin="normal"
                     defaultValue={selectedUser.email}
-                    onChange={(e) => setEditUser({ ...editUser, email: e.target.value })}
+                    onChange={(e) => editUser.id && setEditUser({ ...editUser, email: e.target.value })}
+                    InputProps={{
+                      readOnly: !editUser.id, // Make read-only if just viewing
+                    }}
+                    disabled={!editUser.id}
                   />
                   <FormControl fullWidth margin="normal">
                     <InputLabel>Role</InputLabel>
@@ -738,11 +770,11 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
       
       {/* Delete User Dialog */}
       <Dialog open={openDeleteDialog} onClose={handleCloseDeleteDialog}>
-        <DialogTitle>Deactivate User</DialogTitle>
+        <DialogTitle>Delete User: {selectedUser?.username}</DialogTitle>
         <DialogContent>
           <Typography>
             Are you sure you want to deactivate {selectedUser?.username}? 
-            This will prevent them from logging in.
+            This action is irreversible and will permanently remove the user.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -752,7 +784,7 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
             variant="contained"
             color="error"
           >
-            Deactivate
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

@@ -25,15 +25,7 @@ interface ApiQuestion {
   explanation?: string;
 }
 
-// Quiz component's expected question format
-interface QuizQuestion {
-  id: string;
-  question: string;
-  options: string[];
-  correctAnswer: string;
-  timeLimit?: number;
-  explanation?: string;
-}
+
 
 interface QualificationResponse {
   hasAttempted: boolean;

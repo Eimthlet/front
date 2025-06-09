@@ -4,37 +4,57 @@ import './AdminDashboard.css';
 
 interface ActivityItem {
   id: number;
+  user_id?: number;
+  username?: string;
+  email?: string;
   type: string;
+  action?: string;
   timestamp: string;
-  details: string;
+  details?: string;
+}
+
+interface PerformerItem {
+  user_id: number;
+  username: string;
+  email: string;
+  score: number;
+  completedAt: string;
 }
 
 interface DashboardStats {
   totalUsers: number;
-  totalQuizzes: number;
+  activeUsers: number;
+  totalQuestions: number;
   averageScore: number;
+  completedAttempts: number;
   recentActivity: ActivityItem[];
+  topPerformers: PerformerItem[];
 }
 
 const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
-    totalQuizzes: 0,
+    activeUsers: 0,
+    totalQuestions: 0,
     averageScore: 0,
-    recentActivity: []
+    completedAttempts: 0,
+    recentActivity: [],
+    topPerformers: []
   });
   const [error, setError] = useState<string | null>(null);
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      const response = await apiClient.get('/admin/dashboard-stats');
-      const responseData = response?.data || {};
+      const data = await apiClient.get('/admin/stats');
       
       setStats({
-        totalUsers: responseData.totalUsers || 0,
-        totalQuizzes: responseData.totalQuizzes || 0,
-        averageScore: responseData.averageScore || 0,
-        recentActivity: responseData.recentActivity || []
+        totalUsers: data.users?.total ?? 0,
+        activeUsers: data.users?.active ?? 0,
+        totalQuestions: data.quizStats?.totalQuestions ?? 0,
+        averageScore: data.quizStats?.averageScore ?? 0,
+        completedAttempts: data.quizStats?.completedAttempts ?? 0,
+        recentActivity: data.recentActivity ?? [],
+        topPerformers: data.topPerformers ?? []
       });
       setError(null);
     } catch (err) {
@@ -69,8 +89,8 @@ const AdminDashboard: React.FC = () => {
             <p>{stats.totalUsers}</p>
           </div>
           <div className="stat-card">
-            <h3>Total Quizzes</h3>
-            <p>{stats.totalQuizzes}</p>
+            <h3>Total Questions</h3>
+            <p>{stats.totalQuestions}</p>
           </div>
           <div className="stat-card">
             <h3>Average Score</h3>
