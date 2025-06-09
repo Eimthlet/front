@@ -84,25 +84,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
           throw error;
         });
-        
+      
+      // Debug log the raw response
+      console.log('Raw login response:', response);
+      
+      // The response data is already the data we need
       const responseData = response?.data || {};
-      console.log('Login response:', responseData);
-
-      if (!responseData.success || !responseData.token || !responseData.user) {
-        console.error('Invalid login response:', responseData);
-        throw new Error(responseData.error || 'Login failed: Invalid response from server.');
+      console.log('Login response data:', responseData);
+      
+      // Check if the response contains the expected data structure
+      if (!responseData || typeof responseData !== 'object') {
+        console.error('Invalid response format:', responseData);
+        throw new Error('Invalid response format from server');
       }
       
-      localStorage.setItem('token', responseData.token);
-      if (responseData.refreshToken) {
-        localStorage.setItem('refreshToken', responseData.refreshToken);
+      // The server returns the tokens and user data at the root level
+      const { token, refreshToken, user } = responseData;
+      
+      if (!token || !user) {
+        console.error('Missing required fields in response:', { token, user });
+        throw new Error('Missing required authentication data');
       }
       
-      const { user } = responseData;
+      console.log('Setting tokens and user data:', { token, refreshToken, user });
+      
+      // Store tokens
+      localStorage.setItem('token', token);
+      if (refreshToken) {
+        localStorage.setItem('refreshToken', refreshToken);
+      }
+      
+      // Update state
       setUser(user);
       setIsAuthenticated(true);
       setIsAdmin(user.isAdmin);
       
+      console.log('Login successful, navigating to:', user.isAdmin ? '/admin' : '/quiz');
       navigate(user.isAdmin ? '/admin' : '/quiz');
     } catch (error: any) {
       const normalizedError = handleApiError(error);

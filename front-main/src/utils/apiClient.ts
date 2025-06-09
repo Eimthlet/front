@@ -67,6 +67,18 @@ const api: AxiosInstance = axios.create({
   },
   withCredentials: true,
   timeout: 10000, // 10 seconds timeout
+  transformResponse: (data: any) => {
+    // Parse the response data if it's a string
+    if (typeof data === 'string') {
+      try {
+        return JSON.parse(data);
+      } catch (e) {
+        console.error('Error parsing response data:', e);
+        return data;
+      }
+    }
+    return data;
+  }
 });
 
 // Log the base URL being used
