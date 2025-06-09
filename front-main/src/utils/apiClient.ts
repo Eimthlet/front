@@ -101,16 +101,14 @@ api.interceptors.response.use(
         }
         
         // Try to refresh the token
-        const response = await axios.post<AuthResponse>(
-          `${baseUrl}/auth/refresh-token`,
-          { refreshToken }
-        );
+        const response = await axios.post(`${baseUrl}/auth/refresh-token`, { refreshToken });
         
-        const { token: newToken, refreshToken: newRefreshToken } = response.data;
-        TokenManager.setTokens(newToken, newRefreshToken);
+        // Cast the response data to AuthResponse
+        const authResponse = response.data as AuthResponse;
+        TokenManager.setTokens(authResponse.token, authResponse.refreshToken);
         
         // Retry the original request with the new token
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        originalRequest.headers.Authorization = `Bearer ${authResponse.token}`;
         return api(originalRequest);
       } catch (refreshError) {
         // Failed to refresh token, clear tokens and redirect to login

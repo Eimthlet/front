@@ -44,15 +44,6 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [qualification, setQualification] = useState<QualificationResponse | null>(null);
-  
-  // Define the QuizQuestion type that matches what the Quiz component expects
-  interface QuizQuestion {
-    id: string;
-    question: string;
-    options: string[];
-    correctAnswer: string;
-    timeLimit?: number;
-  }
 
   useEffect(() => {
     const validateAndFetchData = async () => {
