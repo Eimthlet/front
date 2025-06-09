@@ -88,8 +88,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Debug log the raw response
       console.log('Raw login response:', response);
       
-      // The response data is already the data we need
-      const responseData = response?.data || {};
+      // The response data might be in response.data or directly in response
+      let responseData = response?.data || response;
+      
+      // If responseData is a string, try to parse it as JSON
+      if (typeof responseData === 'string') {
+        try {
+          responseData = JSON.parse(responseData);
+        } catch (e) {
+          console.error('Failed to parse response data:', e);
+          throw new Error('Invalid response format from server');
+        }
+      }
+      
       console.log('Login response data:', responseData);
       
       // Check if the response contains the expected data structure
@@ -102,7 +113,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { token, refreshToken, user } = responseData;
       
       if (!token || !user) {
-        console.error('Missing required fields in response:', { token, user });
+        console.error('Missing required fields in response:', { 
+          hasToken: !!token, 
+          hasUser: !!user,
+          responseDataKeys: Object.keys(responseData)
+        });
         throw new Error('Missing required authentication data');
       }
       

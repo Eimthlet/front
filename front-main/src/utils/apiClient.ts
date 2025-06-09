@@ -111,10 +111,39 @@ api.interceptors.request.use(
 // Add a response interceptor to handle token refresh
 api.interceptors.response.use(
   (response) => {
-    console.log('Received response from:', response.config.url);
-    console.log('Response status:', response.status);
-    console.log('Response data:', response.data);
-    return response;
+    try {
+      // Log the response details
+      const responseUrl = response?.config?.url || 'unknown';
+      console.log(`[API] Response from ${responseUrl} (${response.status})`);
+      
+      // Check if response.data exists and is a string that needs parsing
+      if (response.data) {
+        if (typeof response.data === 'string') {
+          try {
+            // Try to parse the response data if it's a string
+            const parsedData = JSON.parse(response.data);
+            console.log('[API] Parsed response data:', parsedData);
+            response.data = parsedData;
+          } catch (e) {
+            console.log('[API] Response data is not JSON, using as-is');
+          }
+        } else {
+          console.log('[API] Response data:', response.data);
+        }
+      } else {
+        console.log('[API] No data in response');
+      }
+      
+      // Log response headers for debugging
+      if (response.headers) {
+        console.log('[API] Response headers:', response.headers);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('[API] Error processing response:', error);
+      return response; // Still return the original response even if logging fails
+    }
   },
   async (error) => {
     console.error('API Error:', {
