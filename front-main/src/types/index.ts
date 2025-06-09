@@ -49,6 +49,8 @@ export interface Question {
   difficulty?: string;
 }
 
+export type QuestionCreateData = Omit<Question, 'id'>;
+
 export interface QualifiedUser {
   id: number;
   username: string;

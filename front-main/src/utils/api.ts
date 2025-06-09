@@ -1,8 +1,14 @@
-import { ApiResponse, Season, Question, QualifiedUser, QuizResult } from '../types';
-import apiClient from './apiClient'; // Import the apiClient
+import { 
+  Season, 
+  Question, 
+  QualifiedUser, 
+  QuizResult
+} from '../types';
 
-// Re-export the ApiResponse type for consistency
-export type { ApiResponse };
+type QuestionCreateData = Omit<Question, 'id'>;
+import apiClient from './apiClient';
+import type { ApiResponse } from './apiClient';
+import TokenManager from './TokenManager';
 
 // Extend Window interface to include onAuthError
 declare global {
@@ -16,48 +22,7 @@ interface AuthResponse {
   refreshToken: string;
 }
 
-// Token storage using localStorage for persistence
-// This should match the token storage in apiClient.ts
-class TokenManager {
-  private static readonly TOKEN_KEY = 'token';
-  private static readonly REFRESH_TOKEN_KEY = 'refresh_token';
-
-  static setTokens(token: string, refreshToken: string) {
-    try {
-      localStorage.setItem(this.TOKEN_KEY, token);
-      localStorage.setItem(this.REFRESH_TOKEN_KEY, refreshToken);
-    } catch (error) {
-      console.error('Error saving tokens to localStorage:', error);
-    }
-  }
-
-  static getToken(): string | null {
-    try {
-      return localStorage.getItem(this.TOKEN_KEY);
-    } catch (error) {
-      console.error('Error getting token from localStorage:', error);
-      return null;
-    }
-  }
-
-  static getRefreshToken(): string | null {
-    try {
-      return localStorage.getItem(this.REFRESH_TOKEN_KEY);
-    } catch (error) {
-      console.error('Error getting refresh token from localStorage:', error);
-      return null;
-    }
-  }
-
-  static clearTokens() {
-    try {
-      localStorage.removeItem(this.TOKEN_KEY);
-      localStorage.removeItem(this.REFRESH_TOKEN_KEY);
-    } catch (error) {
-      console.error('Error clearing tokens from localStorage:', error);
-    }
-  }
-}
+// TokenManager is now imported from TokenManager.ts
 
 // Use the apiClient for all API calls
 // It handles request/response interception and token management
@@ -77,24 +42,29 @@ const formatResponse = <T>(data: T, status = 200, statusText = 'OK'): ApiRespons
     statusText,
     headers: {},
     config: {}
-  } as ApiResponse<T>;
+  };
 };
 
 // Helper function to format error response
-const formatError = <T>(error: any, defaultMessage = 'An error occurred'): ApiResponse<T> => {
+const formatError = <T>(
+  error: any, 
+  defaultMessage = 'An error occurred',
+  statusCode: number = 500,
+  statusText: string = 'Error'
+): ApiResponse<T> => {
   const message = error.message || defaultMessage;
-  const status = error.status || 500;
-  const statusText = error.statusText || 'Error';
+  const status = error.status || statusCode;
+  const errorStatusText = error.statusText || statusText;
   
   return {
     data: {} as T,
     success: false,
     error: message,
     status,
-    statusText,
+    statusText: errorStatusText,
     headers: error.headers || {},
     config: error.config || {}
-  } as ApiResponse<T>;
+  };
 };
 
 // Auth API
@@ -123,12 +93,9 @@ export async function register(userData: {
     // Store tokens in memory
     TokenManager.setTokens(authData.token, authData.refreshToken);
     
-    return {
-      data: authData,
-      success: true
-    };
+    return formatResponse(authData, 200, 'Success');
   } catch (error) {
-    throw error;
+    return formatError(error, 'Registration failed');
   }
 }
 
@@ -156,27 +123,19 @@ export function logout() {
 // Season API - Enhanced with better error handling
 export async function fetchAllSeasons(): Promise<ApiResponse<Season[]>> {
   try {
-    const response = await api.get('/admin/seasons');
-    return {
-      data: response.data as Season[],
-      success: true
-    };
+    const response = await api.get<Season[]>('/admin/seasons');
+    return formatResponse(response, 200, 'Success');
   } catch (error) {
-    console.error('Error fetching seasons:', error);
-    throw error;
+    return formatError(error, 'Failed to fetch seasons');
   }
 }
 
 export async function fetchSeason(id: number): Promise<ApiResponse<Season>> {
   try {
-    const response = await api.get(`/admin/seasons/${id}`);
-    return {
-      data: response.data as Season,
-      success: true
-    };
+    const response = await api.get<Season>(`/admin/seasons/${id}`);
+    return formatResponse(response, 200, 'Success');
   } catch (error) {
-    console.error(`Error fetching season ${id}:`, error);
-    throw error;
+    return formatError(error, `Failed to fetch season ${id}`);
   }
 }
 
@@ -193,28 +152,16 @@ type SeasonCreateData = {
 
 export async function createSeason(season: SeasonCreateData): Promise<ApiResponse<Season>> {
   try {
-    // Ensure required fields are present
+    // Validate required fields
     if (!season.name || !season.start_date || !season.end_date) {
-      throw { message: 'Missing required season fields', status: 400 };
+      return formatError({ message: 'Missing required fields' }, 'Validation failed', 400);
     }
 
-    // Validate dates
-    const startDate = new Date(season.start_date);
-    const endDate = new Date(season.end_date);
-    
-    if (startDate >= endDate) {
-      throw { message: 'End date must be after start date', status: 400 };
-    }
-
-    // Prepare the payload with default values for optional fields
+    // Convert dates to ISO string if they're Date objects
     const payload = {
-      name: season.name,
-      description: season.description || '',
-      start_date: season.start_date,
-      end_date: season.end_date,
-      is_active: season.is_active ?? false,
-      is_qualification_round: season.is_qualification_round ?? false,
-      minimum_score_percentage: season.minimum_score_percentage || 0,
+      ...season,
+      start_date: new Date(season.start_date).toISOString(),
+      end_date: new Date(season.end_date).toISOString(),
     };
 
     console.log('Creating season with payload:', payload);
@@ -232,59 +179,53 @@ export async function createSeason(season: SeasonCreateData): Promise<ApiRespons
 
 export async function updateSeason(id: number | string, season: Partial<SeasonCreateData>): Promise<ApiResponse<Season>> {
   try {
-    // Validate dates if both are provided
-    if (season.start_date && season.end_date && new Date(season.start_date) >= new Date(season.end_date)) {
-      throw new Error('End date must be after start date');
+    // Ensure required fields are present
+    if (!season.name && !season.start_date && !season.end_date) {
+      return formatError(
+        { message: 'At least one field must be provided for update' },
+        'Validation failed',
+        400
+      );
     }
 
-    // Only include fields that are provided and not undefined
-    const payload: Record<string, any> = {};
-    if (season.name !== undefined) payload.name = season.name.trim();
-    if (season.start_date !== undefined) payload.start_date = season.start_date;
-    if (season.end_date !== undefined) payload.end_date = season.end_date;
+    // Prepare the payload with only the fields that are provided
+    const payload: any = {};
+    if (season.name) payload.name = season.name;
+    if (season.description) payload.description = season.description;
+    if (season.start_date) payload.start_date = new Date(season.start_date).toISOString();
+    if (season.end_date) payload.end_date = new Date(season.end_date).toISOString();
     if (season.is_active !== undefined) payload.is_active = season.is_active;
     if (season.is_qualification_round !== undefined) payload.is_qualification_round = season.is_qualification_round;
     if (season.minimum_score_percentage !== undefined) payload.minimum_score_percentage = season.minimum_score_percentage;
-    if (season.description !== undefined) payload.description = season.description;
 
-    console.log(`Sending request to /admin/seasons/${id} with data:`, JSON.stringify(payload, null, 2));
+    console.log('Updating season with payload:', payload);
+    const response = await api.put<Season>(`/admin/seasons/${id}`, payload);
     
-    // Use the apiClient for consistent API handling
-    const response = await apiClient.put<Season>(`/admin/seasons/${id}`, payload);
-    // The apiClient already extracts the data property, so we can use it directly
-    return { 
-      data: response as Season,
-      success: true 
-    };
-  } catch (error: any) {
+    // Return the updated season with success status
+    return formatResponse(response, 200, 'Season updated successfully');
+  } catch (error) {
     console.error(`Error updating season ${id}:`, error);
-    throw new Error(error.message || 'Failed to update season');
+    return formatError(error, `Failed to update season ${id}`);
   }
 }
 
 export async function deleteSeason(id: number | string): Promise<ApiResponse<void>> {
   try {
-    await api.delete(`/admin/seasons/${id}`);
-    return {
-      data: undefined,
-      success: true
-    };
+    const response = await api.delete(`/admin/seasons/${id}`);
+    return formatResponse(response, 204, 'Season deleted successfully');
   } catch (error) {
     console.error(`Error deleting season ${id}:`, error);
-    throw error;
+    return formatError(error, `Failed to delete season ${id}`);
   }
 }
 
-export async function fetchSeasonQuestions(id: number): Promise<ApiResponse<Question[]>> {
+export async function fetchSeasonQuestions(seasonId: number | string): Promise<ApiResponse<Question[]>> {
   try {
-    const response = await api.get(`/admin/seasons/${id}/questions`);
-    return {
-      data: response.data as Question[],
-      success: true
-    };
+    const response = await api.get<Question[]>(`/admin/seasons/${seasonId}/questions`);
+    return formatResponse(response, 200, 'Questions fetched successfully');
   } catch (error) {
-    console.error(`Error fetching questions for season ${id}:`, error);
-    throw error;
+    console.error(`Error fetching questions for season ${seasonId}:`, error);
+    return formatError(error, `Failed to fetch questions for season ${seasonId}`);
   }
 }
 
@@ -293,167 +234,178 @@ export async function addSeasonQuestions(id: number, questions: Question[]): Pro
     // Validate questions before sending
     for (const question of questions) {
       if (!question.question_text?.trim()) {
-        throw new Error('Question text is required for all questions');
+        return formatError(
+          { message: 'Question text is required for all questions' },
+          'Validation failed',
+          400
+        );
       }
       if (!question.options || question.options.length < 2) {
-        throw new Error('At least 2 options are required for each question');
+        return formatError(
+          { message: 'At least 2 options are required for each question' },
+          'Validation failed',
+          400
+        );
       }
       if (question.options.some(opt => !opt?.trim())) {
-        throw new Error('All options must have text');
+        return formatError(
+          { message: 'All options must have text' },
+          'Validation failed',
+          400
+        );
       }
       if (!question.correct_answer?.trim()) {
-        throw new Error('Correct answer is required for all questions');
+        return formatError(
+          { message: 'Correct answer is required for all questions' },
+          'Validation failed',
+          400
+        );
       }
       if (!question.options.includes(question.correct_answer)) {
-        throw new Error('Correct answer must match one of the provided options');
+        return formatError(
+          { message: 'Correct answer must match one of the provided options' },
+          'Validation failed',
+          400
+        );
       }
     }
 
-    await api.post(`/admin/seasons/${id}/questions`, { questions });
-    return {
-      data: undefined,
-      success: true
-    };
+    const response = await api.post(`/admin/seasons/${id}/questions`, { questions });
+    return formatResponse(response, 201, 'Questions added successfully');
   } catch (error) {
     console.error(`Error adding questions to season ${id}:`, error);
-    throw error;
+    return formatError(error, `Failed to add questions to season ${id}`);
   }
 }
 
 export async function removeSeasonQuestion(seasonId: number, questionId: number): Promise<ApiResponse<void>> {
   try {
-    await api.delete(`/admin/seasons/${seasonId}/questions/${questionId}`);
-    return {
-      data: undefined,
-      success: true
-    };
+    const response = await api.delete(`/admin/seasons/${seasonId}/questions/${questionId}`);
+    return formatResponse(response, 204, 'Question removed successfully');
   } catch (error) {
     console.error(`Error removing question ${questionId} from season ${seasonId}:`, error);
-    throw error;
+    return formatError(error, `Failed to remove question ${questionId} from season ${seasonId}`);
   }
 }
 
 export async function fetchQualifiedUsers(seasonId: number): Promise<ApiResponse<QualifiedUser[]>> {
   try {
-    const response = await api.get(`/admin/seasons/${seasonId}/qualified-users`);
-    return {
-      data: response.data as QualifiedUser[],
-      success: true
-    };
+    const response = await api.get<QualifiedUser[]>(`/admin/seasons/${seasonId}/qualified-users`);
+    return formatResponse(response, 200, 'Qualified users fetched successfully');
   } catch (error) {
     console.error(`Error fetching qualified users for season ${seasonId}:`, error);
-    throw error;
+    return formatError(error, `Failed to fetch qualified users for season ${seasonId}`);
+  }
+}
+
+export async function updateQualifiedUser(
+  seasonId: number,
+  userId: number,
+  updates: Partial<QualifiedUser>
+): Promise<ApiResponse<QualifiedUser>> {
+  try {
+    const response = await api.put<QualifiedUser>(
+      `/admin/seasons/${seasonId}/qualified-users/${userId}`,
+      updates
+    );
+    return formatResponse(response, 200, 'Qualified user updated successfully');
+  } catch (error) {
+    console.error(`Error updating qualified user ${userId} for season ${seasonId}:`, error);
+    return formatError(error, `Failed to update qualified user ${userId} for season ${seasonId}`);
   }
 }
 
 // Question API
 export async function fetchAllQuestions(): Promise<ApiResponse<Question[]>> {
   try {
-    const response = await api.get('/admin/questions');
-    return {
-      data: response.data as Question[],
-      success: true
-    };
+    const response = await api.get<Question[]>('/admin/questions');
+    return formatResponse(response, 200, 'Questions fetched successfully');
   } catch (error) {
-    console.error('Error fetching all questions:', error);
-    throw error;
-  }
-}
-
-export async function createQuestion(question: Question): Promise<ApiResponse<Question>> {
-  try {
-    const response = await api.post('/admin/questions', question);
-    return {
-      data: response.data as Question,
-      success: true
-    };
-  } catch (error) {
-    console.error('Error creating question:', error);
-    throw error;
-  }
-}
-
-export async function updateQuestion(id: number, question: Partial<Question>): Promise<ApiResponse<Question>> {
-  try {
-    const response = await api.put(`/admin/questions/${id}`, question);
-    return {
-      data: response.data as Question,
-      success: true
-    };
-  } catch (error) {
-    console.error(`Error updating question ${id}:`, error);
-    throw error;
-  }
-}
-
-export async function deleteQuestion(id: number): Promise<ApiResponse<void>> {
-  try {
-    await api.delete(`/admin/questions/${id}`);
-    return {
-      data: undefined,
-      success: true
-    };
-  } catch (error) {
-    console.error(`Error deleting question ${id}:`, error);
-    throw error;
-  }
-}
-
-// Results API
-export async function fetchResults(userId: number, seasonId: number): Promise<ApiResponse<QuizResult[]>> {
-  try {
-    const response = await api.get(`/results/user/${userId}/season/${seasonId}`);
-    return {
-      data: response.data as QuizResult[],
-      success: true
-    };
-  } catch (error) {
-    console.error(`Error fetching results for user ${userId}, season ${seasonId}:`, error);
-    throw error;
-  }
-}
-
-export async function fetchCurrentSeason(): Promise<ApiResponse<Season>> {
-  try {
-    const response = await api.get('/current');
-    return {
-      data: response.data as Season,
-      success: true
-    };
-  } catch (error) {
-    console.error('Error fetching current season:', error);
-    throw error;
-  }
-}
-
-export async function saveProgress(userId: number, score: number, total: number): Promise<ApiResponse<void>> {
-  try {
-    await api.post('/progress', { userId, score, total });
-    return {
-      data: undefined,
-      success: true
-    };
-  } catch (error) {
-    console.error('Error saving progress:', error);
-    throw error;
+    console.error('Error fetching questions:', error);
+    return formatError(error, 'Failed to fetch questions');
   }
 }
 
 export async function fetchQuestions(): Promise<ApiResponse<{ questions: Question[] }>> {
   try {
-    const response = await api.get('/questions');
-    return {
-      data: response.data as { questions: Question[] },
-      success: true
-    };
+    const response = await api.get<{ questions: Question[] }>('/questions');
+    return formatResponse(response, 200, 'Questions fetched successfully');
   } catch (error) {
     console.error('Error fetching questions:', error);
-    throw error;
+    return formatError(error, 'Failed to fetch questions');
+  }
+}
+
+export async function createQuestion(question: QuestionCreateData): Promise<ApiResponse<Question>> {
+  try {
+    const response = await api.post<Question>('/admin/questions', question);
+    return formatResponse(response, 201, 'Question created successfully');
+  } catch (error) {
+    console.error('Error creating question:', error);
+    return formatError(error, 'Failed to create question');
+  }
+}
+
+export async function updateQuestion(id: number, question: Partial<Question>): Promise<ApiResponse<Question>> {
+  try {
+    const response = await api.put<Question>(`/admin/questions/${id}`, question);
+    return formatResponse(response, 200, 'Question updated successfully');
+  } catch (error) {
+    console.error(`Error updating question ${id}:`, error);
+    return formatError(error, `Failed to update question ${id}`);
+  }
+}
+
+export async function deleteQuestion(id: number): Promise<ApiResponse<void>> {
+  try {
+    const response = await api.delete(`/admin/questions/${id}`);
+    return formatResponse(response, 204, 'Question deleted successfully');
+  } catch (error) {
+    console.error(`Error deleting question ${id}:`, error);
+    return formatError(error, `Failed to delete question ${id}`);
+  }
+}
+
+// Results API
+export async function fetchQuizResults(seasonId: number): Promise<ApiResponse<QuizResult[]>> {
+  try {
+    const response = await api.get<QuizResult[]>(`/admin/seasons/${seasonId}/results`);
+    return formatResponse(response, 200, 'Quiz results fetched successfully');
+  } catch (error) {
+    console.error(`Error fetching quiz results for season ${seasonId}:`, error);
+    return formatError(error, `Failed to fetch quiz results for season ${seasonId}`);
+  }
+}
+
+export async function fetchResults(userId: number, seasonId: number): Promise<ApiResponse<QuizResult[]>> {
+  try {
+    const response = await api.get(`/results/user/${userId}/season/${seasonId}`);
+    return formatResponse(response, 200, 'Results fetched successfully');
+  } catch (error) {
+    console.error(`Error fetching results for user ${userId}, season ${seasonId}:`, error);
+    return formatError(error, `Failed to fetch results for user ${userId}, season ${seasonId}`);
+  }
+}
+
+export async function getCurrentSeason(): Promise<ApiResponse<Season>> {
+  try {
+    const response = await api.get<Season>('/current');
+    return formatResponse(response, 200, 'Current season fetched successfully');
+  } catch (error) {
+    console.error('Error fetching current season:', error);
+    return formatError(error, 'Failed to fetch current season');
+  }
+}
+
+export async function saveProgress(userId: number, score: number, total: number): Promise<ApiResponse<void>> {
+  try {
+    const response = await api.post('/progress', { userId, score, total });
+    return formatResponse(response, 201, 'Progress saved successfully');
+  } catch (error) {
+    console.error('Error saving progress:', error);
+    return formatError(error, 'Failed to save progress');
   }
 }
 
 // Export the api instance as default
 export default api;
-
-// Export TokenManager separately
-export { TokenManager };

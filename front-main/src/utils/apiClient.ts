@@ -1,11 +1,16 @@
 import axios from 'axios';
+import TokenManager from './TokenManager';
 
 // Define the API response type
 export interface ApiResponse<T = any> {
   data: T;
+  success: boolean;
   error?: string;
   message?: string;
-  success?: boolean;
+  status: number;
+  statusText: string;
+  headers?: any;
+  config?: any;
 }
 
 // Define the API client type - returns unwrapped data, not ApiResponse
