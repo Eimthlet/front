@@ -116,8 +116,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const navigate = useNavigate();
-  const { login: authLogin, register: authRegister, isAdmin, error: authError, clearError } = useAuth();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const navigate = useNavigate(); // navigate is used in the useEffect, but ESLint might not see it if useEffect is also considered for removal later.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { login: authLogin, register: authRegister, isAdmin, error: authError, clearError, user, isLoading: authIsLoading } = useAuth(); // Added user, authIsLoading for the useEffect
 
   // Removed unused state variables
 

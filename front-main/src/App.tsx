@@ -11,6 +11,7 @@ import { theme } from './theme';
 import Navigation from './components/Navigation';
 import AdminDashboard from './components/AdminDashboard';
 import UserManagement from './components/UserManagement';
+import AdminPanel from './components/AdminPanel'; // Added for Admin Panel route
 import Leaderboard from './components/Leaderboard';
 
 // Internal question format from API
@@ -166,6 +167,12 @@ const App: React.FC = () => {
           <Route path="/admin/users" element={
             <ProtectedRoute requiredAdmin={true}>
               <UserManagement />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/admin/panel" element={
+            <ProtectedRoute requiredAdmin={true}>
+              <AdminPanel />
             </ProtectedRoute>
           } />
           
