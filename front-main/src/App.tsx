@@ -13,8 +13,8 @@ import AdminPanel from './components/AdminPanel';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import { useAuth } from './contexts/AuthContext';
-import api from './utils/api';
 import { Question as ApiQuestion } from './types';
+import api from './api';
 
 interface QualificationResponse {
   hasAttempted: boolean;

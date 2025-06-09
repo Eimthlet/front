@@ -19,7 +19,7 @@ import api, {
   updateQuestion,
   deleteQuestion,
   fetchResults,
-  fetchCurrentSeason,
+  getCurrentSeason,
   saveProgress,
   fetchQuestions
 } from '../utils/api';
@@ -64,7 +64,7 @@ export {
   updateQuestion,
   deleteQuestion,
   fetchResults,
-  fetchCurrentSeason,
+  getCurrentSeason as fetchCurrentSeason,
   saveProgress,
   fetchQuestions
 };
