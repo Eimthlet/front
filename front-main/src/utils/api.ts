@@ -407,5 +407,8 @@ export async function saveProgress(userId: number, score: number, total: number)
   }
 }
 
+// Export the TokenManager
+export { TokenManager };
+
 // Export the api instance as default
 export default api;
