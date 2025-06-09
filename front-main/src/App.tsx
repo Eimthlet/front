@@ -13,7 +13,7 @@ import AdminPanel from './components/AdminPanel';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import { useAuth } from './contexts/AuthContext';
-import { api } from './utils/api';
+import api from './utils/api';
 import { Question as ApiQuestion } from './types';
 
 interface QualificationResponse {

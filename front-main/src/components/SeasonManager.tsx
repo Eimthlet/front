@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import api from '../api';
-import { createSeason, updateSeason } from '../api';
+import api, { createSeason, updateSeason } from '../api';
 import {
   Box,
   Button,
