@@ -88,11 +88,13 @@ console.log('API Base URL:', baseUrl);
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     console.log('Sending request to:', config.url);
+    // Conditionally log request data, excluding it for sensitive paths like login/register
+    const isSensitivePath = config.url?.includes('/auth/login') || config.url?.includes('/auth/register');
     console.log('Request config:', {
       method: config.method,
       baseURL: config.baseURL,
       url: config.url,
-      data: config.data,
+      data: isSensitivePath ? '[REDACTED FOR SENSITIVE REQUEST]' : config.data,
       headers: config.headers
     });
     
