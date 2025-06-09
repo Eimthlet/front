@@ -245,12 +245,40 @@ const SeasonManager: React.FC = () => {
   const handleOpenQuestionsDialog = handleViewQuestions;
   const handleOpenQualifiedUsersDialog = handleViewQualifiedUsers;
 
-  // Handle form changes
-  const handleSeasonChange = useCallback((field: keyof Season, value: any) => {
-    setCurrentSeason(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  // Handle form changes with proper type safety
+  const handleSeasonChange = useCallback(<K extends keyof Season>(
+    field: K,
+    value: Season[K] | ((prev: Season[K]) => Season[K])
+  ) => {
+    setCurrentSeason(prev => {
+      // Handle both direct values and functional updates
+      const newValue = typeof value === 'function' 
+        ? (value as (prev: Season[K]) => Season[K])(prev[field] as Season[K]) 
+        : value;
+      
+      // Special handling for boolean fields to ensure they're always boolean
+      if (field === 'is_active' || field === 'is_qualification_round') {
+        return {
+          ...prev,
+          [field]: Boolean(newValue)
+        };
+      }
+      
+      // Special handling for minimum_score_percentage to ensure it's a number
+      if (field === 'minimum_score_percentage') {
+        const numValue = Number(newValue);
+        return {
+          ...prev,
+          [field]: isNaN(numValue) ? 50 : Math.max(0, Math.min(100, numValue))
+        };
+      }
+      
+      // For all other fields, update normally
+      return {
+        ...prev,
+        [field]: newValue
+      };
+    });
   }, []);
 
   const handleQuestionChange = useCallback((field: keyof Question, value: string) => {
@@ -285,55 +313,68 @@ const SeasonManager: React.FC = () => {
   // Form submissions
   const handleSubmitSeason = useCallback(async () => {
     try {
-      setError('');
       setLoading(true);
+      setError('');
+
+      // Create a copy of currentSeason with trimmed strings
+      const season = { ...currentSeason };
       
+      // Trim string fields
+      if (season.name) season.name = season.name.trim();
+      if (season.description) season.description = season.description.trim();
+
       // Validate required fields
-      if (!currentSeason.name?.trim()) {
+      if (!season.name) {
         throw new Error('Season name is required');
       }
-      
-      if (!currentSeason.start_date) {
+      if (!season.start_date) {
         throw new Error('Start date is required');
       }
-      
-      if (!currentSeason.end_date) {
+      if (!season.end_date) {
         throw new Error('End date is required');
       }
 
-      // Ensure dates are valid
-      const startDate = new Date(currentSeason.start_date);
-      const endDate = new Date(currentSeason.end_date);
+      // Parse dates
+      const startDate = new Date(season.start_date);
+      const endDate = new Date(season.end_date);
       
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-        throw new Error('Invalid date format');
+        throw new Error('Invalid date format. Please use YYYY-MM-DD format.');
       }
-      
+
       if (startDate >= endDate) {
         throw new Error('End date must be after start date');
       }
-      
-      // Format dates to YYYY-MM-DD
+
+      // Format dates as YYYY-MM-DD strings
       const formatDate = (date: Date) => date.toISOString().split('T')[0];
-      
-      // Prepare the season data with all required fields
+
+      // Prepare season data according to backend expectations
+      const isQualificationRound = Boolean(season.is_qualification_round);
+      const minimumScorePercentage = isQualificationRound 
+        ? Math.min(100, Math.max(0, Number(season.minimum_score_percentage) || 50))
+        : 50; // Default to 50 if not a qualification round
+
       const seasonData = {
-        name: currentSeason.name.trim(),
+        name: season.name,
         start_date: formatDate(startDate),
         end_date: formatDate(endDate),
-        is_active: Boolean(currentSeason.is_active),
-        is_qualification_round: Boolean(currentSeason.is_qualification_round),
-        minimum_score_percentage: currentSeason.is_qualification_round 
-          ? Math.min(100, Math.max(0, Number(currentSeason.minimum_score_percentage) || 50))
-          : 0,
-        description: currentSeason.description?.trim() || ''
+        is_active: Boolean(season.is_active),
+        is_qualification_round: isQualificationRound,
+        minimum_score_percentage: minimumScorePercentage,
+        description: season.description || ''
       };
       
+      console.log('Submitting season data:', seasonData);
+      
+      let response;
       if (dialogMode === 'create') {
-        await api.post<Season>('/admin/seasons', seasonData);
+        response = await api.post<Season>('/admin/seasons', seasonData);
+        console.log('Season created:', response);
         setSuccess('Season created successfully');
-      } else if (currentSeason.id) {
-        await api.put<Season>(`/admin/seasons/${currentSeason.id}`, seasonData);
+      } else if (season.id) {
+        response = await api.put<Season>(`/admin/seasons/${season.id}`, seasonData);
+        console.log('Season updated:', response);
         setSuccess('Season updated successfully');
       }
       
