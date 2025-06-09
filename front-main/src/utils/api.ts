@@ -246,13 +246,22 @@ export async function createSeason(season: SeasonCreateData): Promise<ApiRespons
       baseUrl = baseUrl.substring(0, baseUrl.length - 5);
     }
     
+    // Get the authentication token
+    const token = TokenManager.getToken();
+    if (!token) {
+      throw new Error('No authentication token found. Please log in again.');
+    }
+    
     console.log('Using base URL:', baseUrl);
+    console.log('Using token:', token ? 'Token found' : 'No token');
+    
     const response = await fetch(`${baseUrl}/admin/seasons`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': `Bearer ${TokenManager.getToken()}`
+        'Authorization': `Bearer ${token}`,
+        'X-Requested-With': 'XMLHttpRequest'
       },
       credentials: 'include',
       body: JSON.stringify(payload)
@@ -299,7 +308,7 @@ export async function updateSeason(id: number | string, season: Partial<SeasonCr
 
     console.log(`Sending request to /admin/seasons/${id} with data:`, JSON.stringify(payload, null, 2));
     
-    // Use fetch directly to ensure consistent behavior with createSeason
+    // Remove any trailing /api from the base URL if present
     let baseUrl = process.env.REACT_APP_API_URL || '';
     if (baseUrl.endsWith('/api')) {
       baseUrl = baseUrl.substring(0, baseUrl.length - 4);
@@ -307,13 +316,22 @@ export async function updateSeason(id: number | string, season: Partial<SeasonCr
       baseUrl = baseUrl.substring(0, baseUrl.length - 5);
     }
     
+    // Get the authentication token
+    const token = TokenManager.getToken();
+    if (!token) {
+      throw new Error('No authentication token found. Please log in again.');
+    }
+    
     console.log('Using base URL:', baseUrl);
+    console.log('Using token:', token ? 'Token found' : 'No token');
+    
     const response = await fetch(`${baseUrl}/admin/seasons/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': `Bearer ${TokenManager.getToken()}`
+        'Authorization': `Bearer ${token}`,
+        'X-Requested-With': 'XMLHttpRequest'
       },
       credentials: 'include',
       body: JSON.stringify(payload)
