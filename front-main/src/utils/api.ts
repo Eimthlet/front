@@ -226,8 +226,20 @@ export async function createSeason(season: SeasonCreateData): Promise<ApiRespons
     }
 
     console.log('Sending request to /admin/seasons with data:', JSON.stringify(season, null, 2));
-    const response = await api.post('/admin/seasons', season);
-    console.log('Received response:', response.status, response.data);
+    
+    // Ensure we're sending proper JSON
+    const response = await api({
+      method: 'post',
+      url: '/admin/seasons',
+      data: season,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    });
+    
+    console.log('Received response status:', response.status);
+    console.log('Response data:', response.data);
     return {
       data: response.data as Season,
       success: true
