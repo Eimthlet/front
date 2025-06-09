@@ -52,8 +52,9 @@ const Leaderboard: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      // Fetch leaderboard data
-      const responseData = await apiClient.get('/leaderboard'); // responseData is the actual data object
+      // Fetch leaderboard data, including the timeRange query parameter
+      const apiUrl = `/leaderboard?range=${timeRange}`;
+      const responseData = await apiClient.get(apiUrl); // responseData is the actual data object
       
       if (responseData && Array.isArray(responseData.leaderboard)) {
         setLeaderboard(responseData.leaderboard);
@@ -69,11 +70,11 @@ const Leaderboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [timeRange]); // Add timeRange to dependency array
 
   useEffect(() => {
     fetchLeaderboard();
-  }, [fetchLeaderboard]);
+  }, [fetchLeaderboard, timeRange]); // Ensure fetchLeaderboard is called when timeRange changes
 
   if (loading) {
     return (

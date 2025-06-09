@@ -42,9 +42,9 @@ interface QualificationResponse {
 
 const App: React.FC = () => {
   const navigate = useNavigate();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isLoading: authLoading } = useAuth(); // Destructure isLoading as authLoading
   const [questions, setQuestions] = useState<ApiQuestion[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // This is for app-specific data like qualifications/questions
   const [error, setError] = useState<string | null>(null);
   const [qualification, setQualification] = useState<QualificationResponse | null>(null);
 
@@ -104,8 +104,14 @@ const App: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    fetchQualification();
-  }, [fetchQualification]);
+    // Only fetch qualification if auth is loaded and user is present
+    if (!authLoading && user) {
+      fetchQualification();
+    } else if (!authLoading && !user) {
+      // If auth is loaded and there's no user, no need to fetch qualification, stop app loading
+      setLoading(false);
+    }
+  }, [authLoading, user, fetchQualification]);
 
   const handleQuizComplete = useCallback(async (score: number) => {
     try {
@@ -120,8 +126,8 @@ const App: React.FC = () => {
     }
   }, [fetchQualification]);
 
-  // Render loading state
-  if (loading) {
+  // Render loading state: wait for auth to load AND for app data (qualifications/questions) to load
+  if (authLoading || loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
         <CircularProgress />

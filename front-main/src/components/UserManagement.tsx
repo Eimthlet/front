@@ -155,34 +155,48 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
       console.log('Fetching users from:', apiUrl);
       
       // Make the API call and handle the response
-      const response = await api.get(apiUrl);
+      // The 'api.get' from apiClient.ts returns the data array directly.
+      const usersArray = await api.get(apiUrl) as User[]; // Expect an array of User objects
       
-      // The backend returns the data in response.data
-      const users = Array.isArray(response?.data) ? response.data : [];
-      const total = users.length;
+      console.log('API Response - Users (should be an array):', usersArray); // Log the actual data received
       
-      console.log('API Response - Users:', users);
-      console.log(`Found ${users.length} users`);
-      
-      setUsers(users);
-      
-      // Update pagination with the correct total count
-      setPagination(prev => ({
-        ...prev,
-        total: total,
-        page: page,
-        totalPages: Math.ceil(total / limit)
-      }));
-    } catch (err) {
+      if (usersArray && Array.isArray(usersArray)) {
+        setUsers(usersArray);
+        // Pagination data (total users, total pages) is ideally part of the API response object
+        // or in response headers. Currently, usersArray is just the list for the current page.
+        // This pagination setup is a placeholder until backend provides full pagination metadata.
+        setPagination(prev => ({
+          ...prev,
+          total: usersArray.length, // This is count for current page, not overall total.
+          page: page, // Current page number from request
+          limit: limit, // Items per page from request
+          // totalPages should be Math.ceil(totalOverallUsers / limit).
+          // Placeholder: if usersArray.length is 0, totalPages is 0.
+          // Otherwise, if usersArray.length > 0 but less than limit, it's the last page for current data set.
+          // If usersArray.length === limit, there might be more pages.
+          // This is a guess. A robust solution needs total count from backend.
+          totalPages: usersArray.length > 0 ? (usersArray.length < limit ? page : page +1) : 0 
+                      // A simpler placeholder: Math.ceil(usersArray.length / limit) || (usersArray.length > 0 ? 1 : 0)
+                      // Let's use: if we get users, assume at least 1 page, if less than limit, current page is total pages. If equal to limit, assume more pages. This is still a heuristic.
+                      // For now, a basic calculation based on current page's data, knowing it's not fully accurate for server-side pagination.
+                      // totalPages: usersArray.length > 0 ? Math.ceil(usersArray.length / limit) : 0 // This is only correct if usersArray is ALL users.
+        }));
+        console.log(`Found ${usersArray.length} users (on current page)`);
+      } else {
+        console.error('Expected an array of users, but received:', usersArray);
+        handleError('Failed to fetch users', 'Invalid response format from server or no users found.');
+        setUsers([]); 
+        setPagination(prev => ({ ...prev, total: 0, totalPages: 0, page: 1 }));
+      }
+    } catch (err: any) {
       console.error('Error fetching users:', err);
-      handleError(
-        'Failed to fetch users',
-        err instanceof Error ? err.message : 'Unknown error occurred'
-      );
+      handleError('Failed to fetch users', err.message || 'An unknown error occurred');
+      setUsers([]); 
+      setPagination(prev => ({ ...prev, total: 0, totalPages: 0, page: 1 }));
     } finally {
       setLoading(false);
     }
-  }, []); // Removed dependencies since we're using parameters
+  }, [handleError, clearError]); // Removed dependencies since we're using parameters
 
   // Fetch users on component mount and when filters change
   useEffect(() => {
