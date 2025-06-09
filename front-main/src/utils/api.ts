@@ -238,8 +238,15 @@ export async function createSeason(season: SeasonCreateData): Promise<ApiRespons
     console.log('Sending request to /admin/seasons with data:', JSON.stringify(payload, null, 2));
     
     // Ensure we're sending proper JSON with explicit headers
-    // Note: We're using the full URL here since we're not using the axios instance
-    const baseUrl = process.env.REACT_APP_API_URL || '';
+    // Remove any trailing /api from the base URL if present
+    let baseUrl = process.env.REACT_APP_API_URL || '';
+    if (baseUrl.endsWith('/api')) {
+      baseUrl = baseUrl.substring(0, baseUrl.length - 4);
+    } else if (baseUrl.endsWith('/api/')) {
+      baseUrl = baseUrl.substring(0, baseUrl.length - 5);
+    }
+    
+    console.log('Using base URL:', baseUrl);
     const response = await fetch(`${baseUrl}/admin/seasons`, {
       method: 'POST',
       headers: {
@@ -293,7 +300,14 @@ export async function updateSeason(id: number | string, season: Partial<SeasonCr
     console.log(`Sending request to /admin/seasons/${id} with data:`, JSON.stringify(payload, null, 2));
     
     // Use fetch directly to ensure consistent behavior with createSeason
-    const baseUrl = process.env.REACT_APP_API_URL || '';
+    let baseUrl = process.env.REACT_APP_API_URL || '';
+    if (baseUrl.endsWith('/api')) {
+      baseUrl = baseUrl.substring(0, baseUrl.length - 4);
+    } else if (baseUrl.endsWith('/api/')) {
+      baseUrl = baseUrl.substring(0, baseUrl.length - 5);
+    }
+    
+    console.log('Using base URL:', baseUrl);
     const response = await fetch(`${baseUrl}/admin/seasons/${id}`, {
       method: 'PUT',
       headers: {
