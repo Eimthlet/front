@@ -1,25 +1,6 @@
 import apiClient from './apiClient';
 import TokenManager from './TokenManager';
 
-// Define local types to avoid import issues
-interface IApiResponse<T = any> {
-  data: T;
-  success: boolean;
-  error?: string;
-  message?: string;
-  status: number;
-  statusText: string;
-  headers: Record<string, any>;
-  config: {
-    url?: string;
-    method?: string;
-    [key: string]: any;
-  };
-  [key: string]: any; // Allow additional properties
-}
-
-type ApiResponse<T = any> = IApiResponse<T>;
-
 // Define domain types
 interface Season {
   id: number | string;
@@ -52,23 +33,6 @@ interface Question {
   updated_at?: string;
 }
 
-interface User {
-  id: number;
-  username: string;
-  email: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-interface QualifiedUser {
-  id: number;
-  username: string;
-  email: string;
-  score: number;
-  percentage_score: number;
-  completed_at: string;
-}
-
 interface QuestionCreateData {
   question_text: string;
   options: string[];
@@ -79,14 +43,14 @@ interface QuestionCreateData {
   season_id?: number | null;
 }
 
-// Define the AxiosResponse type
-type AxiosResponse<T = any> = {
-  data: T;
-  status: number;
-  statusText: string;
-  headers: any;
-  config: any;
-};
+interface QualifiedUser {
+  id: number;
+  username: string;
+  email: string;
+  score: number;
+  percentage_score: number;
+  completed_at: string;
+}
 
 // Extend Window interface to include onAuthError
 declare global {

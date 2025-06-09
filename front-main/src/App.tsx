@@ -28,10 +28,6 @@ interface QualificationResponse {
   completed_at?: string;
 }
 
-interface QuestionsResponse {
-  questions: QuizQuestion[];
-}
-
 type QuizQuestion = {
   id: string;
   question: string;
@@ -48,14 +44,6 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [qualification, setQualification] = useState<QualificationResponse | null>(null);
-  
-  // Type to narrow down the qualification response
-  type QualificationApiResponse = {
-    hasAttempted: boolean;
-    isQualified?: boolean;
-    qualifies_for_next_round?: boolean;
-    [key: string]: any; // Allow additional properties
-  };
   
   // Define the QuizQuestion type that matches what the Quiz component expects
   interface QuizQuestion {

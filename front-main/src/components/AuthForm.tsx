@@ -21,15 +21,6 @@ interface ResumePaymentResponse {
   email: string;
 }
 
-interface RegisterResponse {
-  tx_ref: string;
-  public_key: string;
-  amount: number;
-  email: string;
-  phone: string;
-  message: string;
-}
-
 // Helper function to generate UUID using Web Crypto API instead of Node.js crypto
 const generateUUID = (): string => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {

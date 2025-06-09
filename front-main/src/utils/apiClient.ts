@@ -1,8 +1,8 @@
 import axios from 'axios';
 import TokenManager from './TokenManager';
 
-// Define the AuthResponse interface here since it's not in types
-export interface AuthResponse {
+// Define the AuthResponse interface for token refresh
+interface AuthResponse {
   token: string;
   refreshToken: string;
   user?: {
