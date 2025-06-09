@@ -238,17 +238,37 @@ const SeasonManager: React.FC = () => {
   // Form submissions
   const handleSubmitSeason = useCallback(async () => {
     try {
+      setError('');
       setLoading(true);
+      
+      // Validate required fields
+      if (!currentSeason.name?.trim()) {
+        throw new Error('Season name is required');
+      }
+      
+      if (!currentSeason.start_date) {
+        throw new Error('Start date is required');
+      }
+      
+      if (!currentSeason.end_date) {
+        throw new Error('End date is required');
+      }
+      
+      // Format dates to YYYY-MM-DD
+      const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toISOString().split('T')[0];
+      };
       
       // Prepare the season data with all required fields
       const seasonData = {
-        name: currentSeason.name || '',
-        start_date: currentSeason.start_date || new Date().toISOString().split('T')[0],
-        end_date: currentSeason.end_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        is_active: currentSeason.is_active || false,
-        is_qualification_round: currentSeason.is_qualification_round || false,
-        minimum_score_percentage: currentSeason.minimum_score_percentage || 70,
-        description: currentSeason.description || ''
+        name: currentSeason.name.trim(),
+        start_date: formatDate(currentSeason.start_date),
+        end_date: formatDate(currentSeason.end_date),
+        is_active: Boolean(currentSeason.is_active),
+        is_qualification_round: Boolean(currentSeason.is_qualification_round),
+        minimum_score_percentage: Number(currentSeason.minimum_score_percentage) || 70,
+        description: currentSeason.description?.trim() || ''
       };
       
       if (dialogMode === 'create') {
