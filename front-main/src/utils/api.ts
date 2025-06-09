@@ -238,7 +238,9 @@ export async function createSeason(season: SeasonCreateData): Promise<ApiRespons
     console.log('Sending request to /admin/seasons with data:', JSON.stringify(payload, null, 2));
     
     // Ensure we're sending proper JSON with explicit headers
-    const response = await fetch(`${process.env.REACT_APP_API_URL || ''}/admin/seasons`, {
+    // Note: We're using the full URL here since we're not using the axios instance
+    const baseUrl = process.env.REACT_APP_API_URL || '';
+    const response = await fetch(`${baseUrl}/admin/seasons`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -277,9 +279,43 @@ export async function updateSeason(id: number | string, season: Partial<SeasonCr
       }
     }
 
-    const response = await api.put(`/admin/seasons/${id}`, season);
+    // Create a new object with only the fields we want to send
+    const payload = {
+      name: season.name?.trim(),
+      start_date: season.start_date,
+      end_date: season.end_date,
+      is_active: season.is_active,
+      is_qualification_round: season.is_qualification_round,
+      minimum_score_percentage: season.minimum_score_percentage,
+      description: season.description
+    };
+
+    console.log(`Sending request to /admin/seasons/${id} with data:`, JSON.stringify(payload, null, 2));
+    
+    // Use fetch directly to ensure consistent behavior with createSeason
+    const baseUrl = process.env.REACT_APP_API_URL || '';
+    const response = await fetch(`${baseUrl}/admin/seasons/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${TokenManager.getToken()}`
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+    
+    const responseData = await response.json();
+    
+    console.log('Received response status:', response.status);
+    console.log('Response data:', responseData);
+    
+    if (!response.ok) {
+      throw new Error(responseData.message || 'Failed to update season');
+    }
+    
     return {
-      data: response.data as Season,
+      data: responseData as Season,
       success: true
     };
   } catch (error) {
