@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import api, { ApiResponse } from '../utils/apiClient';
+import api from '../utils/apiClient';
+import type { ApiResponse } from '../types';
 import SeasonManager from './SeasonManager';
 import { 
   Box, 
@@ -132,10 +133,10 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       setIsLoading(true);
       clearError();
       // Use the correct endpoint format
-      const response = await api.get<{ questions: Question[] }>(`/admin/seasons/${selectedSeasonId}`);
+      const response = await api.get(`/admin/seasons/${selectedSeasonId}`);
       
       // Handle the response format - response should have a questions property
-      const questionsData = response?.questions || [];
+      const questionsData = response?.data?.questions || [];
       setQuestions(Array.isArray(questionsData) ? questionsData : []);
     } catch (error) {
       console.error('Error fetching questions:', error);
@@ -150,10 +151,10 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const fetchSeasons = useCallback(async () => {
     try {
       clearError();
-      const response = await api.get<Season[]>('/admin/seasons');
+      const response = await api.get('/admin/seasons');
       
-      // Fix: Handle response properly - response should already be the data array
-      const seasonsData = Array.isArray(response) ? response : [];
+      // Handle response properly - response data should be an array
+      const seasonsData = Array.isArray(response?.data) ? response.data : [];
       setSeasons(seasonsData);
       if (seasonsData.length > 0 && !selectedSeasonId) {
         setSelectedSeasonId(seasonsData[0].id);
@@ -346,7 +347,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       }
       
       // Use the correct endpoint format based on the server implementation
-      await api.delete<ApiResponse<{ message: string }>>(`/admin/questions/${questionId}`);
+      await api.delete(`/admin/questions/${questionId}`);
       
       // Refresh the questions list after successful deletion
       await fetchQuestions();

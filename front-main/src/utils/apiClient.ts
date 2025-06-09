@@ -1,24 +1,39 @@
 import axios from 'axios';
 import TokenManager from './TokenManager';
+import type { ApiError } from '../types';
 
-// Define the API response type
-export interface ApiResponse<T = any> {
+// Define the AuthResponse interface here since it's not in types
+export interface AuthResponse {
+  token: string;
+  refreshToken: string;
+  user?: {
+    id: number;
+    username: string;
+    email: string;
+  };
+}
+
+// Define Axios types for v1.9.0
+type AxiosRequestConfig = any;
+type AxiosResponse<T = any> = {
   data: T;
-  success: boolean;
-  error?: string;
-  message?: string;
   status: number;
   statusText: string;
-  headers?: any;
-  config?: any;
-}
+  headers: any;
+  config: any;
+  request?: any;
+};
+
+type InternalAxiosRequestConfig = any;
+type AxiosInstance = any;
 
 // Define the API client type - returns unwrapped data, not ApiResponse
 interface IApiClient {
-  get<T = any>(url: string, config?: any): Promise<T>;
-  post<T = any, D = any>(url: string, data?: D, config?: any): Promise<T>;
-  put<T = any, D = any>(url: string, data?: D, config?: any): Promise<T>;
-  delete<T = any>(url: string, config?: any): Promise<T>;
+  get(url: string, config?: AxiosRequestConfig): Promise<any>;
+  post(url: string, data?: any, config?: AxiosRequestConfig): Promise<any>;
+  put(url: string, data?: any, config?: AxiosRequestConfig): Promise<any>;
+  delete(url: string, config?: AxiosRequestConfig): Promise<any>;
+  request(config: AxiosRequestConfig): Promise<AxiosResponse>;
 }
 
 // Determine the API base URL based on the environment
@@ -45,60 +60,21 @@ const getBaseUrl = () => {
 const baseUrl = getBaseUrl().replace(/\/+$/, '');
 
 // Create a custom Axios instance
-const axiosInstance = axios.create({
+const api: AxiosInstance = axios.create({
   baseURL: baseUrl,
-  timeout: 30000,
-  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
+  },
+  withCredentials: true,
 });
 
-// Request interceptor to add auth token and handle URLs
-axiosInstance.interceptors.request.use(
-  (config) => {
-    // Add token to request if available
-    const token = localStorage.getItem('token');
-    if (token && config.headers) {
+// Add a request interceptor to include the auth token
+api.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    const token = TokenManager.getToken();
+    if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    if (config.url) {
-      // Skip URL modification for full URLs
-      if (config.url.startsWith('http')) {
-        return config;
-      }
-
-      // Remove any leading slashes
-      let cleanUrl = config.url.replace(/^\/+/, '');
-      
-      // Handle auth endpoints (should not have /api prefix)
-      if (cleanUrl.startsWith('auth/')) {
-        config.url = `/${cleanUrl}`;
-      } 
-      // Handle admin endpoints (should not have /api prefix)
-      else if (cleanUrl.startsWith('admin/') || cleanUrl.startsWith('api/admin/')) {
-        // Remove any existing /api prefix
-        cleanUrl = cleanUrl.replace(/^api\//, '');
-        config.url = `/${cleanUrl}`;
-      }
-      // For all other requests that don't start with /api, add it
-      else if (!cleanUrl.startsWith('api/')) {
-        config.url = `/api/${cleanUrl}`;
-      } else {
-        // If it already starts with api/, just ensure it has a leading slash
-        config.url = `/${cleanUrl}`;
-      }
-      
-      // Log the final URL for debugging
-      console.log(`Processed URL: ${config.url}`);
-    }
-    
-    // Log the request URL for debugging (without sensitive data)
-    const fullUrl = `${config.baseURL}${config.url}`.replace(/([^:]\/)\/+/g, '$1');
-    console.log(`[Request] ${config.method?.toUpperCase()} ${fullUrl}`);
-    
     return config;
   },
   (error) => {
@@ -106,60 +82,74 @@ axiosInstance.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle errors and logging
-axiosInstance.interceptors.response.use(
-  (response) => {
-    // Log the response for debugging
-    console.log('[Response]', response.config.method?.toUpperCase(), response.config.url, response.status);
-    return response;
-  },
-  (error) => {
-    // Handle errors
-    if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
-      return Promise.reject({
-        message: error.response.data?.message || error.response.data?.error || 'An error occurred',
-        status: error.response.status,
-        data: error.response.data
-      });
-    } else if (error.request) {
-      // The request was made but no response was received
-      return Promise.reject({
-        message: 'No response received from server',
-        isNetworkError: true
-      });
-    } else {
-      // Something happened in setting up the request that triggered an Error
-      return Promise.reject({
-        message: error.message || 'An error occurred while setting up the request'
-      });
+// Add a response interceptor to handle token refresh
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // If the error status is 401 and we haven't tried to refresh the token yet
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        const refreshToken = TokenManager.getRefreshToken();
+        if (!refreshToken) {
+          // No refresh token available, redirect to login
+          TokenManager.clearTokens();
+          window.location.href = '/login';
+          return Promise.reject(error);
+        }
+        
+        // Try to refresh the token
+        const response = await axios.post<AuthResponse>(
+          `${baseUrl}/auth/refresh-token`,
+          { refreshToken }
+        );
+        
+        const { token: newToken, refreshToken: newRefreshToken } = response.data;
+        TokenManager.setTokens(newToken, newRefreshToken);
+        
+        // Retry the original request with the new token
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        // Failed to refresh token, clear tokens and redirect to login
+        TokenManager.clearTokens();
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
     }
+    
+    return Promise.reject(error);
   }
 );
 
-// Helper function to extract data from API response
-function extractApiData<T>(response: any): T {
-  // Handle both direct data and nested data property
-  if (response && typeof response === 'object' && 'data' in response) {
-    return response.data as T;
+// Create a typed API client that matches our IApiClient interface
+const apiClient: IApiClient = {
+  get: async (url: string, config?: AxiosRequestConfig) => {
+    const response = await api.get(url, config) as AxiosResponse;
+    return response.data;
+  },
+  
+  post: async (url: string, data?: any, config?: AxiosRequestConfig) => {
+    const response = await api.post(url, data, config) as AxiosResponse;
+    return response.data;
+  },
+  
+  put: async (url: string, data?: any, config?: AxiosRequestConfig) => {
+    const response = await api.put(url, data, config) as AxiosResponse;
+    return response.data;
+  },
+  
+  delete: async (url: string, config?: AxiosRequestConfig) => {
+    const response = await api.delete(url, config) as AxiosResponse;
+    return response.data;
+  },
+  
+  request: async (config: AxiosRequestConfig) => {
+    return api.request(config) as AxiosResponse;
   }
-  return response as T;
-}
+};
 
-// Create typed API methods that return unwrapped data
-const api: IApiClient = {
-  get: <T = any>(url: string, config?: any) => 
-    axiosInstance.get<T>(url, config).then(response => response.data),
-    
-  post: <T = any, D = any>(url: string, data?: D, config?: any) => 
-    axiosInstance.post<T>(url, data, config).then(response => response.data),
-    
-  put: <T = any, D = any>(url: string, data?: D, config?: any) => 
-    axiosInstance.put<T>(url, data, config).then(response => response.data),
-    
-  delete: <T = any>(url: string, config?: any) => 
-    axiosInstance.delete<T>(url, config).then(response => response.data)
-} as IApiClient;
-
-export default api;
+export default apiClient;

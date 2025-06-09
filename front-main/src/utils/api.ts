@@ -1,13 +1,114 @@
-import { 
-  Season, 
-  Question, 
-  QualifiedUser, 
-  QuizResult
-} from '../types';
+import * as types from '../types';
 
-type QuestionCreateData = Omit<Question, 'id'>;
+// Define local types to avoid import issues
+interface IApiResponse<T = any> {
+  data: T;
+  success: boolean;
+  error?: string;
+  message?: string;
+  status: number;
+  statusText: string;
+  headers: Record<string, any>;
+  config: {
+    url?: string;
+    method?: string;
+    [key: string]: any;
+  };
+  [key: string]: any; // Allow additional properties
+}
+
+type ApiResponse<T = any> = IApiResponse<T>;
+
+// Define domain types
+interface Season {
+  id: number | string;
+  name: string;
+  description: string | null;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  is_qualification_round: boolean;
+  minimum_score_percentage: number;
+  question_count: number;
+  attempts_count: number;
+  qualified_users_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Question {
+  id: number;
+  question_text: string;
+  question?: string;
+  options: string[];
+  correct_answer: string;
+  correctAnswer?: string;
+  category: string;
+  difficulty: string;
+  time_limit?: number;
+  season_id?: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface QualifiedUser {
+  id: number;
+  username: string;
+  email: string;
+  score: number;
+  percentage_score: number;
+  completed_at: string;
+}
+
+interface QuizResult {
+  id: number;
+  user_id: number;
+  season_id: number;
+  round_id: number;
+  score: number;
+  completed_at: string;
+  round_number: number;
+  min_score_to_qualify: number;
+}
+
+// Define auth related types
+interface AuthResponse {
+  token: string;
+  refreshToken: string;
+  user?: {
+    id: number;
+    username: string;
+    email: string;
+  };
+}
+
+interface QuestionCreateData {
+  question_text: string;
+  options: string[];
+  correct_answer: string;
+  category: string;
+  difficulty: string;
+  time_limit?: number;
+  season_id?: number | null;
+}
+
+// Define the AxiosResponse type
+type AxiosResponse<T = any> = {
+  data: T;
+  status: number;
+  statusText: string;
+  headers: any;
+  config: any;
+};
 import apiClient from './apiClient';
-import type { ApiResponse } from './apiClient';
 import TokenManager from './TokenManager';
 
 // Extend Window interface to include onAuthError
@@ -34,48 +135,69 @@ const api = {
 };
 
 // Helper function to ensure consistent response format
-const formatResponse = <T>(data: T, status = 200, statusText = 'OK'): ApiResponse<T> => {
+function formatResponse(
+  data: any, 
+  status = 200, 
+  statusText = 'OK',
+  headers: Record<string, any> = {},
+  config: Record<string, any> = {}
+): any {
   return {
     data,
     success: true,
     status,
     statusText,
-    headers: {},
-    config: {}
+    headers,
+    config: {
+      url: '',
+      method: '',
+      ...config
+    }
   };
-};
+}
 
 // Helper function to format error response
-const formatError = <T>(
-  error: any, 
+function formatError(
+  error: any,
   defaultMessage = 'An error occurred',
-  statusCode: number = 500,
-  statusText: string = 'Error'
-): ApiResponse<T> => {
-  const message = error.message || defaultMessage;
-  const status = error.status || statusCode;
-  const errorStatusText = error.statusText || statusText;
-  
+  statusCode = 500,
+  statusText = 'Error',
+  headers: Record<string, any> = {},
+  config: Record<string, any> = {}
+): any {
   return {
-    data: {} as T,
+    data: {},
     success: false,
-    error: message,
-    status,
-    statusText: errorStatusText,
-    headers: error.headers || {},
-    config: error.config || {}
+    error: error?.message || defaultMessage,
+    message: error?.message || defaultMessage,
+    status: error?.status || statusCode,
+    statusText: error?.statusText || statusText,
+    headers: error?.headers || headers,
+    config: {
+      url: '',
+      method: '',
+      ...(error?.config || config)
+    }
   };
-};
+}
 
 // Auth API
-export async function login(email: string, password: string): Promise<ApiResponse<AuthResponse>> {
+export async function login(email: string, password: string) {
   try {
-    const response = await api.post<AuthResponse>('/auth/login', { email, password });
-    TokenManager.setTokens(response.token, response.refreshToken);
-    return formatResponse(response);
-  } catch (error: any) {
-    console.error('Login error:', error);
-    return formatError<AuthResponse>(error, 'Failed to login');
+    const response = await api.post('/auth/login', { email, password });
+    
+    // Save tokens to TokenManager
+    TokenManager.setTokens(response.data.token, response.data.refreshToken);
+    
+    return formatResponse(
+      response.data,
+      response.status,
+      response.statusText,
+      response.headers,
+      response.config
+    );
+  } catch (error) {
+    return formatError(error, 'Login failed');
   }
 }
 
@@ -85,57 +207,100 @@ export async function register(userData: {
   password: string;
   phone: string;
   amount: number;
-}): Promise<ApiResponse<AuthResponse>> {
+}) {
   try {
     const response = await api.post('/auth/register', userData);
-    const authData = response.data as AuthResponse;
     
-    // Store tokens in memory
-    TokenManager.setTokens(authData.token, authData.refreshToken);
+    // Save tokens to TokenManager on successful registration
+    if (response.data?.token && response.data?.refreshToken) {
+      TokenManager.setTokens(response.data.token, response.data.refreshToken);
+    }
     
-    return formatResponse(authData, 200, 'Success');
+    return formatResponse(
+      response.data,
+      response.status,
+      response.statusText,
+      response.headers,
+      response.config
+    );
   } catch (error) {
+    console.error('Registration error:', error);
     return formatError(error, 'Registration failed');
   }
 }
 
-export async function refreshToken(refreshToken: string): Promise<ApiResponse<AuthResponse>> {
+export async function refreshToken(refreshToken: string) {
   try {
-    const response = await api.post<AuthResponse>('/auth/refresh-token', { refreshToken });
-    TokenManager.setTokens(response.token, response.refreshToken);
-    return formatResponse(response);
-  } catch (error: any) {
-    console.error('Token refresh failed:', error);
-    // Clear tokens on refresh failure
-    TokenManager.clearTokens();
-    // Notify any auth error handlers
-    if (typeof window.onAuthError === 'function') {
-      window.onAuthError();
+    const response = await api.post('/auth/refresh-token', { refreshToken });
+    
+    // Save new tokens
+    if (response.data?.token && response.data?.refreshToken) {
+      TokenManager.setTokens(response.data.token, response.data.refreshToken);
     }
-    throw error;
+    
+    return formatResponse(
+      response.data,
+      response.status,
+      response.statusText,
+      response.headers,
+      response.config
+    );
+  } catch (error) {
+    console.error('Token refresh failed:', error);
+    return formatError(error, 'Token refresh failed');
   }
 }
 
-export function logout() {
-  TokenManager.clearTokens();
+export async function logout() {
+  try {
+    // Clear tokens from storage
+    TokenManager.clearTokens();
+    
+    // Optional: Call the server to invalidate the token
+    await api.post('/auth/logout');
+    
+    return formatResponse(
+      { success: true },
+      200,
+      'Logged out successfully'
+    ) as ApiResponse<{ success: boolean }>;
+  } catch (error: any) {
+    // Even if the server logout fails, we still want to clear local tokens
+    TokenManager.clearTokens();
+    return formatError(error, 'Logout failed') as ApiResponse<{ success: boolean }>;
+  }
 }
 
 // Season API - Enhanced with better error handling
-export async function fetchAllSeasons(): Promise<ApiResponse<Season[]>> {
+export async function fetchAllSeasons() {
   try {
-    const response = await api.get<Season[]>('/admin/seasons');
-    return formatResponse(response, 200, 'Success');
-  } catch (error) {
-    return formatError(error, 'Failed to fetch seasons');
+    const response = await api.get('/seasons');
+    return formatResponse(
+      response.data,
+      response.status,
+      response.statusText,
+      response.headers,
+      response.config
+    );
+  } catch (error: any) {
+    console.error('Error fetching seasons:', error);
+    return formatError(error, 'Failed to fetch seasons') as ApiResponse<Season[]>;
   }
 }
 
-export async function fetchSeason(id: number): Promise<ApiResponse<Season>> {
+export async function fetchSeason(id: number) {
   try {
-    const response = await api.get<Season>(`/admin/seasons/${id}`);
-    return formatResponse(response, 200, 'Success');
-  } catch (error) {
-    return formatError(error, `Failed to fetch season ${id}`);
+    const response = await api.get(`/seasons/${id}`);
+    return formatResponse(
+      response.data,
+      response.status,
+      response.statusText,
+      response.headers,
+      response.config
+    );
+  } catch (error: any) {
+    console.error(`Error fetching season with id ${id}:`, error);
+    return formatError(error, `Failed to fetch season with id ${id}`) as ApiResponse<Season>;
   }
 }
 
@@ -150,7 +315,7 @@ type SeasonCreateData = {
   description?: string;
 };
 
-export async function createSeason(season: SeasonCreateData): Promise<ApiResponse<Season>> {
+export async function createSeason(season: SeasonCreateData) {
   try {
     // Validate required fields
     if (!season.name || !season.start_date || !season.end_date) {
@@ -167,17 +332,23 @@ export async function createSeason(season: SeasonCreateData): Promise<ApiRespons
     console.log('Creating season with payload:', payload);
     
     // Use the apiClient for the request
-    const response = await api.post<Season>('/admin/seasons', payload);
+    const response = await api.post('/admin/seasons', payload);
     console.log('Season created successfully:', response);
     
-    return formatResponse(response, 201, 'Created');
-  } catch (error: any) {
+    return formatResponse(
+      response.data,
+      response.status,
+      response.statusText,
+      response.headers,
+      response.config
+    );
+  } catch (error) {
     console.error('Error creating season:', error);
-    return formatError<Season>(error, 'Failed to create season');
+    return formatError(error, 'Failed to create season');
   }
 }
 
-export async function updateSeason(id: number | string, season: Partial<SeasonCreateData>): Promise<ApiResponse<Season>> {
+export async function updateSeason(id: number | string, season: Partial<SeasonCreateData>) {
   try {
     // Ensure required fields are present
     if (!season.name && !season.start_date && !season.end_date) {
@@ -199,37 +370,55 @@ export async function updateSeason(id: number | string, season: Partial<SeasonCr
     if (season.minimum_score_percentage !== undefined) payload.minimum_score_percentage = season.minimum_score_percentage;
 
     console.log('Updating season with payload:', payload);
-    const response = await api.put<Season>(`/admin/seasons/${id}`, payload);
+    const response = await api.put(`/admin/seasons/${id}`, payload);
     
     // Return the updated season with success status
-    return formatResponse(response, 200, 'Season updated successfully');
+    return formatResponse(
+      response.data,
+      response.status,
+      response.statusText,
+      response.headers,
+      response.config
+    );
   } catch (error) {
     console.error(`Error updating season ${id}:`, error);
     return formatError(error, `Failed to update season ${id}`);
   }
 }
 
-export async function deleteSeason(id: number | string): Promise<ApiResponse<void>> {
+export async function deleteSeason(id: number | string) {
   try {
     const response = await api.delete(`/admin/seasons/${id}`);
-    return formatResponse(response, 204, 'Season deleted successfully');
+    return formatResponse(
+      response.data,
+      response.status,
+      response.statusText,
+      response.headers,
+      response.config
+    );
   } catch (error) {
     console.error(`Error deleting season ${id}:`, error);
     return formatError(error, `Failed to delete season ${id}`);
   }
 }
 
-export async function fetchSeasonQuestions(seasonId: number | string): Promise<ApiResponse<Question[]>> {
+export async function fetchSeasonQuestions(seasonId: number | string) {
   try {
-    const response = await api.get<Question[]>(`/admin/seasons/${seasonId}/questions`);
-    return formatResponse(response, 200, 'Questions fetched successfully');
+    const response = await api.get(`/admin/seasons/${seasonId}/questions`);
+    return formatResponse(
+      response.data,
+      response.status,
+      response.statusText,
+      response.headers,
+      response.config
+    );
   } catch (error) {
     console.error(`Error fetching questions for season ${seasonId}:`, error);
     return formatError(error, `Failed to fetch questions for season ${seasonId}`);
   }
 }
 
-export async function addSeasonQuestions(id: number, questions: Question[]): Promise<ApiResponse<void>> {
+export async function addSeasonQuestions(id: number, questions: Question[]) {
   try {
     // Validate questions before sending
     for (const question of questions) {
@@ -278,7 +467,7 @@ export async function addSeasonQuestions(id: number, questions: Question[]): Pro
   }
 }
 
-export async function removeSeasonQuestion(seasonId: number, questionId: number): Promise<ApiResponse<void>> {
+export async function removeSeasonQuestion(seasonId: number, questionId: number) {
   try {
     const response = await api.delete(`/admin/seasons/${seasonId}/questions/${questionId}`);
     return formatResponse(response, 204, 'Question removed successfully');
@@ -288,9 +477,9 @@ export async function removeSeasonQuestion(seasonId: number, questionId: number)
   }
 }
 
-export async function fetchQualifiedUsers(seasonId: number): Promise<ApiResponse<QualifiedUser[]>> {
+export async function fetchQualifiedUsers(seasonId: number) {
   try {
-    const response = await api.get<QualifiedUser[]>(`/admin/seasons/${seasonId}/qualified-users`);
+    const response = await api.get(`/admin/seasons/${seasonId}/qualified-users`);
     return formatResponse(response, 200, 'Qualified users fetched successfully');
   } catch (error) {
     console.error(`Error fetching qualified users for season ${seasonId}:`, error);
@@ -302,9 +491,9 @@ export async function updateQualifiedUser(
   seasonId: number,
   userId: number,
   updates: Partial<QualifiedUser>
-): Promise<ApiResponse<QualifiedUser>> {
+) {
   try {
-    const response = await api.put<QualifiedUser>(
+    const response = await api.put(
       `/admin/seasons/${seasonId}/qualified-users/${userId}`,
       updates
     );
@@ -316,99 +505,109 @@ export async function updateQualifiedUser(
 }
 
 // Question API
-export async function fetchAllQuestions(): Promise<ApiResponse<Question[]>> {
+export async function fetchAllQuestions() {
   try {
-    const response = await api.get<Question[]>('/admin/questions');
+    const response = await api.get('/questions');
     return formatResponse(response, 200, 'Questions fetched successfully');
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching questions:', error);
     return formatError(error, 'Failed to fetch questions');
   }
 }
 
-export async function fetchQuestions(): Promise<ApiResponse<{ questions: Question[] }>> {
+export async function fetchQuestions() {
   try {
-    const response = await api.get<{ questions: Question[] }>('/questions');
+    const response = await api.get('/questions');
     return formatResponse(response, 200, 'Questions fetched successfully');
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching questions:', error);
     return formatError(error, 'Failed to fetch questions');
   }
 }
 
-export async function createQuestion(question: QuestionCreateData): Promise<ApiResponse<Question>> {
+export async function createQuestion(question: QuestionCreateData) {
   try {
-    const response = await api.post<Question>('/admin/questions', question);
-    return formatResponse(response, 201, 'Question created successfully');
+    const response = await api.post('/questions', question);
+    return formatResponse(
+      response.data,
+      response.status,
+      response.statusText,
+      response.headers,
+      response.config
+    );
   } catch (error) {
     console.error('Error creating question:', error);
     return formatError(error, 'Failed to create question');
   }
 }
 
-export async function updateQuestion(id: number, question: Partial<Question>): Promise<ApiResponse<Question>> {
+export async function updateQuestion(id: number, question: Partial<Question>) {
   try {
-    const response = await api.put<Question>(`/admin/questions/${id}`, question);
-    return formatResponse(response, 200, 'Question updated successfully');
+    const response = await api.put(`/questions/${id}`, question);
+    return formatResponse(
+      response.data,
+      response.status,
+      response.statusText,
+      response.headers,
+      response.config
+    );
   } catch (error) {
-    console.error(`Error updating question ${id}:`, error);
-    return formatError(error, `Failed to update question ${id}`);
+    console.error(`Error updating question with id ${id}:`, error);
+    return formatError(error, `Failed to update question with id ${id}`);
   }
 }
 
-export async function deleteQuestion(id: number): Promise<ApiResponse<void>> {
+export async function deleteQuestion(id: number) {
   try {
-    const response = await api.delete(`/admin/questions/${id}`);
-    return formatResponse(response, 204, 'Question deleted successfully');
+    const response = await api.delete(`/questions/${id}`);
+    return formatResponse(
+      response.data,
+      response.status,
+      response.statusText,
+      response.headers,
+      response.config
+    );
   } catch (error) {
-    console.error(`Error deleting question ${id}:`, error);
-    return formatError(error, `Failed to delete question ${id}`);
+    console.error(`Error deleting question with id ${id}:`, error);
+    return formatError(error, `Failed to delete question with id ${id}`);
   }
 }
 
-// Results API
-export async function fetchQuizResults(seasonId: number): Promise<ApiResponse<QuizResult[]>> {
-  try {
-    const response = await api.get<QuizResult[]>(`/admin/seasons/${seasonId}/results`);
-    return formatResponse(response, 200, 'Quiz results fetched successfully');
-  } catch (error) {
-    console.error(`Error fetching quiz results for season ${seasonId}:`, error);
-    return formatError(error, `Failed to fetch quiz results for season ${seasonId}`);
-  }
-}
-
-export async function fetchResults(userId: number, seasonId: number): Promise<ApiResponse<QuizResult[]>> {
+export async function fetchResults(userId: number, seasonId: number) {
   try {
     const response = await api.get(`/results/user/${userId}/season/${seasonId}`);
     return formatResponse(response, 200, 'Results fetched successfully');
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error fetching results for user ${userId}, season ${seasonId}:`, error);
     return formatError(error, `Failed to fetch results for user ${userId}, season ${seasonId}`);
   }
 }
 
-export async function getCurrentSeason(): Promise<ApiResponse<Season>> {
+export async function getCurrentSeason() {
   try {
-    const response = await api.get<Season>('/current');
+    const response = await api.get('/current');
     return formatResponse(response, 200, 'Current season fetched successfully');
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching current season:', error);
     return formatError(error, 'Failed to fetch current season');
   }
 }
 
-export async function saveProgress(userId: number, score: number, total: number): Promise<ApiResponse<void>> {
+export async function saveProgress(userId: number, score: number, total: number) {
   try {
     const response = await api.post('/progress', { userId, score, total });
-    return formatResponse(response, 201, 'Progress saved successfully');
+    return formatResponse(
+      response.data,
+      response.status,
+      response.statusText,
+      response.headers,
+      response.config
+    ) as ApiResponse<void>;
   } catch (error) {
     console.error('Error saving progress:', error);
     return formatError(error, 'Failed to save progress');
   }
 }
-
-// Export the TokenManager
-export { TokenManager };
 
 // Export the api instance as default
 export default api;
