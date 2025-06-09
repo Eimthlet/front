@@ -175,26 +175,6 @@ const SeasonManager: React.FC = () => {
     setOpenDialog(true);
   }, []);
 
-  // Handle view questions
-  const handleViewQuestions = useCallback(async (seasonId: number | string) => {
-    try {
-      setLoading(true);
-      setSelectedSeasonId(Number(seasonId));
-      
-      // Fetch questions for the season
-      const questionsData = await fetchQuestions(seasonId);
-      setQuestions(questionsData);
-      
-      setOpenQuestionsDialog(true);
-    } catch (err: any) {
-      const error = err as ApiError;
-      setError(error.response?.data?.message || 'Failed to fetch questions');
-      setQuestions([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   // Fetch questions for a season
   const fetchQuestions = useCallback(async (seasonId: number | string) => {
     try {
@@ -221,10 +201,25 @@ const SeasonManager: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setLoading, setError, setQuestions]);
 
-  // Alias for backward compatibility
-  const fetchQuestionsForSeason = fetchQuestions;
+  // Handle view questions
+  const handleViewQuestions = useCallback(async (seasonId: number | string) => {
+    setSelectedSeasonId(Number(seasonId));
+    
+    try {
+      setLoading(true);
+      // Fetch questions for the season
+      const questionsData = await fetchQuestions(seasonId);
+      setQuestions(questionsData);
+      setOpenQuestionsDialog(true);
+    } catch (err) {
+      console.error('Error in handleViewQuestions:', err);
+      setError('Failed to load questions');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchQuestions, setLoading, setError, setQuestions, setOpenQuestionsDialog]);
 
   // Handle view qualified users
   const handleViewQualifiedUsers = useCallback(async (seasonId: number | string) => {
@@ -244,8 +239,8 @@ const SeasonManager: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
-  
+  }, [setLoading, setError, setSelectedSeasonId, setQualifiedUsers, setOpenQualifiedUsersDialog]);
+
   // Alias for backward compatibility
   const handleOpenQuestionsDialog = handleViewQuestions;
   const handleOpenQualifiedUsersDialog = handleViewQualifiedUsers;
@@ -427,13 +422,9 @@ const SeasonManager: React.FC = () => {
       }
       
       setSuccess('Question saved successfully');
-    } catch (err: any) {
-      const error = err as ApiError;
-      console.error('Error saving question:', error);
-      const errorMessage = error.response?.data?.message || 
-                         error.response?.data?.error || 
-                         error.message || 
-                         'Failed to save question';
+    } catch (err) {
+      console.error('Error in handleSubmitQuestions:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save question';
       setError(errorMessage);
     } finally {
       setLoading(false);
