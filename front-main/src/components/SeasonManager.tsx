@@ -340,7 +340,6 @@ const SeasonManager: React.FC = () => {
       
       console.log('Submitting season data:', seasonData);
       
-      let response;
       if (dialogMode === 'create') {
         // Use the API client's createSeason function which handles validation
         const response = await createSeason(seasonData);
