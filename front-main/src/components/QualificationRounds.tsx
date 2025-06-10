@@ -21,7 +21,9 @@ import {
   Tooltip,
   CircularProgress,
   Alert,
-  Snackbar
+  Snackbar,
+  Grid,
+  Chip
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -32,30 +34,38 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import api from '../utils/apiClient';
 
-interface Round {
-  id: number;
+interface QualificationRound {
+  id?: number;
   name: string;
   description: string;
   is_active: boolean;
-  start_date: string | null;
-  end_date: string | null;
-  question_count: number;
+  start_date: string;
+  end_date: string;
+  round_number: number;
+  min_score_to_qualify?: number;
+  season_id?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
+const defaultRound: Omit<QualificationRound, 'id' | 'created_at' | 'updated_at'> = {
+  name: '',
+  description: '',
+  is_active: true,
+  start_date: new Date().toISOString(),
+  end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+  round_number: 1,
+  min_score_to_qualify: 70
+};
+
 const QualificationRounds: React.FC = () => {
-  const [rounds, setRounds] = useState<Round[]>([]);
+  const [rounds, setRounds] = useState<QualificationRound[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
-  const [editingRound, setEditingRound] = useState<Round | null>(null);
+  const [editingRound, setEditingRound] = useState<QualificationRound | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  
-  // Form state
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [isActive, setIsActive] = useState(true);
-  const [startDate, setStartDate] = useState<Date | null>(new Date());
-  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [round, setRound] = useState<QualificationRound>(defaultRound);
 
   const fetchRounds = async () => {
     try {
@@ -76,21 +86,13 @@ const QualificationRounds: React.FC = () => {
     fetchRounds();
   }, []);
 
-  const handleOpenDialog = (round: Round | null = null) => {
+  const handleOpenDialog = (round: QualificationRound | null = null) => {
     if (round) {
       setEditingRound(round);
-      setName(round.name);
-      setDescription(round.description || '');
-      setIsActive(round.is_active);
-      setStartDate(round.start_date ? new Date(round.start_date) : null);
-      setEndDate(round.end_date ? new Date(round.end_date) : null);
+      setRound(round);
     } else {
       setEditingRound(null);
-      setName('');
-      setDescription('');
-      setIsActive(true);
-      setStartDate(new Date());
-      setEndDate(null);
+      setRound(defaultRound);
     }
     setOpenDialog(true);
   };
@@ -100,34 +102,74 @@ const QualificationRounds: React.FC = () => {
     setEditingRound(null);
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target as HTMLInputElement;
+    setRound(prev => ({
+      ...prev,
+      [name]: type === 'number' ? Number(value) : value
+    }));
+  };
+
+  const handleDateChange = (field: 'start_date' | 'end_date') => (date: Date | null) => {
+    if (date) {
+      setRound(prev => ({
+        ...prev,
+        [field]: date.toISOString()
+      }));
+    }
+  };
+
+  const validateRound = (): boolean => {
+    if (!round.name) {
+      setError('Name is required');
+      return false;
+    }
+    if (!round.round_number || round.round_number < 1) {
+      setError('Round number must be at least 1');
+      return false;
+    }
+    if (!round.start_date) {
+      setError('Start date is required');
+      return false;
+    }
+    if (!round.end_date) {
+      setError('End date is required');
+      return false;
+    }
+    if (new Date(round.end_date) <= new Date(round.start_date)) {
+      setError('End date must be after start date');
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async () => {
     try {
+      setError('');
+      
+      if (!validateRound()) {
+        return;
+      }
+
       const roundData = {
-        name,
-        description,
-        is_active: isActive,
-        start_date: startDate?.toISOString(),
-        end_date: endDate?.toISOString()
+        ...round,
+        round_number: Number(round.round_number),
+        min_score_to_qualify: round.min_score_to_qualify ? Number(round.min_score_to_qualify) : 70
       };
 
-      if (editingRound) {
+      if (editingRound && editingRound.id) {
         await api.put(`/admin/rounds/${editingRound.id}`, roundData);
         setSnackbar({ open: true, message: 'Round updated successfully', severity: 'success' });
       } else {
         await api.post('/admin/rounds', roundData);
         setSnackbar({ open: true, message: 'Round created successfully', severity: 'success' });
       }
-
-      fetchRounds();
       handleCloseDialog();
+      fetchRounds();
     } catch (err) {
       setError('Failed to save round');
       console.error('Error saving round:', err);
-      setSnackbar({ 
-        open: true, 
-        message: `Failed to ${editingRound ? 'update' : 'create'} round`, 
-        severity: 'error' 
-      });
+      setSnackbar({ open: true, message: 'Failed to save round', severity: 'error' });
     }
   };
 
@@ -147,6 +189,10 @@ const QualificationRounds: React.FC = () => {
 
   const handleCloseSnackbar = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
   };
 
   if (loading) {
@@ -174,65 +220,68 @@ const QualificationRounds: React.FC = () => {
         <Button
           variant="contained"
           color="primary"
-          startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
+          startIcon={<AddIcon />}
         >
           Add Round
         </Button>
       </Box>
 
-      <Paper elevation={3}>
-        <TableContainer>
-          <Table>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+        <TableContainer sx={{ maxHeight: 440 }}>
+          <Table stickyHeader>
             <TableHead>
               <TableRow>
                 <TableCell>Name</TableCell>
+                <TableCell>Round #</TableCell>
+                <TableCell>Start Date</TableCell>
+                <TableCell>End Date</TableCell>
+                <TableCell>Min Score</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell>Questions</TableCell>
-                <TableCell>Date Range</TableCell>
-                <TableCell align="right">Actions</TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {rounds.map((round) => (
-                <TableRow key={round.id}>
+              {rounds.map((roundItem) => (
+                <TableRow key={roundItem.id}>
+                  <TableCell>{roundItem.name}</TableCell>
+                  <TableCell>{roundItem.round_number}</TableCell>
                   <TableCell>
-                    <Typography variant="subtitle1">{round.name}</Typography>
-                    {round.description && (
-                      <Typography variant="body2" color="textSecondary">
-                        {round.description}
-                      </Typography>
-                    )}
+                    {roundItem.start_date ? formatDate(roundItem.start_date) : 'N/A'}
                   </TableCell>
                   <TableCell>
-                    <Box
-                      display="inline-flex"
-                      alignItems="center"
-                      px={1.5}
-                      py={0.5}
-                      borderRadius={1}
-                      bgcolor={round.is_active ? 'success.light' : 'grey.300'}
-                      color={round.is_active ? 'success.contrastText' : 'text.secondary'}
-                    >
-                      {round.is_active ? 'Active' : 'Inactive'}
-                    </Box>
+                    {roundItem.end_date ? formatDate(roundItem.end_date) : 'N/A'}
                   </TableCell>
-                  <TableCell>{round.question_count} questions</TableCell>
+                  <TableCell>{roundItem.min_score_to_qualify || 70}%</TableCell>
                   <TableCell>
-                    {round.start_date 
-                      ? new Date(round.start_date).toLocaleDateString() 
-                      : 'No start date'}
-                    {round.end_date && ` - ${new Date(round.end_date).toLocaleDateString()}`}
+                    <Chip
+                      label={roundItem.is_active ? 'Active' : 'Inactive'}
+                      color={roundItem.is_active ? 'success' : 'default'}
+                      size="small"
+                    />
                   </TableCell>
-                  <TableCell align="right">
+                  <TableCell>
                     <Tooltip title="Edit">
-                      <IconButton onClick={() => handleOpenDialog(round)}>
-                        <EditIcon />
+                      <IconButton
+                        size="small"
+                        onClick={() => handleOpenDialog(roundItem)}
+                      >
+                        <EditIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Delete">
-                      <IconButton onClick={() => handleDeleteRound(round.id)}>
-                        <DeleteIcon />
+                      <IconButton
+                        size="small"
+                        onClick={() => roundItem.id && handleDeleteRound(roundItem.id)}
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                   </TableCell>
@@ -240,8 +289,8 @@ const QualificationRounds: React.FC = () => {
               ))}
               {rounds.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
-                    No qualification rounds found. Create one to get started.
+                  <TableCell colSpan={7} align="center">
+                    No rounds found. Click "Add Round" to create one.
                   </TableCell>
                 </TableRow>
               )}
@@ -256,44 +305,35 @@ const QualificationRounds: React.FC = () => {
           {editingRound ? 'Edit Qualification Round' : 'Add New Qualification Round'}
         </DialogTitle>
         <DialogContent dividers>
-          <Box display="flex" flexDirection="column" gap={3} pt={1}>
-            <TextField
-              label="Round Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              fullWidth
-              required
-              margin="normal"
-            />
-            
-            <TextField
-              label="Description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              fullWidth
-              multiline
-              rows={3}
-              margin="normal"
-            />
-
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                  color="primary"
-                />
-              }
-              label="Active"
-              labelPlacement="start"
-            />
-
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <Box display="flex" gap={2}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Name"
+                name="name"
+                value={round.name}
+                onChange={handleInputChange}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                type="number"
+                label="Round Number"
+                name="round_number"
+                value={round.round_number}
+                onChange={handleInputChange}
+                required
+                inputProps={{ min: 1 }}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
                 <DatePicker
                   label="Start Date"
-                  value={startDate}
-                  onChange={(newValue) => setStartDate(newValue)}
+                  value={new Date(round.start_date)}
+                  onChange={handleDateChange('start_date')}
                   slotProps={{
                     textField: {
                       fullWidth: true,
@@ -301,20 +341,62 @@ const QualificationRounds: React.FC = () => {
                     }
                   }}
                 />
+              </LocalizationProvider>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
                 <DatePicker
-                  label="End Date (Optional)"
-                  value={endDate}
-                  onChange={(newValue) => setEndDate(newValue)}
+                  label="End Date"
+                  value={new Date(round.end_date)}
+                  onChange={handleDateChange('end_date')}
+                  minDate={new Date(round.start_date)}
                   slotProps={{
                     textField: {
-                      fullWidth: true
+                      fullWidth: true,
+                      required: true
                     }
                   }}
-                  minDate={startDate || undefined}
                 />
-              </Box>
-            </LocalizationProvider>
-          </Box>
+              </LocalizationProvider>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                type="number"
+                label="Minimum Score to Qualify (%)"
+                name="min_score_to_qualify"
+                value={round.min_score_to_qualify}
+                onChange={handleInputChange}
+                inputProps={{ min: 0, max: 100 }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="Description"
+                name="description"
+                value={round.description}
+                onChange={handleInputChange}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={round.is_active}
+                    onChange={(e) =>
+                      setRound({ ...round, is_active: e.target.checked })
+                    }
+                    name="is_active"
+                    color="primary"
+                  />
+                }
+                label="Active"
+              />
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>
@@ -322,7 +404,7 @@ const QualificationRounds: React.FC = () => {
             onClick={handleSubmit} 
             variant="contained" 
             color="primary"
-            disabled={!name}
+            disabled={!round.name || !round.round_number || !round.start_date || !round.end_date}
           >
             {editingRound ? 'Update' : 'Create'} Round
           </Button>
