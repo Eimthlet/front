@@ -37,26 +37,16 @@ interface IApiClient {
 
 // Determine the API base URL based on the environment
 const getBaseUrl = () => {
-  let baseUrl = '';
-  // Use environment variable if available
-  if (process.env.REACT_APP_API_URL) {
-    baseUrl = process.env.REACT_APP_API_URL;
+  // For production, use the render.com URL
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://car-quizz.onrender.com';
   }
-  // In local development, use localhost
-  else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    baseUrl = 'http://localhost:5001';
-  }
-  // Default to production URL
-  else {
-    baseUrl = 'https://car-quizz.onrender.com';
-  }
-
-  // Remove any trailing slashes and return
-  return baseUrl.replace(/\/+$/, '');
+  // For local development, use localhost
+  return 'http://localhost:5001';
 };
 
-// Get base URL without any trailing slashes
-const baseUrl = getBaseUrl().replace(/\/+$/, '');
+// Get base URL (already processed in getBaseUrl)
+const baseUrl = getBaseUrl();
 
 // Create a custom Axios instance
 const api: AxiosInstance = axios.create({
@@ -87,21 +77,23 @@ console.log('API Base URL:', baseUrl);
 // Add a request interceptor to include the auth token
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    console.log('Sending request to:', config.url);
-    // Conditionally log request data, excluding it for sensitive paths like login/register
-    const isSensitivePath = config.url?.includes('/auth/login') || config.url?.includes('/auth/register');
-    console.log('Request config:', {
-      method: config.method,
-      baseURL: config.baseURL,
-      url: config.url,
-      data: isSensitivePath ? '[REDACTED FOR SENSITIVE REQUEST]' : config.data,
+    // Get token if it exists
+    const token = TokenManager.getToken();
+    
+    // Only add auth header for non-auth endpoints when we have a token
+    if (token && !config.url?.startsWith('/auth/')) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Log the request
+    const isSensitivePath = config.url?.startsWith('/auth/');
+    console.log('API Request:', {
+      method: config.method?.toUpperCase(),
+      url: `${config.baseURL}${config.url}`,
+      data: isSensitivePath ? '[REDACTED]' : config.data,
       headers: config.headers
     });
     
-    const token = TokenManager.getToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
     return config;
   },
   (error) => {
