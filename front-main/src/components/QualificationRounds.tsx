@@ -136,7 +136,7 @@ const QualificationRounds: React.FC = () => {
     };
     
     fetchSeasons();
-  }, []);
+  }, [round.season_id]);
   
   // Disable the form if no seasons are available
   const isFormDisabled = seasons.length === 0;
