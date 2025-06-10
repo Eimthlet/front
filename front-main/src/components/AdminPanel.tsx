@@ -165,8 +165,14 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       const response = await api.get('/admin/seasons');
       console.log('Seasons API response:', response);
       
-      // Handle response properly - response data should be an array
-      const seasonsData = Array.isArray(response?.data) ? response.data : [];
+      // Handle response properly - response data could be in response.data or response.data.data
+      let seasonsData = [];
+      if (Array.isArray(response?.data)) {
+        seasonsData = response.data;
+      } else if (response?.data?.data && Array.isArray(response.data.data)) {
+        seasonsData = response.data.data;
+      }
+      
       console.log('Processed seasons data:', seasonsData);
       
       setSeasons(seasonsData);
