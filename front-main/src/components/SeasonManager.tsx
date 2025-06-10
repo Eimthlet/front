@@ -186,8 +186,8 @@ const SeasonManager: React.FC = () => {
   const fetchQuestions = useCallback(async (seasonId: number | string) => {
     try {
       setLoading(true);
-      const response = await apiClient.get(`/admin/seasons/${seasonId}/questions`);
-      const questionsData = Array.isArray(response?.data) ? response.data : [];
+      const response = await apiClient.get(`/api/seasons/${seasonId}/questions`);
+      const questionsData = Array.isArray(response) ? response : [];
       
       // Map the response to ensure consistent field names
       const normalizedQuestions = questionsData.map(q => ({
@@ -495,7 +495,7 @@ const SeasonManager: React.FC = () => {
 
   const handleDeleteQuestion = useCallback(async (questionId: number | string) => {
     if (!selectedSeasonId) {
-      setError('No season selected to refresh questions from.');
+      setError('No season selected to delete questions from.');
       return;
     }
     if (!window.confirm('Are you sure you want to delete this question?')) return;
@@ -505,7 +505,8 @@ const SeasonManager: React.FC = () => {
       setError('');
       setSuccess('');
 
-      await apiClient.delete(`/admin/questions/${questionId}`);
+      // Use the correct endpoint that includes both season and question IDs
+      await apiClient.delete(`/api/seasons/${selectedSeasonId}/questions/${questionId}`);
       setSuccess('Question deleted successfully.');
 
       // Refresh questions for the current season
@@ -514,7 +515,10 @@ const SeasonManager: React.FC = () => {
     } catch (err: any) {
       const error = err as ApiError;
       console.error('Error deleting question:', error);
-      setError(error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to delete question.');
+      setError(error.response?.data?.message || 
+               error.response?.data?.error || 
+               error.message || 
+               'Failed to delete question. Please try again.');
     } finally {
       setLoading(false);
     }
