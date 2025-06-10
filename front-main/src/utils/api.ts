@@ -565,24 +565,42 @@ export interface QualificationStartResponse {
 export async function startQualificationAttempt(): Promise<QualificationStartResponse> {
   try {
     console.log('[API] Starting qualification attempt...');
+    
+    // Log the request being made
+    console.log('[API] Making POST request to /quiz/start-qualification');
+    
     const response = await api.post('/quiz/start-qualification');
-    console.log('[API] Qualification attempt response:', response);
+    
+    // Log the raw response for debugging
+    console.log('[API] Raw qualification attempt response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+      data: response.data
+    });
     
     // Handle both direct response and nested data property
     const responseData = response?.data?.data || response?.data;
     
+    console.log('[API] Processed response data:', responseData);
+    
     if (!responseData) {
+      console.error('[API] No data in response from qualification start endpoint');
       throw new Error('No data received from qualification start endpoint');
     }
     
-    return {
+    // Ensure we have the expected response structure
+    const result = {
       success: responseData.success,
       attemptId: responseData.attemptId,
-      questions: responseData.questions || [],
-      totalQuestions: responseData.totalQuestions || 0,
+      questions: Array.isArray(responseData.questions) ? responseData.questions : [],
+      totalQuestions: responseData.totalQuestions || (Array.isArray(responseData.questions) ? responseData.questions.length : 0),
       minimumScorePercentage: responseData.minimumScorePercentage || 0,
-      message: responseData.message
+      message: responseData.message || 'Qualification attempt started'
     };
+    
+    console.log('[API] Processed qualification response:', result);
+    return result;
   } catch (error) {
     console.error('[API] Error starting qualification attempt:', error);
     if (error.response) {

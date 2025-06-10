@@ -93,7 +93,7 @@ const ActionButton = styled(Button)(({ theme }) => ({
 // Quiz Component Props
 interface QuizProps {
   questions: Question[];
-  onComplete: (score: number) => void;
+  onComplete: (score: number, answers: { questionId: string; answer: string }[]) => void;
 }
 
 const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
@@ -180,7 +180,12 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
             };
           } else {
             setShowResult(true);
-            onComplete(prev.score);
+            // Convert answers to the expected format
+            const answers = Object.entries(prev.answers).map(([questionId, answer]) => ({
+              questionId,
+              answer
+            }));
+            onComplete(prev.score, answers);
             return { ...prev, isComplete: true };
           }
         });
@@ -278,7 +283,13 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
       newState.isComplete = true;
       setQuizState(newState);
       setShowResult(true);
-      onComplete(newState.score);
+      
+      // Convert answers to the expected format
+      const answers = Object.entries(newState.answers).map(([questionId, answer]) => ({
+        questionId,
+        answer
+      }));
+      onComplete(newState.score, answers);
     }
   };
 
@@ -491,7 +502,12 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
                   variant="contained"
                   onClick={() => {
                     clearQuizSession();
-                    onComplete(quizState.score);
+                    // Convert answers to the expected format
+                    const answers = Object.entries(quizState.answers).map(([questionId, answer]) => ({
+                      questionId,
+                      answer
+                    }));
+                    onComplete(quizState.score, answers);
                     navigate('/leaderboard');
                   }}
                 >

@@ -11,7 +11,7 @@ import { theme } from './theme';
 import Navigation from './components/Navigation';
 import AdminDashboard from './components/AdminDashboard';
 import UserManagement from './components/UserManagement';
-import AdminPanel from './components/AdminPanel'; // Added for Admin Panel route
+import AdminPanel from './components/AdminPanel';
 import Leaderboard from './components/Leaderboard';
 
 // Internal question format from API
@@ -25,8 +25,6 @@ interface ApiQuestion {
   timeLimit?: number;
   explanation?: string;
 }
-
-
 
 interface QualificationResponse {
   hasAttempted: boolean;
@@ -43,91 +41,101 @@ interface QualificationResponse {
 
 const App: React.FC = () => {
   const navigate = useNavigate();
-  const { user, isAdmin, isLoading: authLoading } = useAuth(); // Destructure isLoading as authLoading
+  const { user, isAdmin, isLoading: authLoading } = useAuth();
   const [questions, setQuestions] = useState<ApiQuestion[]>([]);
-  const [loading, setLoading] = useState(true); // This is for app-specific data like qualifications/questions
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [qualification, setQualification] = useState<QualificationResponse | null>(null);
+  
+  // Memoized function to set error state
+  const handleError = useCallback((error: unknown) => {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error(errorMessage, error);
+    setError(errorMessage);
+  }, []);
 
+  // Memoized function to fetch qualification status and handle qualification flow
   const fetchQualification = useCallback(async () => {
+    if (!user) {
+      console.log('No user, skipping qualification check');
+      setLoading(false);
+      return;
+    }
+
+    console.group('fetchQualification');
+    setLoading(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      setError(null);
-      
-      if (!user) {
-        console.log('No user, skipping qualification check');
-        setLoading(false);
-        return;
-      }
-      
       console.log('Fetching qualification status...');
-      // Get the qualification data from the API
       const response = await api.get('/qualification');
       const responseData = response?.data;
-      console.log('Qualification response:', responseData);
-      
-      if (responseData && typeof responseData === 'object') {
-        // Check if this is the direct response or if it's nested in a data property
-        const data = responseData.data || responseData;
-        
-        const qualData = {
-          hasAttempted: Boolean(data.hasAttempted),
-          isQualified: Boolean(data.isQualified || data.qualifies_for_next_round),
-          message: data.message || 'No qualification data available',
-          ...data
-        };
-        
-        console.log('Setting qualification data:', qualData);
-        setQualification(qualData);
-        
-        // If user hasn't attempted yet, start a new qualification attempt
-        if (!qualData.hasAttempted) {
-          console.log('No previous attempt, starting new qualification...');
-          try {
-            console.log('Calling startQualificationAttempt()...');
-            const qualificationData = await startQualificationAttempt();
-            console.log('startQualificationAttempt response:', qualificationData);
-            
-            if (qualificationData.success && qualificationData.questions) {
-              console.log('Setting questions from qualification attempt:', qualificationData.questions);
+
+      if (!responseData || typeof responseData !== 'object') {
+        throw new Error('Invalid response format from qualification endpoint');
+      }
+
+      // Handle both direct response and nested data property
+      const data = 'data' in responseData ? responseData.data : responseData;
+      console.log('Processed qualification data:', data);
+
+      const qualData: QualificationResponse = {
+        hasAttempted: Boolean(data?.hasAttempted),
+        isQualified: Boolean(data?.isQualified || data?.qualifies_for_next_round),
+        message: data?.message || 'No qualification data available',
+        ...data
+      };
+
+      console.log('Setting qualification data:', qualData);
+      setQualification(qualData);
+
+      // If user hasn't attempted yet, start a new qualification attempt
+      if (!qualData.hasAttempted) {
+        console.log('No previous attempt, starting new qualification...');
+        try {
+          const qualificationData = await startQualificationAttempt();
+          console.log('startQualificationAttempt response:', qualificationData);
+
+          if (qualificationData.success) {
+            if (qualificationData.questions?.length) {
+              console.log(`Received ${qualificationData.questions.length} questions`);
               setQuestions(qualificationData.questions);
             } else {
-              console.log('No questions received from qualification attempt');
+              throw new Error('No questions received in qualification attempt');
             }
-          } catch (err) {
-            console.error('Error starting qualification attempt:', err);
-            setError('Failed to start qualification quiz');
+          } else {
+            throw new Error(qualificationData.message || 'Failed to start qualification quiz');
           }
-        } else if (qualData.isQualified) {
-          // If already qualified, just load regular questions
-          try {
-            const questionsResponse = await api.get('/questions');
-            const questionsData = questionsResponse?.data;
-            
-            const fetchedQuestions = Array.isArray(questionsData) 
-              ? questionsData 
-              : questionsData?.questions || [];
-              
-            setQuestions(fetchedQuestions);
-          } catch (err) {
-            console.error('Error fetching questions:', err);
-            setError('Failed to load questions');
-          }
+        } catch (error) {
+          handleError(error);
+        }
+      } else if (qualData.isQualified) {
+        // If already qualified, load regular questions
+        try {
+          const response = await api.get('/questions');
+          const responseData = response?.data;
+          const questionsData = Array.isArray(responseData) 
+            ? responseData 
+            : responseData?.questions || [];
+          setQuestions(questionsData);
+        } catch (error) {
+          handleError(new Error('Failed to load questions'));
         }
       } else {
-        setQualification({
+        setQualification(prev => ({
+          ...prev,
           hasAttempted: false,
           isQualified: false,
           message: 'Could not determine qualification status'
-        });
+        }));
       }
-    } catch (err) {
-      console.error('Error in qualification flow:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load qualification data');
+    } catch (error) {
+      handleError(new Error('Failed to load qualification data'));
     } finally {
       setLoading(false);
+      console.groupEnd();
     }
-  }, [user]);
+  }, [user, handleError]);
 
   useEffect(() => {
     // Only fetch qualification if auth is loaded and user is present
@@ -139,23 +147,23 @@ const App: React.FC = () => {
     }
   }, [authLoading, user, fetchQualification]);
 
-  const handleQuizComplete = useCallback(async (score: number) => {
+  const handleQuizComplete = useCallback(async (score: number, answers: { questionId: string; answer: string }[]) => {
     try {
       setLoading(true);
-      // Submit the quiz attempt with the current score
+      // Submit the quiz attempt with the score and answers
       await api.post('/quiz/submit', { 
         score,
-        // Include any additional data needed for submission
+        answers,
+        attemptType: qualification?.hasAttempted ? 'qualification' : 'regular'
       });
       // Refresh the qualification status
       await fetchQualification();
-    } catch (err) {
-      console.error('Error submitting quiz:', err);
-      setError('Failed to submit quiz results');
+    } catch (error) {
+      handleError(new Error('Failed to submit quiz results'));
     } finally {
       setLoading(false);
     }
-  }, [fetchQualification]);
+  }, [fetchQualification, handleError, qualification]);
 
   // Render loading state: wait for auth to load AND for app data (qualifications/questions) to load
   if (authLoading || loading) {
@@ -235,7 +243,7 @@ const App: React.FC = () => {
                       timeLimit: q.timeLimit,
                       explanation: q.explanation
                     }))} 
-                    onComplete={handleQuizComplete} 
+                    onComplete={(score, answers) => handleQuizComplete(score, answers)} 
                   />
                 ) : (
                   <Box textAlign="center" mt={10}>
