@@ -68,7 +68,7 @@ const App: React.FC = () => {
 
     try {
       console.log('Fetching qualification status...');
-      const response = await api.get('/qualification');
+      const response = await api.get('/qualification', { withCredentials: true });
       const responseData = response?.data;
 
       // Log the raw response for debugging
