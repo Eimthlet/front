@@ -35,17 +35,18 @@ interface IApiClient {
   request(config: AxiosRequestConfig): Promise<AxiosResponse>;
 }
 
-// List of endpoints that should NOT use /api prefix
-const NON_API_PREFIXED_ENDPOINTS = [
-  '/auth',
+// List of endpoints that should use /api prefix
+const API_PREFIXED_ENDPOINTS = [
   '/quiz/start-qualification',
   '/qualification'
 ];
 
 // Determine if a URL should use the API prefix
 const shouldUseApiPrefix = (url: string | undefined): boolean => {
-  if (!url) return true;
-  return !NON_API_PREFIXED_ENDPOINTS.some(prefix => url.startsWith(prefix));
+  if (!url) return false;
+  return API_PREFIXED_ENDPOINTS.some(prefix => url.startsWith(prefix)) || 
+         url.startsWith('/api/') ||
+         url === '/api';
 };
 
 // Get base URL without any path
@@ -68,15 +69,19 @@ const getRequestUrl = (config: any): string => {
     return url;
   }
   
+  // Remove any leading slashes to prevent double slashes
+  url = url.replace(/^\/+/, '');
+  
   // Add /api prefix if needed
   if (shouldUseApiPrefix(url)) {
-    url = `/api${url.startsWith('/') ? '' : '/'}${url}`;
-  } else if (url.startsWith('/')) {
-    // Remove any leading slashes to prevent double slashes
-    url = url.replace(/^\/+/, '');
+    if (!url.startsWith('/api/') && url !== '/api') {
+      url = `api/${url}`;
+    }
   }
   
-  return `${baseUrl}/${url}`.replace(/([^:]\/)\/+/g, '$1');
+  // Ensure we don't have double slashes
+  const fullUrl = `${baseUrl}/${url}`.replace(/([^:]\/)\/+/g, '$1');
+  return fullUrl;
 };
 
 // Get base URL (already processed in getBaseUrl)
