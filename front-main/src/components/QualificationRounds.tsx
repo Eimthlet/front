@@ -91,7 +91,7 @@ const QualificationRounds: React.FC = () => {
     };
     
     fetchSeasons();
-  }, []);
+  }, [round.season_id]); // Added round.season_id as a dependency
 
   const fetchRounds = async () => {
     try {
