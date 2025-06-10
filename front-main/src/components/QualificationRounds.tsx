@@ -138,8 +138,12 @@ const QualificationRounds: React.FC = () => {
 
   const handleDateChange = (field: 'start_date' | 'end_date') => (date: Date | null) => {
     if (date) {
-      // Ensure we're using the correct date format (YYYY-MM-DD)
-      const formattedDate = date.toISOString().split('T')[0];
+      // Format date as YYYY-MM-DD
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const formattedDate = `${year}-${month}-${day}`;
+      
       setRound(prev => ({
         ...prev,
         [field]: formattedDate
@@ -179,20 +183,25 @@ const QualificationRounds: React.FC = () => {
         return;
       }
 
-      console.log('Submitting round data:', round);
-      
+      // Ensure dates are properly formatted as YYYY-MM-DD
+      const formatDate = (dateString: string) => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toISOString().split('T')[0];
+      };
+
       const roundData = {
         name: round.name,
         description: round.description || '',
         is_active: round.is_active,
-        start_date: round.start_date,
-        end_date: round.end_date,
+        start_date: formatDate(round.start_date),
+        end_date: formatDate(round.end_date),
         round_number: Number(round.round_number),
         min_score_to_qualify: Number(round.min_score_to_qualify) || 70,
         season_id: Number(round.season_id)
       };
       
-      console.log('Processed round data:', roundData);
+      console.log('Submitting round data:', roundData);
 
       if (editingRound && editingRound.id) {
         await api.put(`/admin/rounds/${editingRound.id}`, roundData);
