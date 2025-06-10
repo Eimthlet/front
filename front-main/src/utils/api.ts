@@ -579,8 +579,13 @@ export async function startQualificationAttempt(): Promise<QualificationStartRes
       data: response.data
     });
     
-    // Handle both direct response and nested data property
-    const responseData = response?.data?.data || response?.data;
+    // The response data might be directly the questions array or in a nested property
+    let responseData = response?.data;
+    
+    // If the response has a data property, use that
+    if (responseData && typeof responseData === 'object' && 'data' in responseData) {
+      responseData = responseData.data;
+    }
     
     console.log('[API] Processed response data:', responseData);
     
@@ -589,18 +594,41 @@ export async function startQualificationAttempt(): Promise<QualificationStartRes
       throw new Error('No data received from qualification start endpoint');
     }
     
-    // Ensure we have the expected response structure
-    const result = {
-      success: responseData.success,
-      attemptId: responseData.attemptId,
-      questions: Array.isArray(responseData.questions) ? responseData.questions : [],
-      totalQuestions: responseData.totalQuestions || (Array.isArray(responseData.questions) ? responseData.questions.length : 0),
-      minimumScorePercentage: responseData.minimumScorePercentage || 0,
-      message: responseData.message || 'Qualification attempt started'
-    };
+    // Handle case where the response is just the questions array
+    if (Array.isArray(responseData)) {
+      console.log('[API] Response is an array of questions');
+      const result = {
+        success: true,
+        attemptId: '',
+        questions: responseData,
+        totalQuestions: responseData.length,
+        minimumScorePercentage: 0,
+        message: 'Qualification questions loaded successfully'
+      };
+      console.log('[API] Processed qualification response (array format):', result);
+      return result;
+    }
     
-    console.log('[API] Processed qualification response:', result);
-    return result;
+    // Handle case where response is an object with questions and other properties
+    if (responseData && typeof responseData === 'object') {
+      console.log('[API] Response is an object with questions');
+      const result = {
+        success: responseData.success !== false, // Default to true if not specified
+        attemptId: responseData.attemptId || '',
+        questions: Array.isArray(responseData.questions) ? responseData.questions : [],
+        totalQuestions: responseData.totalQuestions || 
+                        (Array.isArray(responseData.questions) ? responseData.questions.length : 0),
+        minimumScorePercentage: responseData.minimumScorePercentage || 0,
+        message: responseData.message || 'Qualification attempt started'
+      };
+      
+      console.log('[API] Processed qualification response (object format):', result);
+      return result;
+    }
+    
+    // If we get here, the response format is unexpected
+    console.error('[API] Unexpected response format:', responseData);
+    throw new Error('Unexpected response format from qualification endpoint');
   } catch (error) {
     console.error('[API] Error starting qualification attempt:', error);
     if (error.response) {

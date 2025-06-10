@@ -71,48 +71,94 @@ const App: React.FC = () => {
       const response = await api.get('/qualification');
       const responseData = response?.data;
 
-      if (!responseData || typeof responseData !== 'object') {
-        throw new Error('Invalid response format from qualification endpoint');
-      }
+      // Log the raw response for debugging
+      console.log('Raw qualification response:', responseData);
 
-      // Handle both direct response and nested data property
-      const data = 'data' in responseData ? responseData.data : responseData;
-      console.log('Processed qualification data:', data);
+      // If response is an object with the expected properties
+      if (responseData && typeof responseData === 'object') {
+        // Extract the actual data if it's nested under a 'data' property
+        const data = responseData.data || responseData;
+        
+        const qualData: QualificationResponse = {
+          hasAttempted: Boolean(data.hasAttempted),
+          isQualified: Boolean(data.isQualified || data.qualifies_for_next_round),
+          score: typeof data.score === 'number' ? data.score : undefined,
+          totalQuestions: typeof data.totalQuestions === 'number' ? data.totalQuestions : undefined,
+          percentageScore: data.percentageScore || undefined,
+          minimumRequired: data.minimumRequired || undefined,
+          message: data.message || 'No qualification data available',
+          ...data
+        };
 
-      const qualData: QualificationResponse = {
-        hasAttempted: Boolean(data?.hasAttempted),
-        isQualified: Boolean(data?.isQualified || data?.qualifies_for_next_round),
-        message: data?.message || 'No qualification data available',
-        ...data
-      };
+        console.log('Processed qualification data:', qualData);
+        setQualification(qualData);
 
-      console.log('Setting qualification data:', qualData);
-      setQualification(qualData);
-
-      // If user hasn't attempted yet, don't throw an error - this is a valid state
-      if (!qualData.hasAttempted) {
-        console.log('No previous attempt found. User needs to start a qualification attempt.');
-        // Don't set error here - this is a valid state
-        setQuestions([]);
-        return;
-      }
-
-      // If already qualified, load regular questions
-      if (qualData.isQualified) {
-        try {
-          const response = await api.get('/questions');
-          const responseData = response?.data;
-          const questionsData = Array.isArray(responseData) 
-            ? responseData 
-            : responseData?.questions || [];
-          setQuestions(questionsData);
-        } catch (error) {
-          handleError(new Error('Failed to load questions'));
+        // If user hasn't attempted yet, this is a valid state
+        if (!qualData.hasAttempted) {
+          console.log('No previous attempt found. User needs to start a qualification attempt.');
+          setQuestions([]);
+          return;
         }
+
+        // If already qualified, load regular questions
+        if (qualData.isQualified) {
+          try {
+            console.log('Fetching regular questions for qualified user...');
+            const questionsResponse = await api.get('/questions');
+            const questionsData = Array.isArray(questionsResponse?.data) 
+              ? questionsResponse.data 
+              : questionsResponse?.data?.questions || [];
+            
+            console.log(`Loaded ${questionsData.length} regular questions`);
+            setQuestions(questionsData);
+          } catch (error) {
+            console.error('Error loading questions:', error);
+            handleError(new Error('Failed to load questions'));
+          }
+        }
+      } else {
+        // If we get here, the response format is unexpected
+        console.error('Unexpected response format:', responseData);
+        setQualification({
+          hasAttempted: false,
+          isQualified: false,
+          message: 'Could not determine qualification status'
+        });
       }
     } catch (error) {
       console.error('Error in fetchQualification:', error);
-      handleError(error instanceof Error ? error : new Error('Failed to load qualification data'));
+      
+      // More detailed error handling
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+        console.error('Response headers:', error.response.headers);
+        
+        // Handle specific status codes
+        if (error.response.status === 401) {
+          handleError(new Error('Session expired. Please log in again.'));
+        } else if (error.response.status === 404) {
+          // If qualification endpoint is not found, treat as no qualification needed
+          console.log('Qualification endpoint not found, proceeding without qualification');
+          setQualification({
+            hasAttempted: true,
+            isQualified: true,
+            message: 'Qualification not required'
+          });
+          return;
+        } else {
+          handleError(new Error(error.response.data?.message || 'Failed to load qualification data'));
+        }
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error('No response received:', error.request);
+        handleError(new Error('No response from server. Please check your connection.'));
+      } else {
+        // Something happened in setting up the request
+        handleError(error instanceof Error ? error : new Error('Failed to load qualification data'));
+      }
     } finally {
       setLoading(false);
       console.groupEnd();
