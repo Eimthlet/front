@@ -241,12 +241,12 @@ const QualificationRounds: React.FC = () => {
       const roundData = {
         name: round.name,
         description: round.description || '',
-        is_active: round.is_active,
-        start_date: formatDate(round.start_date),
-        end_date: formatDate(round.end_date),
-        round_number: Number(round.round_number),
-        min_score_to_qualify: Number(round.min_score_to_qualify) || 70,
-        season_id: Number(round.season_id)
+        isActive: round.is_active,
+        startDate: formatDate(round.start_date),
+        endDate: formatDate(round.end_date),
+        roundNumber: Number(round.round_number),
+        minScoreToQualify: Number(round.min_score_to_qualify) || 70,
+        seasonId: Number(round.season_id)
       };
       
       console.log('Submitting round data:', roundData);
