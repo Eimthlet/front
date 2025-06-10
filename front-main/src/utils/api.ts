@@ -548,7 +548,7 @@ export async function saveProgress(userId: number, score: number, total: number)
 // Quiz API
 export interface QualificationStartResponse {
   success: boolean;
-  attemptId: string;
+  attemptId?: string; // Made optional to handle error cases
   questions: Array<{
     id: string | number;
     question: string;
@@ -567,7 +567,22 @@ export async function startQualificationAttempt(): Promise<QualificationStartRes
     console.log('[API] Starting qualification attempt...');
     const response = await api.post('/quiz/start-qualification');
     console.log('[API] Qualification attempt response:', response);
-    return response.data;
+    
+    // Handle both direct response and nested data property
+    const responseData = response?.data?.data || response?.data;
+    
+    if (!responseData) {
+      throw new Error('No data received from qualification start endpoint');
+    }
+    
+    return {
+      success: responseData.success,
+      attemptId: responseData.attemptId,
+      questions: responseData.questions || [],
+      totalQuestions: responseData.totalQuestions || 0,
+      minimumScorePercentage: responseData.minimumScorePercentage || 0,
+      message: responseData.message
+    };
   } catch (error) {
     console.error('[API] Error starting qualification attempt:', error);
     if (error.response) {
@@ -576,14 +591,24 @@ export async function startQualificationAttempt(): Promise<QualificationStartRes
       console.error('[API] Response data:', error.response.data);
       console.error('[API] Response status:', error.response.status);
       console.error('[API] Response headers:', error.response.headers);
+      
+      // Return a structured error response
+      return {
+        success: false,
+        message: error.response.data?.message || 'Failed to start qualification',
+        questions: [],
+        totalQuestions: 0,
+        minimumScorePercentage: 0
+      };
     } else if (error.request) {
       // The request was made but no response was received
       console.error('[API] No response received:', error.request);
+      throw new Error('No response received from server');
     } else {
       // Something happened in setting up the request that triggered an Error
       console.error('[API] Request setup error:', error.message);
+      throw error;
     }
-    throw error;
   }
 }
 

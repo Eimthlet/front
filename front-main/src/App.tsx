@@ -67,11 +67,14 @@ const App: React.FC = () => {
       console.log('Qualification response:', responseData);
       
       if (responseData && typeof responseData === 'object') {
+        // Check if this is the direct response or if it's nested in a data property
+        const data = responseData.data || responseData;
+        
         const qualData = {
-          hasAttempted: Boolean(responseData.hasAttempted),
-          isQualified: Boolean(responseData.isQualified || responseData.qualifies_for_next_round),
-          message: responseData.message,
-          ...responseData
+          hasAttempted: Boolean(data.hasAttempted),
+          isQualified: Boolean(data.isQualified || data.qualifies_for_next_round),
+          message: data.message || 'No qualification data available',
+          ...data
         };
         
         console.log('Setting qualification data:', qualData);
