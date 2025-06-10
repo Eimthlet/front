@@ -566,10 +566,13 @@ export async function startQualificationAttempt(): Promise<QualificationStartRes
   try {
     console.log('[API] Starting qualification attempt...');
     
-    // Log the request being made
-    console.log('[API] Making POST request to /quiz/start-qualification');
+    const endpoint = '/quiz/start-qualification';
+    console.log(`[API] Making POST request to ${endpoint}`);
     
-    const response = await api.post('/quiz/start-qualification', {}, { withCredentials: true });
+    const response = await api.post(endpoint, {}, { 
+      withCredentials: true,
+      _skipApiPrefix: false // Let the API client handle the /api prefix
+    });
     
     // Log the raw response for debugging
     console.log('[API] Raw qualification attempt response:', {
@@ -579,7 +582,7 @@ export async function startQualificationAttempt(): Promise<QualificationStartRes
       data: response.data
     });
     
-    // The response data might be directly the questions array or in a nested property
+    // The response data should be the direct response from the server
     let responseData = response?.data;
     
     // If the response has a data property, use that

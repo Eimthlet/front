@@ -74,6 +74,8 @@ const App: React.FC = () => {
         // Add a custom config to prevent any automatic prefixing
         _skipApiPrefix: true
       });
+      
+      // The response data is already the object we need
       const responseData = response?.data;
 
       // Log the raw response for debugging
@@ -81,8 +83,8 @@ const App: React.FC = () => {
 
       // If response is an object with the expected properties
       if (responseData && typeof responseData === 'object') {
-        // Extract the actual data if it's nested under a 'data' property
-        const data = responseData.data || responseData;
+        // Use the response data directly as it's already in the expected format
+        const data = responseData;
         
         const qualData: QualificationResponse = {
           hasAttempted: Boolean(data.hasAttempted),
@@ -130,27 +132,22 @@ const App: React.FC = () => {
           message: 'Could not determine qualification status'
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in fetchQualification:', error);
       
-      // More detailed error handling
+      // Log response details if available
       if (error.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
-        console.error('Response headers:', error.response.headers);
+        console.log('Response data:', error.response.data);
+        console.log('Response status:', error.response.status);
+        console.log('Response headers:', error.response.headers);
         
-        // Handle specific status codes
-        if (error.response.status === 401) {
-          handleError(new Error('Session expired. Please log in again.'));
-        } else if (error.response.status === 404) {
-          // If qualification endpoint is not found, treat as no qualification needed
+        // If we have a 404, it means the endpoint doesn't exist
+        if (error.response.status === 404) {
           console.log('Qualification endpoint not found, proceeding without qualification');
           setQualification({
-            hasAttempted: true,
-            isQualified: true,
-            message: 'Qualification not required'
+            hasAttempted: false,
+            isQualified: false,
+            message: 'Qualification feature is not available.'
           });
           return;
         } else {

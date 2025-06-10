@@ -37,8 +37,10 @@ interface IApiClient {
 
 // List of endpoints that should use /api prefix
 const API_PREFIXED_ENDPOINTS = [
-  '/quiz/start-qualification'
-  // '/qualification' is intentionally left out to prevent /api prefix
+  '/quiz/start-qualification',
+  '/quiz',
+  '/qualification'
+  // Add other endpoints that need the /api prefix here
 ];
 
 // Determine if a URL should use the API prefix
@@ -75,12 +77,17 @@ const getRequestUrl = (config: any): string => {
   // Skip adding /api prefix if _skipApiPrefix is true
   if (!config._skipApiPrefix && shouldUseApiPrefix(url)) {
     if (!url.startsWith('api/') && !url.startsWith('/api/')) {
-      url = `api/${url}`;
+      // Only add 'api' if it's not already in the URL
+      if (!url.includes('api/')) {
+        url = `api/${url}`;
+      }
     }
   }
   
   // Ensure we don't have double slashes
   let fullUrl = `${baseUrl}/${url}`.replace(/([^:]\/)\/+/g, '$1');
+  
+  console.log('[API] Request URL:', fullUrl);
   
   return fullUrl;
 };
