@@ -80,12 +80,18 @@ const QualificationRounds: React.FC = () => {
         setSeasons(seasonsData);
         
         // Set the first season as default if available and no season is selected
-        if (seasonsData.length > 0 && !round.season_id) {
-          console.log('Setting default season to:', seasonsData[0].id);
-          setRound(prev => ({
-            ...prev,
-            season_id: seasonsData[0].id
-          }));
+        if (seasonsData.length > 0) {
+          setRound(prev => {
+            // Only update if we don't have a season_id yet or if the current one is invalid
+            if (!prev.season_id || !seasonsData.some(s => s.id === prev.season_id)) {
+              console.log('Setting default season to:', seasonsData[0].id);
+              return {
+                ...prev,
+                season_id: seasonsData[0].id
+              };
+            }
+            return prev;
+          });
         }
       } catch (error) {
         console.error('Error fetching seasons:', error);
@@ -94,7 +100,7 @@ const QualificationRounds: React.FC = () => {
     };
     
     fetchSeasons();
-  }, []); // Removed round.season_id to prevent infinite loop
+  }, []); // Empty dependency array since we only want to run this once on mount
 
   const fetchRounds = async () => {
     try {
