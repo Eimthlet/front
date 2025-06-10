@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/apiClient';
 import SeasonManager from './SeasonManager';
+import QualificationRounds from './QualificationRounds';
 import { 
   Box, 
   Button, 
@@ -289,6 +290,12 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     setTabValue(newValue);
   };
 
+  // Define tabs for the admin panel
+  const tabs = [
+    { label: 'Seasons', component: <SeasonManager /> },
+    { label: 'Qualification Rounds', component: <QualificationRounds /> },
+  ];
+
   // Handle input changes for text fields
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -509,9 +516,11 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
         onChange={handleTabChange} 
         aria-label="admin panel tabs"
         sx={{ mb: 3 }}
+        variant="fullWidth"
       >
         <Tab label="Questions" {...a11yProps(0)} />
         <Tab label="Seasons" {...a11yProps(1)} />
+        <Tab label="Qualification Rounds" {...a11yProps(2)} />
       </Tabs>
 
       <TabPanel value={tabValue} index={0}>
@@ -705,6 +714,10 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
 
       <TabPanel value={tabValue} index={1}>
         <SeasonManager />
+      </TabPanel>
+
+      <TabPanel value={tabValue} index={2}>
+        <QualificationRounds />
       </TabPanel>
     </Box>
   );
