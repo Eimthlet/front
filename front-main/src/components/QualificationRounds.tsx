@@ -152,9 +152,11 @@ const QualificationRounds: React.FC = () => {
       }
 
       const roundData = {
-        ...round,
-        round_number: Number(round.round_number),
-        min_score_to_qualify: round.min_score_to_qualify ? Number(round.min_score_to_qualify) : 70
+        name: round.name,
+        startDate: round.start_date,
+        endDate: round.end_date,
+        seasonId: round.season_id || 1, // Default to 1 if not specified, update as needed
+        roundNumber: Number(round.round_number)
       };
 
       if (editingRound && editingRound.id) {
