@@ -76,7 +76,11 @@ const QualificationRounds: React.FC = () => {
       try {
         console.log('Fetching seasons...');
         const response = await api.get('/admin/seasons');
-        const seasonsData = Array.isArray(response.data) ? response.data : [];
+        // Handle both array response and object with seasons property
+        const responseData = response.data || {};
+        const seasonsData = Array.isArray(responseData) 
+          ? responseData 
+          : (Array.isArray(responseData.seasons) ? responseData.seasons : []);
         console.log('Seasons data:', seasonsData);
         
         // If no seasons, show error and use a fallback
