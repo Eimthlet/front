@@ -74,7 +74,16 @@ const QualificationRounds: React.FC = () => {
     const fetchSeasons = async () => {
       try {
         const response = await api.get('/admin/seasons');
-        setSeasons(response.data || []);
+        const seasonsData = Array.isArray(response.data) ? response.data : [];
+        setSeasons(seasonsData);
+        
+        // Set the first season as default if available and no season is selected
+        if (seasonsData.length > 0 && !round.season_id) {
+          setRound(prev => ({
+            ...prev,
+            season_id: seasonsData[0].id
+          }));
+        }
       } catch (error) {
         console.error('Error fetching seasons:', error);
         setSnackbar({ open: true, message: 'Failed to load seasons', severity: 'error' });
@@ -119,19 +128,21 @@ const QualificationRounds: React.FC = () => {
     setEditingRound(null);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
     setRound(prev => ({
       ...prev,
-      [name]: type === 'number' ? Number(value) : value
+      [name]: type === 'number' || name === 'season_id' || name === 'round_number' ? Number(value) : value
     }));
   };
 
   const handleDateChange = (field: 'start_date' | 'end_date') => (date: Date | null) => {
     if (date) {
+      // Ensure we're using the correct date format (YYYY-MM-DD)
+      const formattedDate = date.toISOString().split('T')[0];
       setRound(prev => ({
         ...prev,
-        [field]: date.toISOString()
+        [field]: formattedDate
       }));
     }
   };
@@ -168,6 +179,8 @@ const QualificationRounds: React.FC = () => {
         return;
       }
 
+      console.log('Submitting round data:', round);
+      
       const roundData = {
         name: round.name,
         description: round.description || '',
@@ -176,8 +189,10 @@ const QualificationRounds: React.FC = () => {
         end_date: round.end_date,
         round_number: Number(round.round_number),
         min_score_to_qualify: Number(round.min_score_to_qualify) || 70,
-        season_id: round.season_id
+        season_id: Number(round.season_id)
       };
+      
+      console.log('Processed round data:', roundData);
 
       if (editingRound && editingRound.id) {
         await api.put(`/admin/rounds/${editingRound.id}`, roundData);
