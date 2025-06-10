@@ -77,24 +77,44 @@ const QualificationRounds: React.FC = () => {
         console.log('Fetching seasons...');
         const response = await api.get('/admin/seasons');
         
+        console.log('Full API response:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+          data: response.data,
+          config: {
+            url: response.config?.url,
+            method: response.config?.method,
+            headers: response.config?.headers
+          }
+        });
+        
         // Handle different response structures
         let seasonsData = [];
         const responseData = response.data;
         
-        console.log('Raw response data:', responseData);
+        console.log('Response data type:', typeof responseData);
+        console.log('Is array:', Array.isArray(responseData));
+        console.log('Response data keys:', responseData ? Object.keys(responseData) : 'null/undefined');
         
         if (Array.isArray(responseData)) {
           // Direct array response
           seasonsData = responseData;
+          console.log('Using direct array response with', seasonsData.length, 'items');
         } else if (responseData && Array.isArray(responseData.data)) {
           // Response with data property
           seasonsData = responseData.data;
+          console.log('Using response.data with', seasonsData.length, 'items');
         } else if (responseData && Array.isArray(responseData.seasons)) {
           // Response with seasons property
           seasonsData = responseData.seasons;
+          console.log('Using response.seasons with', seasonsData.length, 'items');
         } else if (responseData && typeof responseData === 'object') {
           // If it's a single season object, wrap it in an array
           seasonsData = [responseData];
+          console.log('Wrapped single season object in array');
+        } else {
+          console.log('No valid season data found in response');
         }
         
         console.log('Processed seasons data:', seasonsData);
