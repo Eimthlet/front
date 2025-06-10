@@ -572,10 +572,17 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {questions.length > 0 ? (
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={4} align="center">
+                        <CircularProgress size={24} />
+                        <Typography variant="body2" sx={{ mt: 1 }}>Loading questions...</Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : questions.length > 0 ? (
                     questions.map((question) => (
                       <TableRow key={question.id}>
-                        <TableCell>{question.question}</TableCell>
+                        <TableCell>{question.question_text || question.question}</TableCell>
                         <TableCell>{question.category}</TableCell>
                         <TableCell>{question.difficulty}</TableCell>
                         <TableCell>
@@ -592,11 +599,7 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={4} align="center">
-                        {isLoading ? (
-                          <CircularProgress size={24} />
-                        ) : (
-                          'No questions found. Add a question to get started.'
-                        )}
+                        No questions found. Add a question to get started.
                       </TableCell>
                     </TableRow>
                   )}
