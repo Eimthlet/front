@@ -526,7 +526,7 @@ const SeasonManager: React.FC = () => {
     
     try {
       setLoading(true);
-      const response = await apiClient.put(`/admin/seasons/${id}/activate`);
+      await apiClient.put(`/admin/seasons/${id}/activate`);
       
       // Refresh seasons list
       const refreshResponse = await apiClient.get('/admin/seasons');
