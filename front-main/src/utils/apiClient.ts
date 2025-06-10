@@ -66,7 +66,7 @@ const api: AxiosInstance = axios.create({
     'Accept': 'application/json',
   },
   withCredentials: true,
-  timeout: 10000, // 10 seconds timeout
+  timeout: 15000, // 15 seconds timeout
   transformResponse: (data: any) => {
     // Parse the response data if it's a string
     if (typeof data === 'string') {
