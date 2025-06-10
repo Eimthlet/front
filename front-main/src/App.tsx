@@ -55,13 +55,16 @@ const App: React.FC = () => {
       setError(null);
       
       if (!user) {
+        console.log('No user, skipping qualification check');
         setLoading(false);
         return;
       }
       
+      console.log('Fetching qualification status...');
       // Get the qualification data from the API
       const response = await api.get('/qualification');
       const responseData = response?.data;
+      console.log('Qualification response:', responseData);
       
       if (responseData && typeof responseData === 'object') {
         const qualData = {
@@ -71,14 +74,22 @@ const App: React.FC = () => {
           ...responseData
         };
         
+        console.log('Setting qualification data:', qualData);
         setQualification(qualData);
         
         // If user hasn't attempted yet, start a new qualification attempt
         if (!qualData.hasAttempted) {
+          console.log('No previous attempt, starting new qualification...');
           try {
+            console.log('Calling startQualificationAttempt()...');
             const qualificationData = await startQualificationAttempt();
+            console.log('startQualificationAttempt response:', qualificationData);
+            
             if (qualificationData.success && qualificationData.questions) {
+              console.log('Setting questions from qualification attempt:', qualificationData.questions);
               setQuestions(qualificationData.questions);
+            } else {
+              console.log('No questions received from qualification attempt');
             }
           } catch (err) {
             console.error('Error starting qualification attempt:', err);

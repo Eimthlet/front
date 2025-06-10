@@ -564,10 +564,25 @@ export interface QualificationStartResponse {
 
 export async function startQualificationAttempt(): Promise<QualificationStartResponse> {
   try {
+    console.log('[API] Starting qualification attempt...');
     const response = await api.post('/quiz/start-qualification');
+    console.log('[API] Qualification attempt response:', response);
     return response.data;
   } catch (error) {
-    console.error('Error starting qualification attempt:', error);
+    console.error('[API] Error starting qualification attempt:', error);
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      console.error('[API] Response data:', error.response.data);
+      console.error('[API] Response status:', error.response.status);
+      console.error('[API] Response headers:', error.response.headers);
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error('[API] No response received:', error.request);
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      console.error('[API] Request setup error:', error.message);
+    }
     throw error;
   }
 }
