@@ -35,14 +35,48 @@ interface IApiClient {
   request(config: AxiosRequestConfig): Promise<AxiosResponse>;
 }
 
-// Determine the API base URL based on the environment
-const getBaseUrl = () => {
+// List of endpoints that should NOT use /api prefix
+const NON_API_PREFIXED_ENDPOINTS = [
+  '/auth',
+  '/quiz/start-qualification',
+  '/qualification'
+];
+
+// Determine if a URL should use the API prefix
+const shouldUseApiPrefix = (url: string | undefined): boolean => {
+  if (!url) return true;
+  return !NON_API_PREFIXED_ENDPOINTS.some(prefix => url.startsWith(prefix));
+};
+
+// Get base URL without any path
+const getBaseUrl = (): string => {
   // For production, use the render.com URL
   if (process.env.NODE_ENV === 'production') {
     return 'https://car-quizz.onrender.com';
   }
   // For local development, use localhost
   return 'http://localhost:5001';
+};
+
+// Get the full URL for a request
+const getRequestUrl = (config: any): string => {
+  const baseUrl = getBaseUrl();
+  let url = config.url || '';
+  
+  // Don't modify absolute URLs
+  if (url.startsWith('http')) {
+    return url;
+  }
+  
+  // Add /api prefix if needed
+  if (shouldUseApiPrefix(url)) {
+    url = `/api${url.startsWith('/') ? '' : '/'}${url}`;
+  } else if (url.startsWith('/')) {
+    // Remove any leading slashes to prevent double slashes
+    url = url.replace(/^\/+/, '');
+  }
+  
+  return `${baseUrl}/${url}`.replace(/([^:]\/)\/+/g, '$1');
 };
 
 // Get base URL (already processed in getBaseUrl)
@@ -74,7 +108,7 @@ const api: AxiosInstance = axios.create({
 // Log the base URL being used
 console.log('API Base URL:', baseUrl);
 
-// Add a request interceptor to include the auth token
+// Add a request interceptor to include the auth token and handle URLs
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     // Get token if it exists
@@ -85,14 +119,20 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
+    // Get the full URL for this request
+    const fullUrl = getRequestUrl(config);
+    
     // Log the request
     const isSensitivePath = config.url?.startsWith('/auth/');
     console.log('API Request:', {
       method: config.method?.toUpperCase(),
-      url: `${config.baseURL}${config.url}`,
+      url: fullUrl,
       data: isSensitivePath ? '[REDACTED]' : config.data,
       headers: config.headers
     });
+    
+    // Update the URL to be relative to the base URL
+    config.url = fullUrl.replace(getBaseUrl(), '');
     
     return config;
   },
