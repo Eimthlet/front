@@ -142,8 +142,16 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       const response = await api.get(`/admin/seasons/${selectedSeasonId}/questions`);
       console.log('Questions API response:', response);
       
-      // The response should be an array of questions
-      const questionsData = Array.isArray(response?.data) ? response.data : [];
+      // Handle different response formats
+      let questionsData = [];
+      if (Array.isArray(response)) {
+        questionsData = [...response];
+      } else if (Array.isArray(response?.data)) {
+        questionsData = [...response.data];
+      } else if (response?.data && Array.isArray(response.data.data)) {
+        questionsData = [...response.data.data];
+      }
+      
       console.log('Processed questions data:', questionsData);
       setQuestions(questionsData);
       setHasFetchedQuestions(true);
@@ -344,26 +352,26 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedSeasonId) {
-      updateError('No Season Selected', 'Please select a season before adding a question.');
-      return;
-    }
-
     try {
       setIsLoading(true);
       clearError();
-
-      // Validate question data
-      if (!newQuestion.question.trim()) {
+      
+      // Make sure we have a season selected
+      if (!selectedSeasonId) {
+        throw new Error('Please select a season');
+      }
+      
+      // Ensure required fields are present
+      if (!newQuestion.question_text?.trim()) {
         throw new Error('Question text is required');
       }
-
+      if (!newQuestion.correct_answer?.trim()) {
+        throw new Error('Please select a correct answer');
+      }
+      
+      // Validate all options are filled
       if (newQuestion.options.some(opt => !opt.trim())) {
         throw new Error('All options must be filled');
-      }
-
-      if (!newQuestion.correctAnswer) {
-        throw new Error('Please select the correct answer');
       }
 
       // Submit the question - ensure all fields match backend expectations
