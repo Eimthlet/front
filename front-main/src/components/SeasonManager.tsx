@@ -186,8 +186,8 @@ const SeasonManager: React.FC = () => {
   const fetchQuestions = useCallback(async (seasonId: number | string) => {
     try {
       setLoading(true);
-      const response = await apiClient.get(`/api/seasons/${seasonId}/questions`);
-      const questionsData = Array.isArray(response) ? response : [];
+      const response = await apiClient.get(`/admin/seasons/${seasonId}/questions`);
+      const questionsData = Array.isArray(response?.data) ? response.data : [];
       
       // Map the response to ensure consistent field names
       const normalizedQuestions = questionsData.map(q => ({
@@ -505,8 +505,8 @@ const SeasonManager: React.FC = () => {
       setError('');
       setSuccess('');
 
-      // Use the correct endpoint that includes both season and question IDs
-      await apiClient.delete(`/api/seasons/${selectedSeasonId}/questions/${questionId}`);
+      // Use the correct admin endpoint that includes both season and question IDs
+      await apiClient.delete(`/admin/seasons/${selectedSeasonId}/questions/${questionId}`);
       setSuccess('Question deleted successfully.');
 
       // Refresh questions for the current season
