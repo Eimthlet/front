@@ -79,15 +79,22 @@ const QualificationRounds: React.FC = () => {
         
         // Handle different response structures
         let seasonsData = [];
-        if (Array.isArray(response.data)) {
+        const responseData = response.data;
+        
+        console.log('Raw response data:', responseData);
+        
+        if (Array.isArray(responseData)) {
           // Direct array response
-          seasonsData = response.data;
-        } else if (response.data?.data && Array.isArray(response.data.data)) {
+          seasonsData = responseData;
+        } else if (responseData && Array.isArray(responseData.data)) {
           // Response with data property
-          seasonsData = response.data.data;
-        } else if (response.data?.seasons && Array.isArray(response.data.seasons)) {
+          seasonsData = responseData.data;
+        } else if (responseData && Array.isArray(responseData.seasons)) {
           // Response with seasons property
-          seasonsData = response.data.seasons;
+          seasonsData = responseData.seasons;
+        } else if (responseData && typeof responseData === 'object') {
+          // If it's a single season object, wrap it in an array
+          seasonsData = [responseData];
         }
         
         console.log('Processed seasons data:', seasonsData);
