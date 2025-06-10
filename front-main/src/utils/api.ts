@@ -566,12 +566,13 @@ export async function startQualificationAttempt(): Promise<QualificationStartRes
   try {
     console.log('[API] Starting qualification attempt...');
     
-    const endpoint = '/quiz/start-qualification';
+    // Use the direct endpoint that exists on the server
+    const endpoint = '/quiz/start';
     console.log(`[API] Making POST request to ${endpoint}`);
     
     const response = await api.post(endpoint, {}, { 
       withCredentials: true,
-      _skipApiPrefix: false // Let the API client handle the /api prefix
+      _skipApiPrefix: false // Ensure API prefix is added
     });
     
     // Log the raw response for debugging
@@ -584,6 +585,11 @@ export async function startQualificationAttempt(): Promise<QualificationStartRes
     
     // The response data should be the direct response from the server
     let responseData = response?.data;
+    
+    // If the user has already played, throw an error with the server's message
+    if (responseData?.error === 'Game Already Played') {
+      throw new Error(responseData.message || 'You have already played this quiz.');
+    }
     
     // If the response has a data property, use that
     if (responseData && typeof responseData === 'object' && 'data' in responseData) {
