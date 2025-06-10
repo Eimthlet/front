@@ -545,6 +545,33 @@ export async function saveProgress(userId: number, score: number, total: number)
   }
 }
 
+// Quiz API
+export interface QualificationStartResponse {
+  success: boolean;
+  attemptId: string;
+  questions: Array<{
+    id: string | number;
+    question: string;
+    options: string[];
+    category: string;
+    difficulty: string;
+    timeLimit: number;
+  }>;
+  totalQuestions: number;
+  minimumScorePercentage: number;
+  message?: string;
+}
+
+export async function startQualificationAttempt(): Promise<QualificationStartResponse> {
+  try {
+    const response = await api.post('/quiz/start-qualification');
+    return response.data;
+  } catch (error) {
+    console.error('Error starting qualification attempt:', error);
+    throw error;
+  }
+}
+
 // Re-export TokenManager for backward compatibility
 export { TokenManager };
 

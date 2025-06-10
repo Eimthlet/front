@@ -6,7 +6,7 @@ import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Quiz from './components/Quiz';
 import AuthForm from './components/AuthForm';
-import api from './utils/api';
+import api, { startQualificationAttempt, QualificationStartResponse } from './utils/api';
 import { theme } from './theme';
 import Navigation from './components/Navigation';
 import AdminDashboard from './components/AdminDashboard';
@@ -73,8 +73,19 @@ const App: React.FC = () => {
         
         setQualification(qualData);
         
-        // Only fetch questions if user is qualified or hasn't attempted yet
-        if (!qualData.hasAttempted || qualData.isQualified) {
+        // If user hasn't attempted yet, start a new qualification attempt
+        if (!qualData.hasAttempted) {
+          try {
+            const qualificationData = await startQualificationAttempt();
+            if (qualificationData.success && qualificationData.questions) {
+              setQuestions(qualificationData.questions);
+            }
+          } catch (err) {
+            console.error('Error starting qualification attempt:', err);
+            setError('Failed to start qualification quiz');
+          }
+        } else if (qualData.isQualified) {
+          // If already qualified, just load regular questions
           try {
             const questionsResponse = await api.get('/questions');
             const questionsData = questionsResponse?.data;
@@ -97,7 +108,7 @@ const App: React.FC = () => {
         });
       }
     } catch (err) {
-      console.error('Error fetching qualification:', err);
+      console.error('Error in qualification flow:', err);
       setError(err instanceof Error ? err.message : 'Failed to load qualification data');
     } finally {
       setLoading(false);
@@ -117,8 +128,13 @@ const App: React.FC = () => {
   const handleQuizComplete = useCallback(async (score: number) => {
     try {
       setLoading(true);
-      await api.post('/quiz/submit', { score });
-      await fetchQualification(); // Refresh qualification status
+      // Submit the quiz attempt with the current score
+      await api.post('/quiz/submit', { 
+        score,
+        // Include any additional data needed for submission
+      });
+      // Refresh the qualification status
+      await fetchQualification();
     } catch (err) {
       console.error('Error submitting quiz:', err);
       setError('Failed to submit quiz results');
