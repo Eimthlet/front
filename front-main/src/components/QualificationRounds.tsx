@@ -76,12 +76,21 @@ const QualificationRounds: React.FC = () => {
       try {
         console.log('Fetching seasons...');
         const response = await api.get('/admin/seasons');
-        // Handle both array response and object with seasons property
-        const responseData = response.data || {};
-        const seasonsData = Array.isArray(responseData) 
-          ? responseData 
-          : (Array.isArray(responseData.seasons) ? responseData.seasons : []);
-        console.log('Seasons data:', seasonsData);
+        
+        // Handle different response structures
+        let seasonsData = [];
+        if (Array.isArray(response.data)) {
+          // Direct array response
+          seasonsData = response.data;
+        } else if (response.data?.data && Array.isArray(response.data.data)) {
+          // Response with data property
+          seasonsData = response.data.data;
+        } else if (response.data?.seasons && Array.isArray(response.data.seasons)) {
+          // Response with seasons property
+          seasonsData = response.data.seasons;
+        }
+        
+        console.log('Processed seasons data:', seasonsData);
         
         // If no seasons, show error and use a fallback
         if (seasonsData.length === 0) {
