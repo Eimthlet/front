@@ -21,7 +21,7 @@ import {
   Tooltip,
   CircularProgress,
   Alert,
-  Snackbar,
+   Snackbar,
   Grid,
   Chip
 } from '@mui/material';
@@ -153,10 +153,12 @@ const QualificationRounds: React.FC = () => {
 
       const roundData = {
         name: round.name,
-        startDate: round.start_date,
-        endDate: round.end_date,
-        seasonId: round.season_id || 1, // Default to 1 if not specified, update as needed
-        roundNumber: Number(round.round_number)
+        description: round.description || '',
+        is_active: round.is_active,
+        start_date: round.start_date,
+        end_date: round.end_date,
+        round_number: Number(round.round_number),
+        min_score_to_qualify: Number(round.min_score_to_qualify) || 70
       };
 
       if (editingRound && editingRound.id) {
