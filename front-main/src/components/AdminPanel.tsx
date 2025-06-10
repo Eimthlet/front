@@ -97,12 +97,13 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   const [selectedSeasonId, setSelectedSeasonId] = useState<number | null>(null);
   const [error, setError] = useState<ErrorState | null>(null);
   const [success, setSuccess] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(true);
   const [tabValue, setTabValue] = useState(0);
   const [adminCheckFailed, setAdminCheckFailed] = useState(false);
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [hasFetchedQuestions, setHasFetchedQuestions] = useState(false);
   const [newQuestion, setNewQuestion] = useState<Question>({
     question_text: '',
     options: ['', '', '', ''],
@@ -129,12 +130,14 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     console.log('fetchQuestions called with selectedSeasonId:', selectedSeasonId);
     if (!selectedSeasonId) {
       console.log('No selectedSeasonId, returning early');
+      setHasFetchedQuestions(false);
       return;
     }
     
     try {
       setIsLoading(true);
       clearError();
+      setHasFetchedQuestions(false);
       console.log('Fetching questions for season:', selectedSeasonId);
       const response = await api.get(`/admin/seasons/${selectedSeasonId}/questions`);
       console.log('Questions API response:', response);
@@ -143,10 +146,12 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       const questionsData = Array.isArray(response?.data) ? response.data : [];
       console.log('Processed questions data:', questionsData);
       setQuestions(questionsData);
+      setHasFetchedQuestions(true);
     } catch (error) {
       console.error('Error fetching questions:', error);
       updateError('Error', 'Failed to load questions. The season may not have any questions yet.');
       setQuestions([]);
+      setHasFetchedQuestions(false);
     } finally {
       setIsLoading(false);
     }
@@ -587,6 +592,12 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
                       <TableCell colSpan={4} align="center">
                         <CircularProgress size={24} />
                         <Typography variant="body2" sx={{ mt: 1 }}>Loading questions...</Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : !hasFetchedQuestions ? (
+                    <TableRow>
+                      <TableCell colSpan={4} align="center">
+                        <Typography variant="body2">Select a season to view questions</Typography>
                       </TableCell>
                     </TableRow>
                   ) : questions.length > 0 ? (
