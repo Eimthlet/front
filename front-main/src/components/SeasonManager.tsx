@@ -329,10 +329,14 @@ const SeasonManager: React.FC = () => {
         ? Math.min(100, Math.max(0, Number(seasonInput.minimum_score_percentage) || 50))
         : 50;
 
+      // Convert dates to ISO string format
+      const formattedStartDate = new Date(seasonInput.start_date).toISOString().split('T')[0];
+      const formattedEndDate = new Date(seasonInput.end_date).toISOString().split('T')[0];
+
       const seasonPayload = {
         name: seasonInput.name,
-        start_date: seasonInput.start_date,
-        end_date: seasonInput.end_date,
+        startDate: formattedStartDate,  
+        endDate: formattedEndDate,      
         is_active: Boolean(seasonInput.is_active),
         is_qualification_round: isQualificationRound,
         minimum_score_percentage: minimumScorePercentage,
@@ -344,20 +348,30 @@ const SeasonManager: React.FC = () => {
       let response;
       if (dialogMode === 'create') {
         response = await apiClient.post('/admin/seasons', seasonPayload);
-        if (response?.success) {
+        if (response?.success || response?.id) {  
           setSuccess('Season created successfully');
         } else {
           throw new Error(response?.message || 'Failed to create season');
         }
       } else {
         // Ensure ID is present for update
-        if (!currentSeason.id) { // Check currentSeason.id as it's the authoritative ID from the state for an item being edited
+        if (!currentSeason?.id) {
           setError('Season ID is missing for update.');
-          // setLoading(false); // setLoading would be in the finally block
           return;
         }
-        response = await apiClient.put(`/admin/seasons/${currentSeason.id}`, seasonPayload);
-        if (response?.success) {
+        
+        const updatePayload = {
+          name: seasonInput.name,
+          startDate: formattedStartDate,
+          endDate: formattedEndDate,
+          is_active: Boolean(seasonInput.is_active),
+          is_qualification_round: isQualificationRound,
+          minimum_score_percentage: minimumScorePercentage,
+          description: seasonInput.description || ''
+        };
+        
+        response = await apiClient.put(`/admin/seasons/${currentSeason.id}`, updatePayload);
+        if (response?.success || response?.id) {
           setSuccess('Season updated successfully');
         } else {
           throw new Error(response?.message || 'Failed to update season');
