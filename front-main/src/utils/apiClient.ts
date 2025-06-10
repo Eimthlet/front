@@ -74,13 +74,19 @@ const getRequestUrl = (config: any): string => {
   
   // Add /api prefix if needed
   if (shouldUseApiPrefix(url)) {
-    if (!url.startsWith('/api/') && url !== '/api') {
+    if (!url.startsWith('api/') && !url.startsWith('/api/')) {
       url = `api/${url}`;
     }
   }
   
   // Ensure we don't have double slashes
-  const fullUrl = `${baseUrl}/${url}`.replace(/([^:]\/)\/+/g, '$1');
+  let fullUrl = `${baseUrl}/${url}`.replace(/([^:]\/)\/+/g, '$1');
+  
+  // Special handling for qualification endpoints
+  if (url.startsWith('qualification')) {
+    fullUrl = `${baseUrl}/api/${url}`.replace(/([^:]\/)\/+/g, '$1');
+  }
+  
   return fullUrl;
 };
 
