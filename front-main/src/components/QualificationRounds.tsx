@@ -55,7 +55,8 @@ const defaultRound: Omit<QualificationRound, 'id' | 'created_at' | 'updated_at'>
   start_date: new Date().toISOString(),
   end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
   round_number: 1,
-  min_score_to_qualify: 70
+  min_score_to_qualify: 70,
+  season_id: 1 // Default to first season
 };
 
 const QualificationRounds: React.FC = () => {
@@ -66,6 +67,22 @@ const QualificationRounds: React.FC = () => {
   const [editingRound, setEditingRound] = useState<QualificationRound | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [round, setRound] = useState<QualificationRound>(defaultRound);
+  const [seasons, setSeasons] = useState<any[]>([]);
+  
+  // Fetch seasons for the dropdown
+  useEffect(() => {
+    const fetchSeasons = async () => {
+      try {
+        const response = await api.get('/admin/seasons');
+        setSeasons(response.data || []);
+      } catch (error) {
+        console.error('Error fetching seasons:', error);
+        setSnackbar({ open: true, message: 'Failed to load seasons', severity: 'error' });
+      }
+    };
+    
+    fetchSeasons();
+  }, []);
 
   const fetchRounds = async () => {
     try {
@@ -158,7 +175,8 @@ const QualificationRounds: React.FC = () => {
         start_date: round.start_date,
         end_date: round.end_date,
         round_number: Number(round.round_number),
-        min_score_to_qualify: Number(round.min_score_to_qualify) || 70
+        min_score_to_qualify: Number(round.min_score_to_qualify) || 70,
+        season_id: round.season_id
       };
 
       if (editingRound && editingRound.id) {
@@ -310,7 +328,27 @@ const QualificationRounds: React.FC = () => {
         </DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2}>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
+              <TextField
+                select
+                fullWidth
+                label="Season"
+                name="season_id"
+                value={round.season_id || ''}
+                onChange={handleInputChange}
+                required
+                SelectProps={{
+                  native: true
+                }}
+              >
+                {seasons.map((season: any) => (
+                  <option key={season.id} value={season.id}>
+                    {season.name}
+                  </option>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
                 label="Name"
