@@ -163,25 +163,49 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
       console.log('Fetching seasons...');
       clearError();
       const response = await api.get('/admin/seasons');
-      console.log('Seasons API response:', response);
       
-      // Handle response properly - response data could be in response.data or response.data.data
+      // Debug log the entire response structure
+      console.group('Seasons API Response');
+      console.log('Full response:', response);
+      console.log('Response data type:', typeof response?.data);
+      console.log('Response data keys:', response?.data ? Object.keys(response.data) : 'No data');
+      
       let seasonsData = [];
+      
+      // Check if response.data is an array
       if (Array.isArray(response?.data)) {
-        seasonsData = response.data;
-      } else if (response?.data?.data && Array.isArray(response.data.data)) {
-        seasonsData = response.data.data;
+        console.log('Response data is an array, using as seasons');
+        seasonsData = [...response.data]; // Create a new array to ensure reactivity
+      } 
+      // Check if response.data has a data property that's an array
+      else if (response?.data?.data && Array.isArray(response.data.data)) {
+        console.log('Found seasons in response.data.data');
+        seasonsData = [...response.data.data];
+      }
+      // Check if response.data is an object with seasons array
+      else if (response?.data && typeof response.data === 'object') {
+        console.log('Response is an object, checking for seasons array');
+        const keys = Object.keys(response.data);
+        for (const key of keys) {
+          if (Array.isArray(response.data[key])) {
+            console.log(`Found array in key '${key}', using as seasons`);
+            seasonsData = [...response.data[key]];
+            break;
+          }
+        }
       }
       
       console.log('Processed seasons data:', seasonsData);
+      console.groupEnd();
       
+      // Update state with the processed data
       setSeasons(seasonsData);
       
       if (seasonsData.length > 0) {
         console.log('Setting selected season to first season:', seasonsData[0].id);
         setSelectedSeasonId(seasonsData[0].id);
       } else {
-        console.log('No seasons available');
+        console.log('No valid seasons data found in response');
         setSelectedSeasonId(null);
       }
     } catch (error) {
