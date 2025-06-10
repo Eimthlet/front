@@ -29,6 +29,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PeopleIcon from '@mui/icons-material/People';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 // Import the Season type from our types file
 import { type Season as SeasonType } from '../types';
@@ -106,12 +107,26 @@ const SeasonManager: React.FC = () => {
       try {
         setLoading(true);
         setError('');
+        console.log('Fetching seasons...');
         const response = await apiClient.get('/admin/seasons');
-        const data = Array.isArray(response?.data) ? response.data : [];
-        setSeasons(data);
+        console.log('Seasons response:', response);
+        
+        // Handle different response structures
+        let seasonsData = [];
+        if (Array.isArray(response)) {
+          seasonsData = response; // Direct array response
+        } else if (response?.data && Array.isArray(response.data)) {
+          seasonsData = response.data; // Response with data property
+        } else if (response?.seasons && Array.isArray(response.seasons)) {
+          seasonsData = response.seasons; // Response with seasons property
+        }
+        
+        console.log('Processed seasons data:', seasonsData);
+        setSeasons(seasonsData);
       } catch (err: any) {
         console.error('Error fetching seasons:', err);
-        setError(err.message || 'Failed to fetch seasons');
+        const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch seasons';
+        setError(errorMessage);
         setSeasons([]);
       } finally {
         setLoading(false);
@@ -505,6 +520,28 @@ const SeasonManager: React.FC = () => {
     }
   }, [selectedSeasonId, fetchQuestions, setLoading, setError, setSuccess]);
 
+  // Handle season activation
+  const handleActivateSeason = useCallback(async (id: number | string) => {
+    if (!window.confirm('Are you sure you want to activate this season? This will deactivate all other seasons.')) return;
+    
+    try {
+      setLoading(true);
+      const response = await apiClient.put(`/admin/seasons/${id}/activate`);
+      
+      // Refresh seasons list
+      const refreshResponse = await apiClient.get('/admin/seasons');
+      const refreshedSeasons = Array.isArray(refreshResponse) ? refreshResponse : []; 
+      setSeasons(refreshedSeasons);
+      
+      setSuccess('Season activated successfully');
+    } catch (err: any) {
+      const error = err as ApiError;
+      setError(error.response?.data?.message || 'Failed to activate season');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Delete handlers
   const handleDeleteSeason = useCallback(async (id: number | string) => {
     if (!window.confirm('Are you sure you want to delete this season?')) return;
@@ -513,9 +550,9 @@ const SeasonManager: React.FC = () => {
       setLoading(true);
       await apiClient.delete(`/admin/seasons/${id}`);
       
-      // Refresh seasons
+      // Refresh seasons list
       const refreshResponse = await apiClient.get('/admin/seasons');
-      const refreshedSeasons = Array.isArray(refreshResponse?.data) ? refreshResponse.data : [];
+      const refreshedSeasons = Array.isArray(refreshResponse) ? refreshResponse : []; 
       setSeasons(refreshedSeasons);
       
       setSuccess('Season deleted successfully');
@@ -677,6 +714,16 @@ const SeasonManager: React.FC = () => {
                     >
                       <PeopleIcon fontSize="small" />
                     </IconButton>
+                    {!season.is_active && (
+                      <IconButton 
+                        size="small" 
+                        color="success"
+                        onClick={() => handleActivateSeason(season.id)}
+                        title="Activate Season"
+                      >
+                        <CheckCircleIcon fontSize="small" />
+                      </IconButton>
+                    )}
                   </Box>
                 </TableCell>
               </TableRow>
