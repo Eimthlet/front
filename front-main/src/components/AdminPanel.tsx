@@ -126,16 +126,22 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
 
   // Fetch questions for the selected season
   const fetchQuestions = useCallback(async () => {
-    if (!selectedSeasonId) return;
+    console.log('fetchQuestions called with selectedSeasonId:', selectedSeasonId);
+    if (!selectedSeasonId) {
+      console.log('No selectedSeasonId, returning early');
+      return;
+    }
     
     try {
       setIsLoading(true);
       clearError();
-      // Use the correct endpoint to get questions for the season
+      console.log('Fetching questions for season:', selectedSeasonId);
       const response = await api.get(`/admin/seasons/${selectedSeasonId}/questions`);
+      console.log('Questions API response:', response);
       
       // The response should be an array of questions
       const questionsData = Array.isArray(response?.data) ? response.data : [];
+      console.log('Processed questions data:', questionsData);
       setQuestions(questionsData);
     } catch (error) {
       console.error('Error fetching questions:', error);
@@ -197,8 +203,12 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
 
   // Fetch questions when selectedSeasonId changes
   useEffect(() => {
+    console.log('useEffect - selectedSeasonId:', selectedSeasonId, 'isVerifying:', isVerifying, 'isAdmin:', isAdmin, 'adminCheckFailed:', adminCheckFailed);
     if (selectedSeasonId && !isVerifying && isAdmin && !adminCheckFailed) {
-      fetchQuestions();
+      console.log('Fetching questions...');
+      fetchQuestions().catch(error => {
+        console.error('Error in fetchQuestions:', error);
+      });
     }
   }, [selectedSeasonId, fetchQuestions, isVerifying, isAdmin, adminCheckFailed]);
 
