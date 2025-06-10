@@ -46,9 +46,16 @@ const API_PREFIXED_ENDPOINTS = [
 // Determine if a URL should use the API prefix
 const shouldUseApiPrefix = (url: string | undefined): boolean => {
   if (!url) return false;
-  return API_PREFIXED_ENDPOINTS.some(prefix => url.startsWith(prefix)) || 
-         url.startsWith('/api/') ||
-         url === '/api';
+  
+  // Remove leading slash for comparison
+  const normalizedUrl = url.startsWith('/') ? url.substring(1) : url;
+  
+  return API_PREFIXED_ENDPOINTS.some(prefix => 
+    normalizedUrl.startsWith(prefix.startsWith('/') ? prefix.substring(1) : prefix) ||
+    normalizedUrl === (prefix.startsWith('/') ? prefix.substring(1) : prefix)
+  ) || 
+  normalizedUrl.startsWith('api/') ||
+  normalizedUrl === 'api';
 };
 
 // Get base URL without any path
@@ -76,18 +83,16 @@ const getRequestUrl = (config: any): string => {
   
   // Skip adding /api prefix if _skipApiPrefix is true
   if (!config._skipApiPrefix && shouldUseApiPrefix(url)) {
-    if (!url.startsWith('api/') && !url.startsWith('/api/')) {
-      // Only add 'api' if it's not already in the URL
-      if (!url.includes('api/')) {
-        url = `api/${url}`;
-      }
+    // Only add 'api' if it's not already in the URL
+    if (!url.startsWith('api/') && !url.includes('/api/')) {
+      url = `api/${url}`;
     }
   }
   
   // Ensure we don't have double slashes
   let fullUrl = `${baseUrl}/${url}`.replace(/([^:]\/)\/+/g, '$1');
   
-  console.log('[API] Request URL:', fullUrl);
+  console.log('[API] Request URL:', fullUrl, { originalUrl: config.url, _skipApiPrefix: config._skipApiPrefix });
   
   return fullUrl;
 };
