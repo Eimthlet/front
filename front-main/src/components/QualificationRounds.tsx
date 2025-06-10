@@ -32,6 +32,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import SaveIcon from '@mui/icons-material/Save';
 import api from '../utils/apiClient';
 
 interface QualificationRound {
@@ -77,30 +78,41 @@ const QualificationRounds: React.FC = () => {
         const response = await api.get('/admin/seasons');
         const seasonsData = Array.isArray(response.data) ? response.data : [];
         console.log('Seasons data:', seasonsData);
+        
+        // If no seasons, show error and use a fallback
+        if (seasonsData.length === 0) {
+          console.warn('No seasons found in the API response');
+          setSnackbar({ 
+            open: true, 
+            message: 'No seasons found. Please create a season first.', 
+            severity: 'warning' 
+          });
+          return;
+        }
+        
         setSeasons(seasonsData);
         
-        // Set the first season as default if available and no season is selected
-        if (seasonsData.length > 0) {
-          setRound(prev => {
-            // Only update if we don't have a season_id yet or if the current one is invalid
-            if (!prev.season_id || !seasonsData.some(s => s.id === prev.season_id)) {
-              console.log('Setting default season to:', seasonsData[0].id);
-              return {
-                ...prev,
-                season_id: seasonsData[0].id
-              };
-            }
-            return prev;
-          });
-        }
+        // Set the first season as default
+        setRound(prev => ({
+          ...prev,
+          season_id: seasonsData[0].id
+        }));
+        
       } catch (error) {
         console.error('Error fetching seasons:', error);
-        setSnackbar({ open: true, message: 'Failed to load seasons', severity: 'error' });
+        setSnackbar({ 
+          open: true, 
+          message: 'Failed to load seasons. Please try again later.', 
+          severity: 'error' 
+        });
       }
     };
     
     fetchSeasons();
-  }, []); // Empty dependency array since we only want to run this once on mount
+  }, []);
+  
+  // Disable the form if no seasons are available
+  const isFormDisabled = seasons.length === 0;
 
   const fetchRounds = async () => {
     try {
@@ -483,14 +495,22 @@ const QualificationRounds: React.FC = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button 
-            onClick={handleSubmit} 
-            variant="contained" 
-            color="primary"
-            disabled={!round.name || !round.round_number || !round.start_date || !round.end_date}
+          <Button
+            onClick={handleCloseDialog}
+            color="inherit"
+            disabled={isFormDisabled}
           >
-            {editingRound ? 'Update' : 'Create'} Round
+            {isFormDisabled ? 'Close' : 'Cancel'}
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            color="primary"
+            disabled={isFormDisabled || !round.name || !round.start_date || !round.end_date || !round.season_id}
+            startIcon={<SaveIcon />}
+            title={isFormDisabled ? 'No seasons available. Please create a season first.' : ''}
+          >
+            {editingRound ? 'Update' : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>
