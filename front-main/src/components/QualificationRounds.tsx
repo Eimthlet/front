@@ -61,10 +61,12 @@ const QualificationRounds: React.FC = () => {
     try {
       setLoading(true);
       const response = await api.get('/admin/rounds');
-      setRounds(response.data.rounds);
+      // The response data is the rounds array directly
+      setRounds(Array.isArray(response.data) ? response.data : response.data?.rounds || []);
     } catch (err) {
       setError('Failed to fetch qualification rounds');
       console.error('Error fetching rounds:', err);
+      setRounds([]); // Ensure we always have an array
     } finally {
       setLoading(false);
     }
