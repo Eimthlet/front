@@ -160,21 +160,31 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   // Fetch seasons
   const fetchSeasons = useCallback(async () => {
     try {
+      console.log('Fetching seasons...');
       clearError();
       const response = await api.get('/admin/seasons');
+      console.log('Seasons API response:', response);
       
       // Handle response properly - response data should be an array
       const seasonsData = Array.isArray(response?.data) ? response.data : [];
+      console.log('Processed seasons data:', seasonsData);
+      
       setSeasons(seasonsData);
-      if (seasonsData.length > 0 && !selectedSeasonId) {
+      
+      if (seasonsData.length > 0) {
+        console.log('Setting selected season to first season:', seasonsData[0].id);
         setSelectedSeasonId(seasonsData[0].id);
+      } else {
+        console.log('No seasons available');
+        setSelectedSeasonId(null);
       }
     } catch (error) {
       console.error('Error fetching seasons:', error);
       updateError('Error', 'Failed to load seasons');
       setSeasons([]);
+      setSelectedSeasonId(null);
     }
-  }, [selectedSeasonId, updateError, clearError]);
+  }, [updateError, clearError]);
 
   // Check admin status on component mount
   useEffect(() => {
@@ -199,10 +209,23 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
   // Fetch initial data
   useEffect(() => {
     const fetchInitialData = async () => {
-      await fetchSeasons();
+      console.log('Fetching initial data...');
+      try {
+        await fetchSeasons();
+      } catch (error) {
+        console.error('Error in fetchInitialData:', error);
+      }
     };
+    
     if (!isVerifying && isAdmin && !adminCheckFailed) {
+      console.log('Conditions met, fetching initial data');
       fetchInitialData();
+    } else {
+      console.log('Conditions not met, not fetching initial data:', {
+        isVerifying,
+        isAdmin,
+        adminCheckFailed
+      });
     }
   }, [fetchSeasons, isVerifying, isAdmin, adminCheckFailed]);
 
@@ -449,6 +472,11 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
 
       <TabPanel value={tabValue} index={0}>
         <Box sx={{ mb: 4 }}>
+          {seasons.length === 0 && !isLoading && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              No seasons available. Please create a season first.
+            </Alert>
+          )}
           <Typography variant="h6" gutterBottom>
             Add New Question
           </Typography>
