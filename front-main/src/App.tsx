@@ -68,7 +68,12 @@ const App: React.FC = () => {
 
     try {
       console.log('Fetching qualification status...');
-      const response = await api.get('/qualification', { withCredentials: true });
+      // Use the full URL to bypass any automatic prefixing
+      const response = await api.get('/qualification', { 
+        withCredentials: true,
+        // Add a custom config to prevent any automatic prefixing
+        _skipApiPrefix: true
+      });
       const responseData = response?.data;
 
       // Log the raw response for debugging
