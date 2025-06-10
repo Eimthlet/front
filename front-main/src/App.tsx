@@ -6,7 +6,7 @@ import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Quiz from './components/Quiz';
 import AuthForm from './components/AuthForm';
-import api, { startQualificationAttempt, QualificationStartResponse } from './utils/api';
+import api, { startQualificationAttempt } from './utils/api';
 import { theme } from './theme';
 import Navigation from './components/Navigation';
 import AdminDashboard from './components/AdminDashboard';
