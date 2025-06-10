@@ -521,11 +521,11 @@ export async function fetchResults(userId: number, seasonId: number) {
 
 export async function getCurrentSeason() {
   try {
-    const response = await api.get('/current');
+    const response = await api.get('/seasons/active');
     return formatResponse(response, 200, 'Current season fetched successfully');
   } catch (error: any) {
     console.error('Error fetching current season:', error);
-    return formatError(error, 'Failed to fetch current season');
+    return formatError(error, 'Failed to fetch active season');
   }
 }
 
