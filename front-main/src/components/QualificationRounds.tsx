@@ -76,49 +76,32 @@ const QualificationRounds: React.FC = () => {
       try {
         console.log('Fetching seasons...');
         
-        // Use the API client directly to get the raw response
-        const response = await api.get('/admin/seasons', { 
-          transformResponse: (res) => res // Disable default JSON parsing
-        });
+        // Get seasons data from the API
+        const response = await api.get('/admin/seasons');
         
-        // Parse the response data manually
-        let responseData;
-        try {
-          responseData = typeof response.data === 'string' 
-            ? JSON.parse(response.data) 
-            : response.data;
-        } catch (e) {
-          console.error('Error parsing response data:', e);
-          responseData = response.data;
+        // The API returns an array of seasons directly
+        const seasonsData = Array.isArray(response) ? response : [];
+        
+        console.log('Seasons data:', seasonsData);
+        
+        if (seasonsData.length === 0) {
+          console.warn('No seasons found in the API response');
+          setSnackbar({ 
+            open: true, 
+            message: 'No seasons found. Please create a season first.', 
+            severity: 'warning' 
+          });
+          return;
         }
         
-        console.log('Raw response data:', response);
-        console.log('Parsed response data:', responseData);
+        setSeasons(seasonsData);
         
-        // Handle different response structures
-        let seasonsData = [];
-        
-        // First check if the response is an array
-        if (Array.isArray(responseData)) {
-          seasonsData = responseData;
-          console.log('Using direct array response with', seasonsData.length, 'items');
-        } 
-        // Check if response has a data property that's an array
-        else if (responseData && responseData.data && Array.isArray(responseData.data)) {
-          seasonsData = responseData.data;
-          console.log('Using response.data with', seasonsData.length, 'items');
-        }
-        // Check if response has a seasons property that's an array
-        else if (responseData && responseData.seasons && Array.isArray(responseData.seasons)) {
-          seasonsData = responseData.seasons;
-          console.log('Using response.seasons with', seasonsData.length, 'items');
-        }
-        // If it's a single object, wrap it in an array
-        else if (responseData && typeof responseData === 'object' && responseData !== null) {
-          seasonsData = [responseData];
-          console.log('Wrapped single season object in array');
-        } else {
-          console.log('No valid season data found in response');
+        // Set the first season as default
+        if (seasonsData.length > 0 && !round.season_id) {
+          setRound(prev => ({
+            ...prev,
+            season_id: seasonsData[0].id
+          }));
         }
         
         console.log('Processed seasons data:', seasonsData);
