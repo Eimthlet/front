@@ -290,11 +290,6 @@ const AdminPanel: React.FC<AdminPanelProps> = () => {
     setTabValue(newValue);
   };
 
-  // Define tabs for the admin panel
-  const tabs = [
-    { label: 'Seasons', component: <SeasonManager /> },
-    { label: 'Qualification Rounds', component: <QualificationRounds /> },
-  ];
 
   // Handle input changes for text fields
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
