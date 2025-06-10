@@ -73,12 +73,15 @@ const QualificationRounds: React.FC = () => {
   useEffect(() => {
     const fetchSeasons = async () => {
       try {
+        console.log('Fetching seasons...');
         const response = await api.get('/admin/seasons');
         const seasonsData = Array.isArray(response.data) ? response.data : [];
+        console.log('Seasons data:', seasonsData);
         setSeasons(seasonsData);
         
         // Set the first season as default if available and no season is selected
         if (seasonsData.length > 0 && !round.season_id) {
+          console.log('Setting default season to:', seasonsData[0].id);
           setRound(prev => ({
             ...prev,
             season_id: seasonsData[0].id
@@ -91,7 +94,7 @@ const QualificationRounds: React.FC = () => {
     };
     
     fetchSeasons();
-  }, [round.season_id]); // Added round.season_id as a dependency
+  }, []); // Removed round.season_id to prevent infinite loop
 
   const fetchRounds = async () => {
     try {
@@ -353,24 +356,33 @@ const QualificationRounds: React.FC = () => {
         <DialogContent dividers>
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <TextField
-                select
-                fullWidth
-                label="Season"
-                name="season_id"
-                value={round.season_id || ''}
-                onChange={handleInputChange}
-                required
-                SelectProps={{
-                  native: true
-                }}
-              >
-                {seasons.map((season: any) => (
-                  <option key={season.id} value={season.id}>
-                    {season.name}
-                  </option>
-                ))}
-              </TextField>
+              {seasons.length > 0 ? (
+                <TextField
+                  select
+                  fullWidth
+                  label="Season"
+                  name="season_id"
+                  value={round.season_id || ''}
+                  onChange={handleInputChange}
+                  required
+                  SelectProps={{
+                    native: true
+                  }}
+                >
+                  {seasons.map((season) => (
+                    <option key={season.id} value={season.id}>
+                      {season.name}
+                    </option>
+                  ))}
+                </TextField>
+              ) : (
+                <TextField
+                  fullWidth
+                  label="Season"
+                  value="Loading seasons..."
+                  disabled
+                />
+              )}
             </Grid>
             <Grid item xs={12}>
               <TextField
