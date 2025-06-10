@@ -567,9 +567,9 @@ export async function startQualificationAttempt(): Promise<QualificationStartRes
     console.log('[API] Starting qualification attempt...');
     
     // Log the request being made
-    console.log('[API] Making POST request to /api/quiz/start-qualification');
+    console.log('[API] Making POST request to /quiz/start-qualification');
     
-    const response = await api.post('/api/quiz/start-qualification');
+    const response = await api.post('/quiz/start-qualification');
     
     // Log the raw response for debugging
     console.log('[API] Raw qualification attempt response:', {

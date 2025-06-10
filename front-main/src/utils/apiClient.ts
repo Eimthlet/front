@@ -37,7 +37,7 @@ interface IApiClient {
 
 // List of endpoints that should use /api prefix
 const API_PREFIXED_ENDPOINTS = [
-  '/api/quiz/start-qualification',
+  '/quiz/start-qualification',
   '/qualification'
 ];
 
