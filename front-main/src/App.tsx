@@ -89,28 +89,16 @@ const App: React.FC = () => {
       console.log('Setting qualification data:', qualData);
       setQualification(qualData);
 
-      // If user hasn't attempted yet, start a new qualification attempt
+      // If user hasn't attempted yet, don't throw an error - this is a valid state
       if (!qualData.hasAttempted) {
-        console.log('No previous attempt, starting new qualification...');
-        try {
-          const qualificationData = await startQualificationAttempt();
-          console.log('startQualificationAttempt response:', qualificationData);
+        console.log('No previous attempt found. User needs to start a qualification attempt.');
+        // Don't set error here - this is a valid state
+        setQuestions([]);
+        return;
+      }
 
-          if (qualificationData.success) {
-            if (qualificationData.questions?.length) {
-              console.log(`Received ${qualificationData.questions.length} questions`);
-              setQuestions(qualificationData.questions);
-            } else {
-              throw new Error('No questions received in qualification attempt');
-            }
-          } else {
-            throw new Error(qualificationData.message || 'Failed to start qualification quiz');
-          }
-        } catch (error) {
-          handleError(error);
-        }
-      } else if (qualData.isQualified) {
-        // If already qualified, load regular questions
+      // If already qualified, load regular questions
+      if (qualData.isQualified) {
         try {
           const response = await api.get('/questions');
           const responseData = response?.data;
@@ -121,16 +109,10 @@ const App: React.FC = () => {
         } catch (error) {
           handleError(new Error('Failed to load questions'));
         }
-      } else {
-        setQualification(prev => ({
-          ...prev,
-          hasAttempted: false,
-          isQualified: false,
-          message: 'Could not determine qualification status'
-        }));
       }
     } catch (error) {
-      handleError(new Error('Failed to load qualification data'));
+      console.error('Error in fetchQualification:', error);
+      handleError(error instanceof Error ? error : new Error('Failed to load qualification data'));
     } finally {
       setLoading(false);
       console.groupEnd();
@@ -217,7 +199,40 @@ const App: React.FC = () => {
           <Route path="/quiz" element={
             <ProtectedRoute>
               <Layout>
-                {qualification?.hasAttempted && !qualification?.isQualified ? (
+                {!qualification?.hasAttempted ? (
+                  <Box textAlign="center" mt={10}>
+                    <Typography variant="h4" gutterBottom>
+                      Welcome to the Quiz!
+                    </Typography>
+                    <Typography variant="body1" mb={4}>
+                      You need to complete a qualification quiz before you can start.
+                    </Typography>
+                    <Button 
+                      variant="contained" 
+                      color="primary" 
+                      size="large"
+                      onClick={async () => {
+                        try {
+                          setLoading(true);
+                          const qualificationData = await startQualificationAttempt();
+                          if (qualificationData.success && qualificationData.questions?.length) {
+                            setQuestions(qualificationData.questions);
+                          } else {
+                            handleError(new Error(qualificationData.message || 'Failed to start qualification quiz'));
+                          }
+                        } catch (error) {
+                          handleError(error);
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      disabled={loading}
+                      sx={{ mt: 2 }}
+                    >
+                      {loading ? 'Starting...' : 'Start Qualification Quiz'}
+                    </Button>
+                  </Box>
+                ) : qualification?.hasAttempted && !qualification?.isQualified ? (
                   <Box textAlign="center" mt={10}>
                     <Typography variant="h5" color="error" gutterBottom>
                       Quiz Attempted
