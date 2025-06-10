@@ -38,6 +38,9 @@ interface IApiClient {
 // List of endpoints that should use /api prefix
 const API_PREFIXED_ENDPOINTS = [
   '/quiz/start-qualification',
+  '/quiz/qualification/start',
+  '/quiz/submit',
+  '/quiz/results',
   '/quiz',
   '/qualification'
   // Add other endpoints that need the /api prefix here
@@ -50,12 +53,15 @@ const shouldUseApiPrefix = (url: string | undefined): boolean => {
   // Remove leading slash for comparison
   const normalizedUrl = url.startsWith('/') ? url.substring(1) : url;
   
-  return API_PREFIXED_ENDPOINTS.some(prefix => 
-    normalizedUrl.startsWith(prefix.startsWith('/') ? prefix.substring(1) : prefix) ||
-    normalizedUrl === (prefix.startsWith('/') ? prefix.substring(1) : prefix)
-  ) || 
-  normalizedUrl.startsWith('api/') ||
-  normalizedUrl === 'api';
+  // Check if URL already starts with 'api/'
+  if (normalizedUrl.startsWith('api/')) {
+    return false; // Don't add prefix if already there
+  }
+  
+  return API_PREFIXED_ENDPOINTS.some(prefix => {
+    const normalizedPrefix = prefix.startsWith('/') ? prefix.substring(1) : prefix;
+    return normalizedUrl.startsWith(normalizedPrefix) || normalizedUrl === normalizedPrefix;
+  });
 };
 
 // Get base URL without any path
