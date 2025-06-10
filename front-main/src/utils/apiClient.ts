@@ -51,8 +51,15 @@ const getBaseUrl = () => {
     baseUrl = 'https://car-quizz.onrender.com';
   }
 
-  // Remove any trailing slashes and /api if present
-  return baseUrl.replace(/\/+$/, '').replace(/\/api$/, '');
+  // Remove any trailing slashes
+  baseUrl = baseUrl.replace(/\/+$/, '');
+  
+  // Ensure the URL ends with /api
+  if (!baseUrl.endsWith('/api')) {
+    baseUrl = `${baseUrl}/api`;
+  }
+  
+  return baseUrl;
 };
 
 // Get base URL without any trailing slashes
