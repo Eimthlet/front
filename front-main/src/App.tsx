@@ -1,12 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { ThemeProvider, CssBaseline, Box, Typography, CircularProgress, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { 
+  ThemeProvider, 
+  CssBaseline, 
+  Box, 
+  Typography, 
+  CircularProgress, 
+  Button, 
+  Dialog, 
+  DialogTitle, 
+  DialogContent, 
+  DialogContentText, 
+  DialogActions 
+} from '@mui/material';
 import { useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Quiz from './components/Quiz';
 import AuthForm from './components/AuthForm';
-import api, { startQualificationAttempt } from './utils/api';
+import api from './utils/api';
 import { theme } from './theme';
 import Navigation from './components/Navigation';
 import AdminDashboard from './components/AdminDashboard';
@@ -24,9 +36,23 @@ interface ApiQuestion {
   correctAnswer?: string;
   timeLimit?: number;
   explanation?: string;
+  category?: string;
+  difficulty?: string;
 }
 
-interface QualificationResponse {
+// Quiz component props
+export type Question = {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  timeLimit?: number;
+  explanation?: string;
+  category?: string;
+  difficulty?: string;
+};
+
+interface BaseQualificationResponse {
   hasAttempted: boolean;
   isQualified: boolean;
   score?: number;
@@ -37,12 +63,27 @@ interface QualificationResponse {
   qualifies_for_next_round?: boolean;
   completed?: boolean;
   completed_at?: string;
+  questions?: Question[];
+}
+
+type QualificationResponse = BaseQualificationResponse;
+
+type FetchQualificationResponse = BaseQualificationResponse & {
+  id?: string | number;
+  error?: string;
+};
+
+interface QualificationAttemptResponse {
+  success: boolean;
+  questions?: Question[];
+  message?: string;
+  attemptId?: string;
 }
 
 const App: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAdmin, isLoading: authLoading } = useAuth();
-  const [questions, setQuestions] = useState<ApiQuestion[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [qualification, setQualification] = useState<QualificationResponse | null>(null);
@@ -55,171 +96,100 @@ const App: React.FC = () => {
     setError(errorMessage);
   }, []);
 
-  // Memoized function to fetch qualification status and handle qualification flow
-  const fetchQualification = useCallback(async () => {
-    if (!user) {
-      console.log('No user, skipping qualification check');
-      setLoading(false);
-      return;
-    }
-
-    console.group('fetchQualification');
-    setLoading(true);
-    setError(null);
-
+  // Function to convert API questions to the required format
+  const normalizeQuestions = useCallback((apiQuestions: ApiQuestion[]): Question[] => {
+    return apiQuestions.map(q => ({
+      ...q,
+      id: String(q.id),
+      question: q.question || q.question_text || 'No question provided',
+      options: Array.isArray(q.options) ? q.options : [],
+      correctAnswer: q.correctAnswer || String(q.correct_answer || '')
+    }));
+  }, []);
+  
+  // Function to fetch qualification status
+  const fetchQualification = useCallback(async (): Promise<FetchQualificationResponse | null> => {
+    if (!user) return null;
+    
     try {
-      console.log('Fetching qualification status...');
-      // Use the full URL to bypass any automatic prefixing
-      const response = await api.get('/qualification', { 
-        withCredentials: true,
-        // Add a custom config to prevent any automatic prefixing
-        _skipApiPrefix: true
-      });
-      
-      // The response data is already the object we need
+      setLoading(true);
+      const response = await api.get('/quiz/qualification');
       const responseData = response?.data;
 
-      // Log the raw response for debugging
-      console.log('Raw qualification response:', responseData);
-
-      // If response is an object with the expected properties
       if (responseData && typeof responseData === 'object') {
-        // Use the response data directly as it's already in the expected format
-        const data = responseData;
-        
         const qualData: QualificationResponse = {
-          hasAttempted: Boolean(data.hasAttempted),
-          isQualified: Boolean(data.isQualified || data.qualifies_for_next_round),
-          score: typeof data.score === 'number' ? data.score : undefined,
-          totalQuestions: typeof data.totalQuestions === 'number' ? data.totalQuestions : undefined,
-          percentageScore: data.percentageScore || undefined,
-          minimumRequired: data.minimumRequired || undefined,
-          message: data.message || 'No qualification data available',
-          ...data
+          hasAttempted: Boolean(responseData.hasAttempted),
+          isQualified: Boolean(responseData.isQualified || responseData.qualifies_for_next_round),
+          score: typeof responseData.score === 'number' ? responseData.score : undefined,
+          totalQuestions: typeof responseData.totalQuestions === 'number' ? responseData.totalQuestions : undefined,
+          percentageScore: responseData.percentageScore || undefined,
+          minimumRequired: responseData.minimumRequired || undefined,
+          message: responseData.message || 'No qualification data available',
+          ...responseData
         };
-
-        console.log('Processed qualification data:', qualData);
-        setQualification(qualData);
-
-        // If user hasn't attempted yet, this is a valid state
-        if (!qualData.hasAttempted) {
-          console.log('No previous attempt found. User needs to start a qualification attempt.');
-          setQuestions([]);
-          return;
-        }
-
-        // If already qualified, load regular questions
-        if (qualData.isQualified) {
-          try {
-            console.log('Fetching regular questions for qualified user...');
-            const questionsResponse = await api.get('/questions');
-            const questionsData = Array.isArray(questionsResponse?.data) 
-              ? questionsResponse.data 
-              : questionsResponse?.data?.questions || [];
-            
-            console.log(`Loaded ${questionsData.length} regular questions`);
-            setQuestions(questionsData);
-          } catch (error) {
-            console.error('Error loading questions:', error);
-            handleError(new Error('Failed to load questions'));
-          }
-        }
-      } else {
-        // If we get here, the response format is unexpected
-        console.error('Unexpected response format:', responseData);
-        setQualification({
-          hasAttempted: false,
-          isQualified: false,
-          message: 'Could not determine qualification status'
-        });
-      }
-    } catch (error: any) {
-      console.error('Error in fetchQualification:', error);
-      
-      // Log response details if available
-      if (error.response) {
-        console.log('Response data:', error.response.data);
-        console.log('Response status:', error.response.status);
-        console.log('Response headers:', error.response.headers);
         
-        // If we have a 404, it means the endpoint doesn't exist
-        if (error.response.status === 404) {
-          console.log('Qualification endpoint not found, proceeding without qualification');
-          setQualification({
-            hasAttempted: false,
-            isQualified: false,
-            message: 'Qualification feature is not available.'
-          });
-          return;
-        } else {
-          handleError(new Error(error.response.data?.message || 'Failed to load qualification data'));
-        }
-      } else if (error.request) {
-        // The request was made but no response was received
-        console.error('No response received:', error.request);
-        handleError(new Error('No response from server. Please check your connection.'));
-      } else {
-        // Something happened in setting up the request
-        handleError(error instanceof Error ? error : new Error('Failed to load qualification data'));
+        setQualification(qualData);
+        return qualData;
       }
+      return null;
+    } catch (error) {
+      handleError(error);
+      return null;
     } finally {
       setLoading(false);
-      console.groupEnd();
     }
   }, [user, handleError]);
 
+  // Function to start qualification attempt
+  const startQualification = useCallback(async (): Promise<QualificationAttemptResponse> => {
+    try {
+      const response = await api.post('/quiz/start-qualification');
+      const questions = response.data.questions ? normalizeQuestions(response.data.questions) : [];
+      return {
+        success: true,
+        questions,
+        attemptId: response.data.attemptId,
+        ...response.data
+      };
+    } catch (error) {
+      console.error('Failed to start qualification:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to start qualification'
+      };
+    }
+  }, [normalizeQuestions]);
+  
+  // Handle quiz completion
+  const handleQuizComplete = useCallback(async (score: number, answers: { questionId: string; answer: string }[]) => {
+    try {
+      setLoading(true);
+      await api.post('/quiz/submit', { score, answers });
+      await fetchQualification();
+    } catch (error) {
+      handleError(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchQualification, handleError]);
+
+  // Fetch qualification status on mount and when auth state changes
   useEffect(() => {
-    // Only fetch qualification if auth is loaded and user is present
     if (!authLoading && user) {
       fetchQualification().then((qualData) => {
-        // Show status dialog if user has already attempted
         if (qualData?.hasAttempted) {
           setShowStatusDialog(true);
         }
       });
     } else if (!authLoading && !user) {
-      // If auth is loaded and there's no user, no need to fetch qualification, stop app loading
       setLoading(false);
     }
-  }, [authLoading, user, fetchQualification]); // Removed qualification?.hasAttempted from deps as we use the data from the promise
+  }, [authLoading, user, fetchQualification]);
 
-  const handleQuizComplete = useCallback(async (score: number, answers: { questionId: string; answer: string }[]) => {
-    try {
-      setLoading(true);
-      // Submit the quiz attempt with the score and answers
-      await api.post('/quiz/submit', { 
-        score,
-        answers,
-        attemptType: qualification?.hasAttempted ? 'qualification' : 'regular'
-      });
-      // Refresh the qualification status
-      await fetchQualification();
-    } catch (error) {
-      handleError(new Error('Failed to submit quiz results'));
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchQualification, handleError, qualification]);
-
-  // Render loading state: wait for auth to load AND for app data (qualifications/questions) to load
-  if (authLoading || loading) {
+  if (authLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
         <CircularProgress />
-      </Box>
-    );
-  }
-
-  // Render error state
-  if (error) {
-    return (
-      <Box p={4}>
-        <Typography color="error" variant="h6">
-          {error}
-        </Typography>
-        <Button onClick={fetchQualification} variant="contained" sx={{ mt: 2 }}>
-          Retry
-        </Button>
       </Box>
     );
   }
@@ -228,218 +198,183 @@ const App: React.FC = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Navigation />
-      <Box component="main" sx={{ p: 3 }}>
+      <Box sx={{ pt: 8 }}>
         <Routes>
-          <Route path="/login" element={!user ? <AuthForm mode="login" /> : <Navigate to="/" replace />} />
+          <Route path="/" element={<Navigate to="/quiz" />} />
+          <Route 
+            path="/login" 
+            element={!user ? <AuthForm mode="login" /> : <Navigate to="/quiz" />} 
+          />
           
-          <Route path="/admin" element={
-            <ProtectedRoute requiredAdmin={true}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/admin/users" element={
-            <ProtectedRoute requiredAdmin={true}>
-              <UserManagement />
-            </ProtectedRoute>
-          } />
-
-          <Route path="/admin/panel" element={
-            <ProtectedRoute requiredAdmin={true}>
-              <AdminPanel />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/quiz" element={
-            <ProtectedRoute>
-              <Layout>
-                {!qualification ? (
-                  <Box textAlign="center" mt={10}>
-                    <CircularProgress />
-                    <Typography variant="body1" mt={2}>Loading quiz data...</Typography>
-                  </Box>
-                ) : (
-                  <Box textAlign="center" mt={10}>
-                    <Typography variant="h4" gutterBottom>
-                      Welcome to the Quiz!
-                    </Typography>
-                    <Typography variant="body1" mb={4}>
-                      {qualification.hasAttempted 
-                        ? 'Your qualification status is shown below.'
-                        : 'You need to complete a qualification quiz before you can start.'}
-                    </Typography>
-                    
-                    {!qualification.hasAttempted && (
-                      <Button 
-                        variant="contained" 
-                        color="primary" 
-                        size="large"
-                        onClick={async () => {
-                          try {
-                            setLoading(true);
-                            const qualificationData = await startQualificationAttempt();
-                            if (qualificationData.success && qualificationData.questions?.length) {
-                              setQuestions(qualificationData.questions);
-                            } else {
-                              handleError(new Error(qualificationData.message || 'Failed to start qualification quiz'));
-                            }
-                          } catch (error) {
-                            handleError(error);
-                          } finally {
-                            setLoading(false);
-                          }
-                        }}
-                        disabled={loading}
-                        sx={{ mt: 2 }}
-                      >
-                        {loading ? 'Starting...' : 'Start Qualification Quiz'}
-                      </Button>
-                    )}
-                    
-                    {qualification.hasAttempted && qualification.isQualified && (
-                      <Button 
-                        variant="contained" 
-                        color="primary"
-                        onClick={() => fetchQualification()}
-                        sx={{ mt: 2, mr: 2 }}
-                      >
-                        Continue to Main Quiz
-                      </Button>
-                    )}
-                  </Box>
-                )}
-                
-                {/* Status Dialog */}
-                <Dialog
-                  open={showStatusDialog && !!qualification?.hasAttempted}
-                  onClose={() => setShowStatusDialog(false)}
-                  aria-labelledby="qualification-status-dialog"
-                >
-                  <DialogTitle id="qualification-status-dialog">
-                    {qualification?.isQualified ? '🎉 Qualification Passed!' : '⚠️ Qualification Status'}
-                  </DialogTitle>
-                  <DialogContent>
-                    <DialogContentText component="div">
-                      {qualification?.isQualified ? (
-                        <>
-                          <Typography variant="h6" color="success.main" gutterBottom>
-                            Congratulations! You've passed the qualification round.
-                          </Typography>
-                          <Typography variant="body1" paragraph>
-                            You can now participate in the main quiz and compete with others.
-                          </Typography>
-                        </>
-                      ) : (
-                        <>
-                          <Typography variant="h6" color="error" gutterBottom>
-                            Qualification Attempted
-                          </Typography>
-                          <Typography variant="body1" paragraph>
-                            You have already attempted the qualification quiz.
-                          </Typography>
-                        </>
-                      )}
-                      
-                      {qualification?.score !== undefined && qualification?.totalQuestions && (
-                        <Box mt={2} mb={2}>
-                          <Typography variant="body1">
-                            Your score: <strong>{qualification.score} / {qualification.totalQuestions}</strong>
-                            {qualification.percentageScore && ` (${qualification.percentageScore})`}
-                          </Typography>
-                          <Typography variant="body1">
-                            Minimum required: {qualification.minimumRequired || 50}%
-                          </Typography>
-                          {qualification.completed_at && (
-                            <Typography variant="body2" color="text.secondary" mt={1}>
-                              Attempted on: {new Date(qualification.completed_at).toLocaleString()}
-                            </Typography>
-                          )}
-                        </Box>
-                      )}
-                      
-                      <Typography variant="body2" color="text.secondary">
-                        {qualification?.message || 
-                          (qualification?.isQualified 
-                            ? 'You can now participate in the main quiz.' 
-                            : 'If you believe this is an error, please contact support.')}
-                      </Typography>
-                    </DialogContentText>
-                  </DialogContent>
-                  <DialogActions>
-                    <Button onClick={() => setShowStatusDialog(false)} color="primary">
-                      {qualification?.isQualified ? 'Continue to Quiz' : 'Close'}
-                    </Button>
-                    {!qualification?.isQualified && (
-                      <Button 
-                        onClick={() => navigate('/leaderboard')} 
-                        color="primary"
-                        variant="contained"
-                      >
-                        View Leaderboard
-                      </Button>
-                    )}
-                  </DialogActions>
-                </Dialog>
-                
-                {questions.length > 0 ? (
-                  <Quiz 
-                    questions={questions.map(q => ({
-                      id: q.id.toString(),
-                      question: q.question || q.question_text || 'No question text',
-                      options: q.options,
-                      correctAnswer: q.correctAnswer || q.correct_answer?.toString() || '',
-                      timeLimit: q.timeLimit,
-                      explanation: q.explanation
-                    }))} 
-                    onComplete={(score, answers) => handleQuizComplete(score, answers)} 
-                  />
-                ) : (
-                  qualification?.hasAttempted && !qualification?.isQualified ? (
+          {/* Quiz route with qualification check */}
+          <Route 
+            path="/quiz" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  {loading ? (
                     <Box textAlign="center" mt={10}>
-                      <Typography variant="h5" color="error" gutterBottom>
-                        Quiz Attempted
-                      </Typography>
-                      <Typography variant="body1" mb={4}>
-                        {qualification.message || 'You have already attempted this quiz.'}
-                      </Typography>
-                      <Button 
-                        variant="contained" 
-                        color="primary" 
-                        onClick={() => navigate('/leaderboard')}
-                      >
-                        View Leaderboard
-                      </Button>
+                      <CircularProgress />
+                      <Typography variant="body1" mt={2}>Loading quiz data...</Typography>
                     </Box>
                   ) : (
                     <Box textAlign="center" mt={10}>
-                      <Typography variant="h5" gutterBottom>
-                        No Questions Available
+                      <Typography variant="h4" gutterBottom>
+                        Welcome to the Quiz!
                       </Typography>
-                      <Typography variant="body1">
-                        There are no questions available at the moment. Please check back later.
+                      <Typography variant="body1" mb={4}>
+                        {qualification?.hasAttempted 
+                          ? 'Your qualification status is shown below.'
+                          : 'You need to complete a qualification quiz before you can start.'}
                       </Typography>
+                      
+                      {!qualification?.hasAttempted && (
+                        <Button 
+                          variant="contained" 
+                          color="primary" 
+                          size="large"
+                          onClick={async () => {
+                            try {
+                              setLoading(true);
+                              const qualificationData = await startQualification();
+                              if (qualificationData.success && qualificationData.questions?.length) {
+                                setQuestions(qualificationData.questions);
+                              } else {
+                                handleError(new Error(qualificationData.message || 'Failed to start qualification quiz'));
+                              }
+                            } catch (error) {
+                              handleError(error);
+                            } finally {
+                              setLoading(false);
+                            }
+                          }}
+                          disabled={loading}
+                          sx={{ mt: 2 }}
+                        >
+                          {loading ? 'Starting...' : 'Start Qualification Quiz'}
+                        </Button>
+                      )}
+                      
+                      {qualification?.hasAttempted && qualification.isQualified && (
+                        <Button 
+                          variant="contained" 
+                          color="primary"
+                          onClick={() => fetchQualification()}
+                          sx={{ mt: 2, mr: 2 }}
+                        >
+                          Continue to Main Quiz
+                        </Button>
+                      )}
                     </Box>
-                  )
-                )}
-              </Layout>
-            </ProtectedRoute>
-          } />
+                  )}
+                  
+                  {/* Status Dialog */}
+                  <Dialog
+                    open={showStatusDialog && !!qualification?.hasAttempted}
+                    onClose={() => setShowStatusDialog(false)}
+                    aria-labelledby="qualification-status-dialog"
+                  >
+                    <DialogTitle id="qualification-status-dialog">
+                      {qualification?.isQualified ? '🎉 Qualification Passed!' : '⚠️ Qualification Status'}
+                    </DialogTitle>
+                    <DialogContent>
+                      <DialogContentText component="div">
+                        {qualification?.isQualified ? (
+                          <>
+                            <Typography variant="h6" color="success.main" gutterBottom>
+                              Congratulations! You've passed the qualification round.
+                            </Typography>
+                            <Typography variant="body1" paragraph>
+                              You can now participate in the main quiz and compete with others.
+                            </Typography>
+                          </>
+                        ) : (
+                          <>
+                            <Typography variant="h6" color="error" gutterBottom>
+                              Qualification Attempted
+                            </Typography>
+                            <Typography variant="body1" paragraph>
+                              You have already attempted the qualification quiz.
+                            </Typography>
+                          </>
+                        )}
+                        
+                        {qualification?.score !== undefined && qualification?.totalQuestions && (
+                          <Box mt={2} mb={2}>
+                            <Typography variant="body1">
+                              Your score: <strong>{qualification.score} / {qualification.totalQuestions}</strong>
+                              {qualification.percentageScore && ` (${qualification.percentageScore})`}
+                            </Typography>
+                            <Typography variant="body1">
+                              Minimum required: {qualification.minimumRequired || 50}%
+                            </Typography>
+                            {qualification.completed_at && (
+                              <Typography variant="body2" color="text.secondary" mt={1}>
+                                Attempted on: {new Date(qualification.completed_at).toLocaleString()}
+                              </Typography>
+                            )}
+                          </Box>
+                        )}
+                        
+                        <Typography variant="body2" color="text.secondary">
+                          {qualification?.message || 
+                            (qualification?.isQualified 
+                              ? 'You can now participate in the main quiz.' 
+                              : 'If you believe this is an error, please contact support.')}
+                        </Typography>
+                      </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                      <Button onClick={() => setShowStatusDialog(false)} color="primary">
+                        {qualification?.isQualified ? 'Continue to Quiz' : 'Close'}
+                      </Button>
+                      {!qualification?.isQualified && (
+                        <Button 
+                          onClick={() => navigate('/leaderboard')} 
+                          color="primary"
+                          variant="contained"
+                        >
+                          View Leaderboard
+                        </Button>
+                      )}
+                    </DialogActions>
+                  </Dialog>
+                  
+                  {questions.length > 0 && (
+                    <Quiz 
+                      questions={questions} 
+                      onComplete={handleQuizComplete} 
+                      isQualificationRound={!qualification?.isQualified}
+                    />
+                  )}
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
           
-          <Route path="/leaderboard" element={
-            <ProtectedRoute>
+          {/* Admin routes */}
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute requiredAdmin>
+                <AdminPanel />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route path="users" element={<UserManagement />} />
+          </Route>
+          
+          <Route 
+            path="/leaderboard" 
+            element={
               <Layout>
                 <Leaderboard />
               </Layout>
-            </ProtectedRoute>
-          } />
+            } 
+          />
           
-          <Route path="/" element={
-            <Navigate to={user ? (isAdmin ? '/admin' : '/quiz') : '/login'} replace />
-          } />
-          
-          <Route path="*" element={
-            <Navigate to="/" replace />
-          } />
+          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Box>
     </ThemeProvider>
