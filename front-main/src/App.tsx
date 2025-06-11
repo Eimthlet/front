@@ -17,7 +17,7 @@ import {
   Collapse,
   IconButton
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
+import { Close as CloseIcon } from '@mui/icons-material';
 import { useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -153,7 +153,7 @@ const App: React.FC = () => {
   }, []);
   
   // Function to fetch qualification status
-  const fetchQualification = useCallback(async (): Promise<FetchQualificationResponse | null> => {
+  const fetchQualificationStatus = useCallback(async (): Promise<FetchQualificationResponse | null> => {
     if (!user || !isMountedRef.current) return null;
     
     try {
@@ -245,7 +245,7 @@ const App: React.FC = () => {
       await api.post('/quiz/submit', { score, answers });
       
       if (isMountedRef.current) {
-        await fetchQualification();
+        await fetchQualificationStatus();
         // Clear questions after successful submission
         setQuestions([]);
       }
@@ -258,7 +258,7 @@ const App: React.FC = () => {
         setLoading(false);
       }
     }
-  }, [fetchQualification, handleError]);
+  }, [fetchQualificationStatus, handleError]);
 
   // Handle starting qualification quiz
   const handleStartQualification = useCallback(async () => {
@@ -284,16 +284,16 @@ const App: React.FC = () => {
   const handleRetry = useCallback(() => {
     setError(null);
     if (user && !qualification) {
-      fetchQualification();
+      fetchQualificationStatus();
     }
-  }, [user, qualification, fetchQualification]);
+  }, [user, qualification, fetchQualificationStatus]);
 
   // Fetch qualification status on mount and when auth state changes
   useEffect(() => {
     isMountedRef.current = true;
     
     if (!authLoading && user) {
-      fetchQualification().then((qualData) => {
+      fetchQualificationStatus().then((qualData) => {
         if (isMountedRef.current && qualData?.hasAttempted) {
           setShowStatusDialog(true);
         }
@@ -307,7 +307,7 @@ const App: React.FC = () => {
     return () => {
       isMountedRef.current = false;
     };
-  }, [authLoading, user, fetchQualification]);
+  }, [authLoading, user, fetchQualificationStatus]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -414,7 +414,7 @@ const App: React.FC = () => {
                         <Button 
                           variant="contained" 
                           color="primary"
-                          onClick={() => fetchQualification()}
+                          onClick={() => fetchQualificationStatus()}
                           disabled={loading}
                           sx={{ mt: 2, mr: 2 }}
                         >
