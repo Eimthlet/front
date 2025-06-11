@@ -92,6 +92,9 @@ const ActionButton = styled(Button)(({ theme }) => ({
 interface QuizProps {
   questions: Question[];
   onComplete: (score: number, answers: { questionId: string; answer: string }[]) => void;
+  isQualificationRound?: boolean;
+  qualificationRoundId?: string;
+  minimumScorePercentage?: number;
 }
 
 const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
