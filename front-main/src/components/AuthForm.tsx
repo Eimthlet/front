@@ -1,5 +1,15 @@
 import React, { useState, useEffect, FC, ReactElement } from 'react';
-import { Checkbox, FormControlLabel, Link, IconButton, Box } from '@mui/material';
+import { 
+  Checkbox, 
+  FormControlLabel, 
+  Link, 
+  IconButton, 
+  Box, 
+  TextField, 
+  Button, 
+  Typography,
+  CircularProgress
+} from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import apiClient from '../utils/apiClient';
@@ -16,20 +26,35 @@ const PAYMENT_CONFIG = {
 
 // No global declaration needed - handled elsewhere or will be typed as any
 
-
-
-interface ResumePaymentResponse {
-  success: boolean;
+interface ResumePaymentData {
   tx_ref: string;
   public_key: string;
   amount: number;
   email: string;
   phone?: string;
+}
+
+interface ResumePaymentResponse {
+  success: boolean;
+  data?: ResumePaymentData;
   message?: string;
+  tx_ref?: string;
+  public_key?: string;
+  amount?: number;
+  email?: string;
+  phone?: string;
 }
 
 interface ApiResponse<T> {
   data: T;
+  success: boolean;
+  status?: number;
+  message?: string;
+  error?: string;
+}
+
+interface RegistrationResponseData {
+  tx_ref: string;
 }
 
 interface PayChanguConfig {
@@ -66,20 +91,89 @@ const generateUUID = (): string => {
 
 const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement => {
   // State for form fields
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [amount, setAmount] = useState<number>(1000);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [currentMode, setCurrentMode] = useState<'login' | 'register'>(mode);
-  const [error, setError] = useState<string | React.ReactElement>('');
-  const [loading, setLoading] = useState(false);
-
-  const { login, error: authError, clearError } = useAuth();
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    phone: '',
+    amount: 1000,
+  });
+  
+  const [uiState, setUiState] = useState({
+    showPassword: false,
+    showConfirmPassword: false,
+    acceptedTerms: false,
+    loading: false,
+    currentMode: mode as 'login' | 'register',
+  });
+  
+  const [error, setError] = useState<string>('');
+  const auth = useAuth();
+  const { login, error: authError, clearError } = auth || {};
+  
+  // Destructure state for easier access in JSX
+  const { username, email, password, confirmPassword, phone, amount } = formData;
+  const { showPassword, showConfirmPassword, acceptedTerms, loading, currentMode } = uiState;
+  
+  // Helper to update form data
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'number' ? Number(value) : value
+    }));
+  };
+  
+  // Individual setters for backward compatibility with existing JSX
+  const setUsername = (value: string) => {
+    setFormData(prev => ({ ...prev, username: value }));
+  };
+  
+  const setEmail = (value: string) => {
+    setFormData(prev => ({ ...prev, email: value }));
+  };
+  
+  const setPassword = (value: string) => {
+    setFormData(prev => ({ ...prev, password: value }));
+  };
+  
+  const setConfirmPassword = (value: string) => {
+    setFormData(prev => ({ ...prev, confirmPassword: value }));
+  };
+  
+  const setPhone = (value: string) => {
+    setFormData(prev => ({ ...prev, phone: value }));
+  };
+  
+  const setAmount = (value: number) => {
+    setFormData(prev => ({ ...prev, amount: value }));
+  };
+  
+  const setShowPassword = (value: boolean) => {
+    setUiState(prev => ({ ...prev, showPassword: value }));
+  };
+  
+  const setShowConfirmPassword = (value: boolean) => {
+    setUiState(prev => ({ ...prev, showConfirmPassword: value }));
+  };
+  
+  const setAcceptedTerms = (value: boolean) => {
+    setUiState(prev => ({ ...prev, acceptedTerms: value }));
+  };
+  
+  const setCurrentMode = (value: 'login' | 'register') => {
+    setUiState(prev => ({ ...prev, currentMode: value }));
+  };
+  
+  // Toggle password visibility
+  const togglePasswordVisibility = (field: 'password' | 'confirmPassword') => {
+    setUiState(prev => ({
+      ...prev,
+      [field === 'password' ? 'showPassword' : 'showConfirmPassword']: 
+        !prev[field === 'password' ? 'showPassword' : 'showConfirmPassword']
+    }));
+  };
 
   // Check if there's a pending registration for the given email
   const checkPendingRegistration = async (email: string): Promise<{ pending: boolean; tx_ref?: string }> => {
@@ -158,25 +252,23 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setUiState(prev => ({ ...prev, loading: true }));
+    setError('');
+    if (clearError) clearError();
 
     try {
       if (currentMode === 'register') {
         // Registration flow
-        // Clear any previous errors
-        setError('');
-        clearError();
-
         // Validate form inputs
         if (password !== confirmPassword) {
           setError('Passwords do not match');
-          setLoading(false);
+          setUiState(prev => ({ ...prev, loading: false }));
           return;
         }
 
         if (!acceptedTerms) {
           setError('You must accept the terms and conditions');
-          setLoading(false);
+          setUiState(prev => ({ ...prev, loading: false }));
           return;
         }
 
@@ -187,22 +279,22 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
           // Attempt to resume payment for pending registration
           try {
             const response = await apiClient.post<ApiResponse<ResumePaymentResponse>>('/auth/resume-payment', { 
-              email,
+              email: email,
               tx_ref 
             });
 
-            if (response.data.success) {
+            if (response.data?.success && response.data.data) {
               // Launch payment popup with the resumed payment details
-              const paymentData = response.data;
+              const paymentData = response.data.data;
               const config: PayChanguConfig = {
-                public_key: paymentData.public_key,
-                tx_ref: paymentData.tx_ref,
-                amount: paymentData.amount,
+                public_key: paymentData.public_key || PAYMENT_CONFIG.PUBLIC_KEY,
+                tx_ref: paymentData.tx_ref || '',
+                amount: paymentData.amount || amount,
                 currency: PAYMENT_CONFIG.CURRENCY,
                 callback_url: `${window.location.origin}${PAYMENT_CONFIG.CALLBACK_URL}`,
                 return_url: `${window.location.origin}${PAYMENT_CONFIG.RETURN_URL}`,
                 customer: {
-                  email: paymentData.email,
+                  email: paymentData.email || email,
                   first_name: username.split(' ')[0] || 'User',
                   last_name: username.split(' ')[1] || 'Name',
                 },
@@ -216,13 +308,15 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
                 }
               };
 
-              waitForPayChanguAndLaunch(config, setError, setLoading);
+              waitForPayChanguAndLaunch(config, setError, (loading) => 
+                setUiState(prev => ({ ...prev, loading }))
+              );
               return;
             }
           } catch (error) {
             console.error('Error resuming payment:', error);
             setError('Failed to resume payment. Please try registering again.');
-            setLoading(false);
+            setUiState(prev => ({ ...prev, loading: false }));
             return;
           }
         }
@@ -237,8 +331,8 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
         };
 
         // Validate required fields
-        const requiredFields = ['username', 'email', 'password', 'amount'];
-        const missingFields = requiredFields.filter(field => !payload[field as keyof typeof payload]);
+        const requiredFields = ['username', 'email', 'password', 'amount'] as const;
+        const missingFields = requiredFields.filter(field => !payload[field]);
         
         if (missingFields.length > 0) {
           throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
@@ -247,11 +341,11 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
         console.log('Registration payload:', JSON.stringify(payload, null, 2));
 
         try {
-          const response = await apiClient.post<any>(
+          const response = await apiClient.post<ApiResponse<RegistrationResponseData>>(
             '/auth/register', 
             payload,
             { 
-              validateStatus: (status) => status < 500, // Don't throw on 4xx errors
+              validateStatus: (status) => true, // Always resolve, never reject HTTP status
               timeout: 15000,
               headers: {
                 'Content-Type': 'application/json'
@@ -266,84 +360,101 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
             throw new Error('No response data received from server');
           }
 
-          // Normalize response format
-          const responseData = response.data.data || response.data;
+          // Handle error responses - check response status and success flag
+          if (response.status >= 400) {
+            // For error responses, response.data might not follow ApiResponse structure
+            const responseData = response.data as any;
+            const errorMessage = responseData?.message || 
+                              responseData?.error || 
+                              `Registration failed with status ${response.status || 'unknown'}`;
+            throw new Error(errorMessage);
+          }
+
+          // For successful responses, check the success flag
+          const apiResponse = response.data as ApiResponse<RegistrationResponseData>;
+          if (!apiResponse.success) {
+            const errorMessage = apiResponse.message || 
+                              apiResponse.error || 
+                              'Registration failed';
+            throw new Error(errorMessage);
+          }
+
+          // Get the transaction reference from the response data
+          const tx_ref = apiResponse.data.tx_ref;
 
           // Log the full response for debugging
-          console.log('Normalized response data:', responseData);
+          console.log('Transaction reference:', tx_ref);
 
-          if (response.data.success) {
-            // Launch payment popup
-            if (!responseData.tx_ref) {
-              throw new Error('No transaction reference received from server');
-            }
-
-            const config: PayChanguConfig = {
-              public_key: PAYMENT_CONFIG.PUBLIC_KEY,
-              tx_ref: responseData.tx_ref,
-              amount: amount,
-              currency: PAYMENT_CONFIG.CURRENCY,
-              callback_url: `${window.location.origin}${PAYMENT_CONFIG.CALLBACK_URL}`,
-              return_url: `${window.location.origin}${PAYMENT_CONFIG.RETURN_URL}`,
-              customer: {
-                email: email,
-                first_name: username.split(' ')[0] || 'User',
-                last_name: username.split(' ')[1] || 'Name',
-              },
-              customization: {
-                title: 'Quiz Registration',
-                description: 'Complete your registration by making the payment',
-              },
-              meta: {
-                uuid: generateUUID(),
-                response: 'json'
-              }
-            };
-
-            waitForPayChanguAndLaunch(config, setError, setLoading);
-          } else {
-            const errorMessage = responseData.error || responseData.message || 
-              (response.data?.error || response.data?.message) || 
-              'Registration failed. Please try again.';
-            setError(errorMessage);
-            setLoading(false);
+          // Launch payment popup if we have a transaction reference
+          if (!tx_ref) {
+            throw new Error('No transaction reference received from server');
           }
+
+          const config: PayChanguConfig = {
+            public_key: PAYMENT_CONFIG.PUBLIC_KEY,
+            tx_ref: tx_ref,
+            amount: amount,
+            currency: PAYMENT_CONFIG.CURRENCY,
+            callback_url: `${window.location.origin}${PAYMENT_CONFIG.CALLBACK_URL}`,
+            return_url: `${window.location.origin}${PAYMENT_CONFIG.RETURN_URL}`,
+            customer: {
+              email: email,
+              first_name: username.split(' ')[0] || 'User',
+              last_name: username.split(' ')[1] || 'Name',
+            },
+            customization: {
+              title: 'Quiz Registration',
+              description: 'Complete your registration by making the payment',
+            },
+            meta: {
+              uuid: generateUUID(),
+              response: 'json'
+            }
+          };
+
+          waitForPayChanguAndLaunch(config, setError, (loading) => 
+            setUiState(prev => ({ ...prev, loading }))
+          );
         } catch (error: any) {
           console.error('Registration error:', error);
           console.error('Full error object:', error);
           const errorMessage = 
-            error.response?.data?.error || 
-            error.response?.data?.message || 
-            (typeof error.response?.data === 'string' ? error.response.data : null) ||
+            (error as any)?.response?.data?.error || 
+            (error as any)?.response?.data?.message || 
+            (typeof (error as any)?.response?.data === 'string' ? (error as any).response.data : null) ||
             error.message || 
             'An error occurred during registration. Please try again.';
           setError(errorMessage);
-          setLoading(false);
+          setUiState(prev => ({ ...prev, loading: false }));
         }
       } else {
         // Login flow
-        // Clear any previous errors from the context
-        clearError();
-
-        // Use the login function from AuthContext which handles cookies properly
-        await login(email, password);
-
-        // After successful login, navigation is handled by App.tsx based on `user` state change
-        // from AuthContext. The navigation here is redundant and might conflict.
-        // navigate('/dashboard');
+        try {
+          await login(email, password);
+          // After successful login, navigation is handled by App.tsx based on `user` state change
+        } catch (error) {
+          console.error('Login error:', error);
+          // Error is already set by the login function in AuthContext
+        } finally {
+          setUiState(prev => ({ ...prev, loading: false }));
+        }
       }
     } catch (error) {
-      console.error('Login error:', error);
-      // Error is already set by the login function in AuthContext
-    } finally {
-      setLoading(false);
+      console.error('Unexpected error:', error);
+      setError('An unexpected error occurred. Please try again.');
+      setUiState(prev => ({ ...prev, loading: false }));
     }
   };
 
   // Render the form
   return (
     <Box className="auth-form-container" sx={{ maxWidth: 400, mx: 'auto', p: 3 }}>
-      <Box component="form" className="auth-form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Box 
+        component="form" 
+        className="auth-form" 
+        onSubmit={handleSubmit} 
+        sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+      >
         <h2>{currentMode === 'login' ? 'Login' : 'Register'}</h2>
         {currentMode === 'register' && (
           <>
