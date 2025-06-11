@@ -306,9 +306,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
         console.error('Registration error:', err);
         
         // Get the specific error message from the API response
-        const errorStr = typeof err === 'string' ? err : '';
+        const apiErrorMessage = err?.response?.data?.message || err?.message || '';
+        const errorStr = typeof apiErrorMessage === 'string' ? apiErrorMessage : JSON.stringify(apiErrorMessage);
         
-        if (errorStr && (errorStr.includes('pending registration') || errorStr.includes('pending for this username') || errorStr.includes('pending for this email'))) {
+        if (apiErrorMessage && (apiErrorMessage.includes('pending registration') || apiErrorMessage.includes('pending for this username') || apiErrorMessage.includes('pending for this email'))) {
           setLoading(true);
           try {
             // First check for pending registration to get the tx_ref
@@ -395,10 +396,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
         }
         
         // If we get here, handle other types of errors
-        const errorMessage = (err as any)?.response?.data?.message || 
-                          (err as Error)?.message || 
-                          'Unable to complete registration. Please try again.';
-        setError(errorMessage);
+        const errorMsg = (err as any)?.response?.data?.message || 
+                       (err as Error)?.message || 
+                       'Unable to complete registration. Please try again.';
+        setError(errorMsg);
         
         setLoading(false);
       }
