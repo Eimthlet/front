@@ -1,5 +1,5 @@
 import React, { useState, useEffect, FC, ReactElement } from 'react';
-import { Checkbox, FormControlLabel, Link, IconButton, TextField, Button, Typography, Box } from '@mui/material';
+import { Checkbox, FormControlLabel, Link, IconButton, Box } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import apiClient from '../utils/apiClient';
@@ -16,17 +16,7 @@ const PAYMENT_CONFIG = {
 
 // No global declaration needed - handled elsewhere or will be typed as any
 
-interface PendingRegistrationResponse {
-  data: {
-    success: boolean;
-    pending: boolean;
-    tx_ref?: string;
-    email?: string;
-    username?: string;
-    error?: string;
-    message?: string;
-  };
-}
+
 
 interface ResumePaymentResponse {
   success: boolean;
@@ -68,8 +58,8 @@ interface PayChanguConfig {
 // Generate UUID for payment reference
 const generateUUID = (): string => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 };
