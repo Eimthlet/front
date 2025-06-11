@@ -17,7 +17,6 @@ import {
   Collapse,
   IconButton
 } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
 import { useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
