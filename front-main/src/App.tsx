@@ -82,7 +82,9 @@ interface QualificationAttemptResponse {
   success: boolean;
   questions?: Question[];
   message?: string;
-  attemptId?: string;
+  attemptId?: string | number;
+  totalQuestions?: number;
+  minimumScore?: number;
   error?: any; // For detailed error information
 }
 
