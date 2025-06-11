@@ -51,7 +51,12 @@ export const checkAdminStatus = async (): Promise<AdminStatusResponse> => {
 
     // Even if local token says admin, we must verify with the server.
     // The /auth/check-token endpoint is the source of truth.
-    const serverVerification = await api.get('/auth/check-token');
+    const serverVerification = await api.get('/auth/check-token', {
+      withCredentials: true, // Ensure cookies are sent with the request
+      headers: {
+        'Authorization': `Bearer ${token}` // Also send token in header for compatibility
+      }
+    });
     
     if (serverVerification && serverVerification.success && serverVerification.user) {
       if (serverVerification.user.isAdmin || (serverVerification.user as any).role === 'admin') {

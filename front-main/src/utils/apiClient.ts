@@ -29,7 +29,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true,
+  withCredentials: true, // Always send cookies with requests
   timeout: 15000, // 15 seconds timeout
 });
 
@@ -43,9 +43,15 @@ api.interceptors.request.use((config) => {
   // Add auth token if available
   const token = TokenManager.getToken();
   if (token) {
-    config.headers = config.headers || {};
-    config.headers.Authorization = `Bearer ${token}`;
+    config.headers = {
+      ...config.headers,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
   }
+  
+  // Ensure credentials are always sent
+  config.withCredentials = true;
   
   return config;
 });

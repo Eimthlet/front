@@ -112,6 +112,11 @@ const SeasonManager: React.FC = () => {
         setLoading(true);
         setError('');
         console.log('Fetching seasons...');
+        
+        // Get token for debugging
+        const token = localStorage.getItem('token');
+        console.log('Current token:', token ? 'Token exists' : 'No token found');
+        
         const response = await apiClient.get('/admin/seasons');
         console.log('Seasons response:', response);
         
@@ -128,8 +133,32 @@ const SeasonManager: React.FC = () => {
         console.log('Processed seasons data:', seasonsData);
         setSeasons(seasonsData);
       } catch (err: any) {
-        console.error('Error fetching seasons:', err);
-        const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch seasons';
+        console.error('Error fetching seasons:', {
+          message: err.message,
+          status: err.response?.status,
+          statusText: err.response?.statusText,
+          data: err.response?.data,
+          config: {
+            url: err.config?.url,
+            method: err.config?.method,
+            headers: err.config?.headers,
+            withCredentials: err.config?.withCredentials
+          }
+        });
+        
+        let errorMessage = 'Failed to fetch seasons';
+        if (err.response) {
+          if (err.response.status === 403) {
+            errorMessage = 'Access denied. You do not have permission to view this resource.';
+          } else if (err.response.data?.message) {
+            errorMessage = err.response.data.message;
+          } else if (err.response.statusText) {
+            errorMessage = `${err.response.status} ${err.response.statusText}`;
+          }
+        } else if (err.message) {
+          errorMessage = err.message;
+        }
+        
         setError(errorMessage);
         setSeasons([]);
       } finally {

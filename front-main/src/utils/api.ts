@@ -567,7 +567,7 @@ export async function startQualificationAttempt(): Promise<QualificationStartRes
     console.log('[API] Starting qualification attempt...');
     
     // Use the direct endpoint that exists on the server
-    const endpoint = '/api/quiz/start';
+    const endpoint = '/quiz/start-qualification';
     console.log(`[API] Making POST request to ${endpoint}`);
     
     // Get the token from local storage
@@ -578,7 +578,6 @@ export async function startQualificationAttempt(): Promise<QualificationStartRes
     
     const response = await api.post(endpoint, {}, { 
       withCredentials: true,
-      _skipApiPrefix: false, // Ensure API prefix is added
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
