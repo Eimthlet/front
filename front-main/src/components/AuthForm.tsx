@@ -85,13 +85,23 @@ const AuthForm: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
   // Check if there's a pending registration for the given email
   const checkPendingRegistration = async (email: string): Promise<{ pending: boolean; tx_ref?: string }> => {
     try {
-      const response = await apiClient.post<ApiResponse<PendingRegistrationResponse>>('/auth/check-pending-registration', { email });
+      const response = await apiClient.post<ApiResponse<PendingRegistrationResponse>>(
+        '/auth/check-pending-registration', 
+        { email },
+        { timeout: 5000 } // Reduce timeout to 5 seconds
+      );
+      
+      if (!response?.data?.data) {
+        throw new Error('Invalid response format from server');
+      }
+      
       return {
         pending: response.data.data.pending || false,
         tx_ref: response.data.data.tx_ref
       };
     } catch (error) {
       console.error('Error checking pending registration:', error);
+      // Continue with registration if we can't check pending status
       return { pending: false };
     }
   };
@@ -199,14 +209,19 @@ const AuthForm: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
         const response = await apiClient.post<ApiResponse<{ 
           success: boolean; 
           tx_ref: string; 
-          message?: string 
+          message?: string;
+          error?: string;
         }>>('/auth/register', {
-          username,
-          email,
-          password,
-          phone,
-          amount
+          username: username.trim(),
+          email: email.trim().toLowerCase(),
+          password: password.trim(),
+          phone: phone?.trim(),
+          amount: Number(amount) // Ensure amount is a number
         });
+
+        if (!response?.data) {
+          throw new Error('No response data received from server');
+        }
 
         if (response.data.success) {
           // Launch payment popup
@@ -234,12 +249,17 @@ const AuthForm: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
 
           waitForPayChanguAndLaunch(config, setError, setLoading);
         } else {
-          setError(response.data.message || 'Registration failed. Please try again.');
+          const errorMessage = response.data.error || response.data.message || 'Registration failed. Please try again.';
+          setError(errorMessage);
           setLoading(false);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Registration error:', error);
-        setError('An error occurred during registration. Please try again.');
+        const errorMessage = error.response?.data?.error || 
+                           error.response?.data?.message || 
+                           error.message || 
+                           'An error occurred during registration. Please try again.';
+        setError(errorMessage);
         setLoading(false);
       }
     } else {
