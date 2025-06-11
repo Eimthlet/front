@@ -1,18 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
-import { PAYMENT_CONFIG } from '../config';
+
+// Payment configuration
+const PAYMENT_CONFIG = {
+  CALLBACK_URL: '/payment-callback',
+  RETURN_URL: '/payment-success',
+  CURRENCY: 'MWK',
+  PUBLIC_KEY: process.env.REACT_APP_PAYCHANGU_PUBLIC_KEY || ''
+} as const;
+
 import { Checkbox, FormControlLabel, Link, IconButton } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import './AuthForm.css';
 
+declare global {
+  interface Window {
+    PaychanguCheckout: any;
+  }
+}
+
 interface PendingRegistrationResponse {
-  success: boolean;
-  pending: boolean;
-  tx_ref?: string;
-  email?: string;
+  data: {
+    success: boolean;
+    pending: boolean;
+    tx_ref?: string;
+    email?: string;
+    username?: string;
+    error?: string;
+    message?: string;
+  };
 }
 
 interface ResumePaymentResponse {
@@ -21,22 +40,13 @@ interface ResumePaymentResponse {
   public_key: string;
   amount: number;
   email: string;
+  phone?: string;
+  message?: string;
 }
 
-// Helper function to generate UUID using Web Crypto API instead of Node.js crypto
-const generateUUID = (): string => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.floor(Math.random() * 16);
-    const v = c === 'x' ? r : ((r & 0x3) | 0x8);
-    return v.toString(16);
-  });
-};
-
-interface AuthFormProps {
-  mode: 'login' | 'register';
+interface ApiResponse<T> {
+  data: T;
 }
-
-// JwtPayload interface moved to a separate types file
 
 interface PayChanguConfig {
   public_key: string;
@@ -61,38 +71,52 @@ interface PayChanguConfig {
   };
 }
 
-interface PendingRegistrationResponse {
-  success: boolean;
-  pending: boolean;
-  tx_ref?: string;
-  email?: string;
-}
+const AuthForm: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
+  // State for form fields
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [amount, setAmount] = useState<number>(1000);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [currentMode, setCurrentMode] = useState<'login' | 'register'>(mode);
+  const [error, setError] = useState<string | React.ReactElement>('');
+  const [loading, setLoading] = useState(false);
 
-interface ResumePaymentResponse {
-  success: boolean;
-  tx_ref: string;
-  public_key: string;
-  amount: number;
-  email: string;
-  phone: string;
-  message: string;
-}
+  const { login, register: authRegister, error: authError, clearError } = useAuth();
+  const navigate = useNavigate();
 
-const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
+  // Check if there's a pending registration for the given email
+  const checkPendingRegistration = async (email: string): Promise<{ pending: boolean; tx_ref?: string }> => {
+    try {
+      const response = await apiClient.post<ApiResponse<PendingRegistrationResponse>>('/auth/check-pending-registration', { email });
+      return {
+        pending: response.data.data.pending || false,
+        tx_ref: response.data.data.tx_ref
+      };
+    } catch (error) {
+      console.error('Error checking pending registration:', error);
+      return { pending: false };
+    }
+  };
+
   // Wait for PayChangu script to load before calling the popup
-  function waitForPayChanguAndLaunch(config: PayChanguConfig, setError: (msg: string) => void, setLoading: (loading: boolean) => void, retries = 10) {
+  const waitForPayChanguAndLaunch = (config: PayChanguConfig, errorSetter: (msg: string) => void, loadingSetter: (loading: boolean) => void, retries = 10) => {
     if (window.PaychanguCheckout) {
       window.PaychanguCheckout(config);
     } else if (retries > 0) {
-      setTimeout(() => waitForPayChanguAndLaunch(config, setError, setLoading, retries - 1), 300);
+      setTimeout(() => waitForPayChanguAndLaunch(config, errorSetter, loadingSetter, retries - 1), 300);
     } else {
-      setError('Payment system failed to load. Please refresh and try again.');
-      setLoading(false);
+      errorSetter('Payment system failed to load. Please refresh and try again.');
+      loadingSetter(false);
     }
-  }
+  };
 
   // Load PayChangu popup script if not already loaded
-  React.useEffect(() => {
+  useEffect(() => {
     if (!window.PaychanguCheckout) {
       const script = document.createElement('script');
       script.src = 'https://in.paychangu.com/js/popup.js';
@@ -105,359 +129,153 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
       document.body.appendChild(script);
     }
   }, []);
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [amount, setAmount] = useState<number>(1000); // Default amount, adjust as needed
-  const [error, setError] = useState<string | React.ReactElement>('');
-  const [loading, setLoading] = useState(false);
-  const [currentMode, setCurrentMode] = useState<'login' | 'register'>(mode);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const navigate = useNavigate(); // navigate is used in the useEffect, but ESLint might not see it if useEffect is also considered for removal later.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { login: authLogin, register: authRegister, isAdmin, error: authError, clearError, user, isLoading: authIsLoading } = useAuth(); // Added user, authIsLoading for the useEffect
-
-  // Removed unused state variables
-
-  // Check for pending registration
-  const checkPendingRegistration = async (emailToCheck: string): Promise<PendingRegistrationResponse> => {
-    try {
-      const response = await apiClient.post('/auth/check-pending-registration', { email: emailToCheck });
-      console.log('Check pending registration response:', response.data);
-      if (response?.data?.success) {
-        return {
-          success: true,
-          pending: response.data.pending || false,
-          tx_ref: response.data.tx_ref,
-          email: response.data.email
-        };
-      }
-      return { success: true, pending: false };
-    } catch (error) {
-      console.error('Error checking pending registration:', error);
-      return { success: false, pending: false };
-    }
-  };
-
-  // Resume payment for pending registration
-  const resumePayment = async (originalTxRef: string, email: string): Promise<ResumePaymentResponse> => {
-    try {
-      const response = await apiClient.post('/auth/resume-payment', {
-        tx_ref: 'TX' + Date.now() + Math.floor(Math.random() * 1000000),
-        original_tx_ref: originalTxRef,
-        email
-      });
-      return response?.data;
-    } catch (error) {
-      console.error('Error resuming payment:', error);
-      throw error;
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
-
-    // Email validation
-    if (!email) {
-      setError('Email is required');
-      setLoading(false);
-      return;
-    }
-    
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address');
-      setLoading(false);
-      return;
-    }
-
-    // Check for pending registration first
-    if (currentMode === 'register') {
-      const pendingResponse = await checkPendingRegistration(email);
-      if (pendingResponse?.pending && pendingResponse.tx_ref) {
-        // Automatically resume payment if there's a pending registration
-        await resumePayment(pendingResponse.tx_ref, email);
-        return;
-      }
-    }
-    
-    // Password validation
-    if (!password) {
-      setError('Password is required');
-      setLoading(false);
-      return;
-    }
-    
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
-      setLoading(false);
-      return;
-    }
 
     if (currentMode === 'register') {
-      // Phone validation
-      if (!phone.trim()) {
-        setError('Phone number is required');
-        setLoading(false);
-        return;
-      }
-      
-      const phoneRegex = /^\+?[0-9]{10,15}$/;
-      if (!phoneRegex.test(phone.replace(/\s/g, ''))) {
-        setError('Please enter a valid phone number (10-15 digits)');
-        setLoading(false);
-        return;
-      }
-      
-      // Amount validation
-      if (!amount || amount <= 0) {
-        setError('Amount is required and must be positive');
-        setLoading(false);
-        return;
-      }
-      
-      // Terms validation
-      if (!acceptedTerms) {
-        setError('Please accept the Terms and Conditions');
-        setLoading(false);
-        return;
-      }
-
-      // Password confirmation validation
-      if (password !== confirmPassword) {
-        setError('Passwords do not match');
-        setLoading(false);
-        return;
-      }
-
-      // Username validation
-      if (!username.trim()) {
-        setError('Username is required');
-        setLoading(false);
-        return;
-      }
-      
-      if (username.length < 3 || username.length > 20) {
-        setError('Username must be between 3 and 20 characters');
-        setLoading(false);
-        return;
-      }
-      
-      const usernameRegex = /^[a-zA-Z0-9_-]+$/;
-      if (!usernameRegex.test(username)) {
-        setError('Username can only contain letters, numbers, underscores and hyphens');
-        setLoading(false);
-        return;
-      }
-
+      // Registration flow
       try {
-        const payload = { username, email, password, phone, amount };
-        console.log('AuthForm: Calling authRegister with payload:', payload);
-        const regResult = await authRegister(payload);
+        // Clear any previous errors
+        setError('');
+        clearError();
 
-        if (!regResult || !regResult.tx_ref || !regResult.public_key) {
-          // This case should ideally be handled by authRegister throwing an error,
-          // but as a fallback:
-          console.error('AuthForm: authRegister did not return expected payment details.', regResult);
-          setError(authError || 'Registration initiation failed. Please try again.');
-          setLoading(false);
-          return;
-        }
-        
-        console.log('AuthForm: authRegister successful, payment details received:', regResult);
-
-        // Launch PayChangu inline payment popup
-        const paychanguConfig: PayChanguConfig = {
-          public_key: regResult.public_key,
-          tx_ref: regResult.tx_ref,
-          amount: regResult.amount,
-          currency: PAYMENT_CONFIG.CURRENCY, // Make sure PAYMENT_CONFIG is correctly imported and provides CURRENCY
-          callback_url: PAYMENT_CONFIG.CALLBACK_URL, // Ensure this is the backend callback URL
-          return_url: PAYMENT_CONFIG.RETURN_URL,   // Ensure this is the frontend return URL after backend processing
-          customer: {
-            email: regResult.email,
-            first_name: username, // Or derive from username if needed
-            last_name: '' // Or derive from username if needed
-          },
-          customization: {
-            title: 'Quiz Registration Payment',
-            description: 'Complete your registration by making the payment.'
-            // logo: 'URL_TO_YOUR_LOGO' // Optional: Add your logo URL here
-          },
-          meta: {
-            uuid: generateUUID(), // Ensure generateUUID() is defined and works
-            response: 'standard' // As per PayChangu docs, often 'standard' or 'hosted'
-          }
-        };
-
-        console.log('AuthForm: Constructed PayChangu config:', paychanguConfig);
-        
-        // Basic validation of constructed config before launching
-        if (!paychanguConfig.public_key || !paychanguConfig.tx_ref || !paychanguConfig.amount || !paychanguConfig.customer.email) {
-          console.error('AuthForm: Critical payment config data missing before launching PayChangu.', paychanguConfig);
-          setError('Payment initiation failed due to missing configuration. Please contact support.');
+        // Validate form inputs
+        if (password !== confirmPassword) {
+          setError('Passwords do not match');
           setLoading(false);
           return;
         }
 
-        waitForPayChanguAndLaunch(paychanguConfig, setError, setLoading);
+        if (!acceptedTerms) {
+          setError('You must accept the terms and conditions');
+          setLoading(false);
+          return;
+        }
+
+        // Check for pending registration
+        const { pending, tx_ref } = await checkPendingRegistration(email);
         
-        setError('Please complete payment in the popup. After payment, your registration will be finalized.');
-        // setLoading(false); // setLoading(false) is called in waitForPayChanguAndLaunch on error, or payment popup takes over.
-        // No explicit return here, as waitForPayChanguAndLaunch handles the flow.
-      } catch (err: any) {
-        console.error('Registration error:', err);
-        
-        // Get the specific error message from the API response
-        const apiErrorMessage = err?.response?.data?.message || err?.message || '';
-        
-        if (apiErrorMessage && (apiErrorMessage.includes('pending registration') || apiErrorMessage.includes('pending for this username') || apiErrorMessage.includes('pending for this email'))) {
-          setLoading(true);
+        if (pending && tx_ref) {
+          // Attempt to resume payment for pending registration
           try {
-            // First check for pending registration to get the tx_ref
-            const pendingResponse = await checkPendingRegistration(email);
-            console.log('Pending registration response:', pendingResponse);
-            
-            if (pendingResponse?.pending && pendingResponse.tx_ref) {
-              console.log('Attempting to resume payment with tx_ref:', pendingResponse.tx_ref);
-              // Now we have the tx_ref, try to resume payment
-              const resumeResponse = await resumePayment(pendingResponse.tx_ref, email);
-              console.log('Resume payment response:', resumeResponse);
-              
-              if (resumeResponse?.success) {
-                // Configure and launch payment popup
-                const paychanguConfig: PayChanguConfig = {
-                  public_key: resumeResponse.public_key,
-                  tx_ref: resumeResponse.tx_ref,
-                  amount: resumeResponse.amount,
-                  currency: PAYMENT_CONFIG.CURRENCY,
-                  callback_url: PAYMENT_CONFIG.CALLBACK_URL,
-                  return_url: PAYMENT_CONFIG.RETURN_URL,
-                  customer: {
-                    email: resumeResponse.email,
-                    first_name: username,
-                    last_name: ''
-                  },
-                  customization: {
-                    title: 'Complete Your Registration Payment',
-                    description: 'Please complete your registration by making the payment.'
-                  },
-                  meta: {
-                    uuid: generateUUID(),
-                    response: 'standard'
-                  }
-                };
+            const response = await apiClient.post<ApiResponse<ResumePaymentResponse>>('/auth/resume-payment', { 
+              email,
+              tx_ref 
+            });
 
-                console.log('Resuming payment with config:', paychanguConfig);
-                waitForPayChanguAndLaunch(paychanguConfig, setError, setLoading);
-                setError('Please complete your payment to finalize registration.');
-                return;
-              } else {
-                setError('Failed to process payment. Please try again or contact support.');
-              }
-            } else {
-              setError('A registration is pending but we couldn\'t resume payment. Please contact support.');
-              console.error('Pending registration but no tx_ref found:', pendingResponse);
+            if (response.data.success) {
+              // Launch payment popup with the resumed payment details
+              const paymentData = response.data;
+              const config: PayChanguConfig = {
+                public_key: paymentData.public_key,
+                tx_ref: paymentData.tx_ref,
+                amount: paymentData.amount,
+                currency: PAYMENT_CONFIG.CURRENCY,
+                callback_url: `${window.location.origin}${PAYMENT_CONFIG.CALLBACK_URL}`,
+                return_url: `${window.location.origin}${PAYMENT_CONFIG.RETURN_URL}`,
+                customer: {
+                  email: paymentData.email,
+                  first_name: username.split(' ')[0] || 'User',
+                  last_name: username.split(' ')[1] || 'Name',
+                },
+                customization: {
+                  title: 'Quiz Registration',
+                  description: 'Complete your registration by making the payment',
+                },
+                meta: {
+                  uuid: generateUUID(),
+                  response: 'json'
+                }
+              };
+
+              waitForPayChanguAndLaunch(config, setError, setLoading);
+              return;
             }
           } catch (error) {
-            console.error('Error handling pending registration:', error);
-            const errorMessage = (error as any)?.response?.data?.message || 
-                             (error as Error)?.message || 
-                             'Failed to resume payment. Please try again or contact support.';
-
-            // Create a retry button
-            const retryButton = (
-              <button 
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleSubmit(e);
-                }}
-                style={{
-                  marginTop: '16px',
-                  display: 'block',
-                  padding: '8px 16px',
-                  backgroundColor: '#1976d2',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                Retry Payment
-              </button>
-            );
-
-            // Set error with retry button
-            setError(
-              <>
-                {errorMessage}
-                {retryButton}
-              </>
-            );
+            console.error('Error resuming payment:', error);
+            setError('Failed to resume payment. Please try registering again.');
+            setLoading(false);
+            return;
           }
         }
-        
-        // If we get here, handle other types of errors
-        const errorMsg = (err as any)?.response?.data?.message || 
-                       (err as Error)?.message || 
-                       'Unable to complete registration. Please try again.';
-        setError(errorMsg);
-        
+
+        // If no pending registration, proceed with new registration
+        const response = await apiClient.post<ApiResponse<{ 
+          success: boolean; 
+          tx_ref: string; 
+          message?: string 
+        }>>('/auth/register', {
+          username,
+          email,
+          password,
+          phone,
+          amount
+        });
+
+        if (response.data.success) {
+          // Launch payment popup
+          const config: PayChanguConfig = {
+            public_key: PAYMENT_CONFIG.PUBLIC_KEY,
+            tx_ref: response.data.tx_ref,
+            amount: amount,
+            currency: PAYMENT_CONFIG.CURRENCY,
+            callback_url: `${window.location.origin}${PAYMENT_CONFIG.CALLBACK_URL}`,
+            return_url: `${window.location.origin}${PAYMENT_CONFIG.RETURN_URL}`,
+            customer: {
+              email: email,
+              first_name: username.split(' ')[0] || 'User',
+              last_name: username.split(' ')[1] || 'Name',
+            },
+            customization: {
+              title: 'Quiz Registration',
+              description: 'Complete your registration by making the payment',
+            },
+            meta: {
+              uuid: generateUUID(),
+              response: 'json'
+            }
+          };
+
+          waitForPayChanguAndLaunch(config, setError, setLoading);
+        } else {
+          setError(response.data.message || 'Registration failed. Please try again.');
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Registration error:', error);
+        setError('An error occurred during registration. Please try again.');
         setLoading(false);
       }
-      return;
-    }
+    } else {
+      // Login flow
+      try {
+        // Clear any previous errors from the context
+        clearError();
 
-    // Login flow
-    try {
-      // Clear any previous errors from the context
-      clearError();
-      
-      // Use the authLogin function from AuthContext which handles cookies properly
-      await authLogin(email, password);
-      
-      // After successful login, navigate to the appropriate page based on user role
-      // The isAdmin state will be updated by the authLogin function
-      // Navigation is now primarily handled by App.tsx based on `user` state change from AuthContext.
-      // The navigation here is likely redundant and might conflict.
-      /*
-      setTimeout(() => {
-        navigate(isAdmin ? '/admin' : '/quiz', { replace: true });
-      }, 500); 
-      */
-    } catch (err: any) {
-      console.error('Authentication error:', err);
-      
-      // Get the specific error message from the API response
-      const apiError = err.response?.data?.message || err.response?.data?.error || err.message;
-      
-      // Display the exact API error message if it exists
-      if (apiError) {
-        setError(apiError);
-      } else {
-        setError('Unable to log in. Please check your credentials and try again.');
+        // Use the login function from AuthContext which handles cookies properly
+        await login(email, password);
+
+        // After successful login, navigation is handled by App.tsx based on `user` state change
+        // from AuthContext. The navigation here is redundant and might conflict.
+        // navigate('/dashboard');
+      } catch (error) {
+        console.error('Login error:', error);
+        // Error is already set by the login function in AuthContext
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
-      return;
     }
   };
 
-  const handleSwitchMode = () => {
-    setCurrentMode(currentMode === 'login' ? 'register' : 'login');
-    setError('');
-    setPassword('');
-    setConfirmPassword('');
-    setShowPassword(false);
-    setShowConfirmPassword(false);
+  // Generate UUID for payment reference
+  const generateUUID = (): string => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.floor(Math.random() * 16);
+      const v = c === 'x' ? r : ((r & 0x3) | 0x8);
+      return v.toString(16);
+    });
   };
 
   return (
@@ -477,7 +295,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
             />
             <input
               type="tel"
-              placeholder="Phone Number"
+              placeholder="Phone"
               value={phone}
               onChange={e => setPhone(e.target.value)}
               required
@@ -512,12 +330,13 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
             onChange={e => setPassword(e.target.value)}
             required
             disabled={loading}
-            autoComplete="current-password"
+            autoComplete={currentMode === 'login' ? "current-password" : "new-password"}
           />
           <IconButton
             onClick={() => setShowPassword(!showPassword)}
             edge="end"
             className="password-toggle"
+            tabIndex={-1}
           >
             {showPassword ? <VisibilityOff /> : <Visibility />}
           </IconButton>
@@ -538,6 +357,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 edge="end"
                 className="password-toggle"
+                tabIndex={-1}
               >
                 {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
               </IconButton>
@@ -546,14 +366,9 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
               control={
                 <Checkbox
                   checked={acceptedTerms}
-                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  onChange={e => setAcceptedTerms(e.target.checked)}
                   disabled={loading}
-                  sx={{
-                    color: '#43cea2',
-                    '&.Mui-checked': {
-                      color: '#43cea2',
-                    },
-                  }}
+                  sx={{ color: '#43cea2', '&.Mui-checked': { color: '#43cea2' } }}
                 />
               }
               label={
@@ -561,17 +376,11 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
                   I accept the{' '}
                   <Link
                     href="#"
-                    onClick={(e) => {
+                    onClick={e => {
                       e.preventDefault();
                       alert('Terms and Conditions: This quiz application is for educational purposes only. By accepting these terms, you agree to use the application responsibly and acknowledge that your quiz results and personal information will be stored securely.');
                     }}
-                    sx={{
-                      color: '#43cea2',
-                      textDecoration: 'underline',
-                      '&:hover': {
-                        color: '#185a9d',
-                      },
-                    }}
+                    sx={{ color: '#43cea2', textDecoration: 'underline', '&:hover': { color: '#185a9d' } }}
                   >
                     Terms and Conditions
                   </Link>
@@ -581,36 +390,22 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
             />
           </>
         )}
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           disabled={loading || (currentMode === 'register' && !acceptedTerms)}
         >
-          {loading ? (
-            currentMode === 'login' ? 'Logging in...' : 'Processing...'
-          ) : (
-            currentMode === 'login' ? 'Login' : 'Register'
-          )}
+          {loading ? (currentMode === 'login' ? 'Logging in...' : 'Processing...') : (currentMode === 'login' ? 'Login' : 'Register')}
         </button>
         <div className="switch-mode">
           {currentMode === 'login' ? (
-            <span>Don't have an account? <button type="button" onClick={handleSwitchMode}>Register</button></span>
+            <span>Don't have an account? <button type="button" onClick={() => { setCurrentMode('register'); setError(''); }}>{'Register'}</button></span>
           ) : (
-            <span>Already have an account? <button type="button" onClick={handleSwitchMode}>Login</button></span>
+            <span>Already have an account? <button type="button" onClick={() => { setCurrentMode('login'); setError(''); }}>{'Login'}</button></span>
           )}
         </div>
         {(error || authError) && (
           <div className="auth-error">
             <p>{error || authError}</p>
-            {typeof error === 'string' && error.includes('already pending for this email') && (
-              <button 
-                type="button" 
-                onClick={() => checkPendingRegistration(email)}
-                disabled={loading}
-                className="check-pending-btn"
-              >
-                {loading ? 'Checking...' : 'Check Pending Registration'}
-              </button>
-            )}
           </div>
         )}
       </form>
@@ -619,4 +414,3 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
 };
 
 export default AuthForm;
-
