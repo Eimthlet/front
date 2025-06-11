@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Checkbox, FormControlLabel, Link, IconButton } from '@mui/material';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import apiClient from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
+import './AuthForm.css';
 
 // Payment configuration
 const PAYMENT_CONFIG = {
@@ -10,11 +14,6 @@ const PAYMENT_CONFIG = {
   CURRENCY: 'MWK',
   PUBLIC_KEY: process.env.REACT_APP_PAYCHANGU_PUBLIC_KEY || ''
 } as const;
-
-import { Checkbox, FormControlLabel, Link, IconButton } from '@mui/material';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import './AuthForm.css';
 
 declare global {
   interface Window {
