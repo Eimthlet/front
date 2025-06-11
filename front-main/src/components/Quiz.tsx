@@ -103,7 +103,6 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
 
   // State hooks must be called first, before any early returns
   const [showTerms, setShowTerms] = useState(true);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showResult, setShowResult] = useState(false);
 
   // Validate and prepare questions
@@ -236,7 +235,6 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
   };
 
   const handleAcceptTerms = () => {
-    setAcceptedTerms(true);
     setShowTerms(false);
   };
 
