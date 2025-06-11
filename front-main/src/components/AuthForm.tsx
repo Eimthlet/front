@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { PAYMENT_CONFIG } from '../config';
-import { Checkbox, FormControlLabel, Link, IconButton, Button } from '@mui/material';
+import { Checkbox, FormControlLabel, Link, IconButton } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import './AuthForm.css';
