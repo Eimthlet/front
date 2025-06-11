@@ -120,40 +120,6 @@ const App: React.FC = () => {
     console.error('App Error:', errorMessage, error);
     setError(errorMessage);
   }, []);
-
-  // Function to convert API questions to the required format
-  const normalizeQuestions = useCallback((apiQuestions: ApiQuestion[]): Question[] => {
-    if (!Array.isArray(apiQuestions)) {
-      console.warn('Expected array of questions, received:', typeof apiQuestions);
-      return [];
-    }
-    
-    return apiQuestions.map(q => {
-      // Validate required fields
-      if (!q.id) {
-        console.warn('Question missing ID:', q);
-      }
-      
-      // Ensure options is an array
-      let options: string[] = [];
-      if (Array.isArray(q.options)) {
-        options = q.options.map(opt => String(opt));
-      } else if (q.options && typeof q.options === 'object') {
-        options = Object.values(q.options).map(opt => String(opt));
-      }
-      
-      return {
-        id: String(q.id || Math.random()),
-        question: q.question || q.question_text || 'No question provided',
-        options,
-        correctAnswer: q.correctAnswer || String(q.correct_answer || ''),
-        timeLimit: typeof q.timeLimit === 'number' ? q.timeLimit : undefined,
-        explanation: typeof q.explanation === 'string' ? q.explanation : undefined,
-        category: typeof q.category === 'string' ? q.category : undefined,
-        difficulty: typeof q.difficulty === 'string' ? q.difficulty : undefined
-      };
-    });
-  }, []);
   
   // Function to fetch qualification status
   const fetchQualificationStatus = useCallback(async (): Promise<FetchQualificationResponse | null> => {
