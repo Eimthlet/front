@@ -140,15 +140,15 @@ const Quiz: FC<QuizProps> = ({
       
       try {
         const response = await api.post('/api/quiz/start-qualification');
-        if (response.data.questions) {
-          setQuestions(response.data.questions.map((q: any) => ({
+        if (response.questions) {
+          setQuestions(response.questions.map((q: any) => ({
             id: q.id,
             question: q.question,
             options: q.options,
             correctAnswer: q.correctAnswer,
             timeLimit: q.timeLimit || 30
           })));
-          setAttemptId(response.data.attemptId);
+          setAttemptId(response.attemptId);
         }
       } catch (err: any) {
         console.error('Failed to load qualification questions:', err);
@@ -158,13 +158,13 @@ const Quiz: FC<QuizProps> = ({
       }
     };
 
-    if (isQualificationRound && questions.length === 0) {
+    if (isQualificationRound && initialQuestions.length === 0) {
       loadQualificationQuestions();
     }
-  }, [isQualificationRound, qualificationRoundId]);
+  }, [isQualificationRound, qualificationRoundId, initialQuestions.length]);
 
-  // Handle quiz completion
-  const handleComplete = async (score: number, answers: { questionId: string; answer: string }[]) => {
+  // Handle quiz completion - used by child components
+  const handleComplete = React.useCallback(async (score: number, answers: { questionId: string; answer: string }[]) => {
     const percentageScore = (score / questions.length) * 100;
     const passed = percentageScore >= minimumScorePercentage;
     
@@ -186,8 +186,8 @@ const Quiz: FC<QuizProps> = ({
         });
         
         // Update with server response
-        result.passed = response.data.passed;
-        result.percentageScore = response.data.percentageScore;
+        result.passed = response.passed;
+        result.percentageScore = response.percentageScore;
       } catch (err) {
         console.error('Failed to submit qualification attempt:', err);
         // Continue with client-side result if submission fails
@@ -208,7 +208,7 @@ const Quiz: FC<QuizProps> = ({
       percentageScore: result.percentageScore,
       passed: result.passed
     });
-  };
+  }, [questions.length, minimumScorePercentage, isQualificationRound, attemptId, onComplete]);
 
   // Handle terms acceptance
   const handleAcceptTerms = () => {
@@ -298,8 +298,8 @@ const Quiz: FC<QuizProps> = ({
               questionId,
               answer
             }));
-            const percentageScore = (prev.score / questions.length) * 100;
-            const passed = percentageScore >= (minimumScorePercentage || 70);
+            const percentageScore = (prev.score / validQuestions.length) * 100;
+            const passed = percentageScore >= minimumScorePercentage;
             
             onComplete({
               score: prev.score,
@@ -318,7 +318,7 @@ const Quiz: FC<QuizProps> = ({
     
     // No-op return if conditions aren't met
     return () => {};
-  }, [onComplete, shuffledQuestions, validQuestions.length, user]);
+  }, [onComplete, shuffledQuestions, validQuestions.length, user, minimumScorePercentage]);
 
   // Qualification check
   const [hasQualification, setHasQualification] = useState<boolean | null>(null);
