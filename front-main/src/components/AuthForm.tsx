@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Checkbox, FormControlLabel, Link, IconButton } from '@mui/material';
+import React, { useState, useEffect, FC, ReactElement } from 'react';
+import { Checkbox, FormControlLabel, Link, IconButton, TextField, Button, Typography, Box } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import apiClient from '../utils/apiClient';
@@ -65,7 +65,16 @@ interface PayChanguConfig {
   };
 }
 
-const AuthForm: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
+// Generate UUID for payment reference
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement => {
   // State for form fields
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -84,20 +93,43 @@ const AuthForm: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
 
   // Check if there's a pending registration for the given email
   const checkPendingRegistration = async (email: string): Promise<{ pending: boolean; tx_ref?: string }> => {
+    console.log('Checking pending registration for:', email);
     try {
-      const response = await apiClient.post<ApiResponse<PendingRegistrationResponse>>(
+      const response = await apiClient.post<any>(
         '/auth/check-pending-registration', 
         { email },
-        { timeout: 5000 } // Reduce timeout to 5 seconds
+        { 
+          timeout: 10000, // Increased timeout to 10 seconds
+          validateStatus: (status) => status < 500, // Don't throw on 4xx errors
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       );
       
-      if (!response?.data?.data) {
-        throw new Error('Invalid response format from server');
+      console.log('Check pending registration response status:', response.status);
+      console.log('Response data:', response.data);
+      
+      // Handle different response formats
+      if (response.data?.data) {
+        return {
+          pending: Boolean(response.data.data.pending),
+          tx_ref: response.data.data.tx_ref
+        };
+      } else if (response.data?.pending !== undefined) {
+        // Handle direct response format
+        return {
+          pending: Boolean(response.data.pending),
+          tx_ref: response.data.tx_ref
+        };
+      } else if (response.data) {
+        // If we have data but not in expected format, log it
+        console.warn('Unexpected response format:', response.data);
       }
       
       return {
-        pending: response.data.data.pending || false,
-        tx_ref: response.data.data.tx_ref
+        pending: response.data?.data?.pending || false,
+        tx_ref: response.data?.data?.tx_ref
       };
     } catch (error) {
       console.error('Error checking pending registration:', error);
@@ -107,7 +139,7 @@ const AuthForm: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
   };
 
   // Wait for PayChangu script to load before calling the popup
-  const waitForPayChanguAndLaunch = (config: PayChanguConfig, errorSetter: (msg: string) => void, loadingSetter: (loading: boolean) => void, retries = 10) => {
+  const waitForPayChanguAndLaunch = (config: PayChanguConfig, errorSetter: (msg: string) => void, loadingSetter: (loading: boolean) => void, retries = 10): void => {
     const paychangu = (window as any).PaychanguCheckout;
     if (paychangu) {
       paychangu(config);
@@ -138,9 +170,9 @@ const AuthForm: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
     e.preventDefault();
     setLoading(true);
 
-    if (currentMode === 'register') {
-      // Registration flow
-      try {
+    try {
+      if (currentMode === 'register') {
+        // Registration flow
         // Clear any previous errors
         setError('');
         clearError();
@@ -206,65 +238,100 @@ const AuthForm: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
         }
 
         // If no pending registration, proceed with new registration
-        const response = await apiClient.post<ApiResponse<{ 
-          success: boolean; 
-          tx_ref: string; 
-          message?: string;
-          error?: string;
-        }>>('/auth/register', {
+        const payload = {
           username: username.trim(),
           email: email.trim().toLowerCase(),
           password: password.trim(),
           phone: phone?.trim(),
           amount: Number(amount) // Ensure amount is a number
-        });
+        };
 
-        if (!response?.data) {
-          throw new Error('No response data received from server');
+        // Validate required fields
+        const requiredFields = ['username', 'email', 'password', 'amount'];
+        const missingFields = requiredFields.filter(field => !payload[field as keyof typeof payload]);
+        
+        if (missingFields.length > 0) {
+          throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
         }
 
-        if (response.data.success) {
-          // Launch payment popup
-          const config: PayChanguConfig = {
-            public_key: PAYMENT_CONFIG.PUBLIC_KEY,
-            tx_ref: response.data.tx_ref,
-            amount: amount,
-            currency: PAYMENT_CONFIG.CURRENCY,
-            callback_url: `${window.location.origin}${PAYMENT_CONFIG.CALLBACK_URL}`,
-            return_url: `${window.location.origin}${PAYMENT_CONFIG.RETURN_URL}`,
-            customer: {
-              email: email,
-              first_name: username.split(' ')[0] || 'User',
-              last_name: username.split(' ')[1] || 'Name',
-            },
-            customization: {
-              title: 'Quiz Registration',
-              description: 'Complete your registration by making the payment',
-            },
-            meta: {
-              uuid: generateUUID(),
-              response: 'json'
-            }
-          };
+        console.log('Registration payload:', JSON.stringify(payload, null, 2));
 
-          waitForPayChanguAndLaunch(config, setError, setLoading);
-        } else {
-          const errorMessage = response.data.error || response.data.message || 'Registration failed. Please try again.';
+        try {
+          const response = await apiClient.post<any>(
+            '/auth/register', 
+            payload,
+            { 
+              validateStatus: (status) => status < 500, // Don't throw on 4xx errors
+              timeout: 15000,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+          console.log('Registration response status:', response.status);
+          console.log('Registration response data:', response.data);
+
+          if (!response.data) {
+            throw new Error('No response data received from server');
+          }
+
+          // Normalize response format
+          const responseData = response.data.data || response.data;
+
+          // Log the full response for debugging
+          console.log('Normalized response data:', responseData);
+
+          if (response.data.success) {
+            // Launch payment popup
+            if (!responseData.tx_ref) {
+              throw new Error('No transaction reference received from server');
+            }
+
+            const config: PayChanguConfig = {
+              public_key: PAYMENT_CONFIG.PUBLIC_KEY,
+              tx_ref: responseData.tx_ref,
+              amount: amount,
+              currency: PAYMENT_CONFIG.CURRENCY,
+              callback_url: `${window.location.origin}${PAYMENT_CONFIG.CALLBACK_URL}`,
+              return_url: `${window.location.origin}${PAYMENT_CONFIG.RETURN_URL}`,
+              customer: {
+                email: email,
+                first_name: username.split(' ')[0] || 'User',
+                last_name: username.split(' ')[1] || 'Name',
+              },
+              customization: {
+                title: 'Quiz Registration',
+                description: 'Complete your registration by making the payment',
+              },
+              meta: {
+                uuid: generateUUID(),
+                response: 'json'
+              }
+            };
+
+            waitForPayChanguAndLaunch(config, setError, setLoading);
+          } else {
+            const errorMessage = responseData.error || responseData.message || 
+              (response.data?.error || response.data?.message) || 
+              'Registration failed. Please try again.';
+            setError(errorMessage);
+            setLoading(false);
+          }
+        } catch (error: any) {
+          console.error('Registration error:', error);
+          console.error('Full error object:', error);
+          const errorMessage = 
+            error.response?.data?.error || 
+            error.response?.data?.message || 
+            (typeof error.response?.data === 'string' ? error.response.data : null) ||
+            error.message || 
+            'An error occurred during registration. Please try again.';
           setError(errorMessage);
           setLoading(false);
         }
-      } catch (error: any) {
-        console.error('Registration error:', error);
-        const errorMessage = error.response?.data?.error || 
-                           error.response?.data?.message || 
-                           error.message || 
-                           'An error occurred during registration. Please try again.';
-        setError(errorMessage);
-        setLoading(false);
-      }
-    } else {
-      // Login flow
-      try {
+      } else {
+        // Login flow
         // Clear any previous errors from the context
         clearError();
 
@@ -274,27 +341,19 @@ const AuthForm: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
         // After successful login, navigation is handled by App.tsx based on `user` state change
         // from AuthContext. The navigation here is redundant and might conflict.
         // navigate('/dashboard');
-      } catch (error) {
-        console.error('Login error:', error);
-        // Error is already set by the login function in AuthContext
-      } finally {
-        setLoading(false);
       }
+    } catch (error) {
+      console.error('Login error:', error);
+      // Error is already set by the login function in AuthContext
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Generate UUID for payment reference
-  const generateUUID = (): string => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = Math.floor(Math.random() * 16);
-      const v = c === 'x' ? r : ((r & 0x3) | 0x8);
-      return v.toString(16);
-    });
-  };
-
+  // Render the form
   return (
-    <div className="auth-form-container">
-      <form className="auth-form" onSubmit={handleSubmit}>
+    <Box className="auth-form-container" sx={{ maxWidth: 400, mx: 'auto', p: 3 }}>
+      <Box component="form" className="auth-form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <h2>{currentMode === 'login' ? 'Login' : 'Register'}</h2>
         {currentMode === 'register' && (
           <>
@@ -422,8 +481,8 @@ const AuthForm: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
             <p>{error || authError}</p>
           </div>
         )}
-      </form>
-    </div>
+      </Box>
+    </Box>
   );
 };
 
