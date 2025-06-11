@@ -287,7 +287,7 @@ const App: React.FC = () => {
         setStartingQuiz(false);
       }
     }
-  }, [normalizeQuestions, handleError]);
+  }, [handleError]);
   
   // Handle quiz completion
   const handleQuizComplete = useCallback(async (score: number, answers: { questionId: string; answer: string }[]) => {
