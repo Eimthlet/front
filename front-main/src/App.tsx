@@ -247,7 +247,78 @@ const App: React.FC = () => {
           <Route path="/quiz" element={
             <ProtectedRoute>
               <Layout>
-                {!qualification?.hasAttempted ? (
+                {!qualification ? (
+                  <Box textAlign="center" mt={10}>
+                    <CircularProgress />
+                    <Typography variant="body1" mt={2}>Loading quiz data...</Typography>
+                  </Box>
+                ) : qualification.hasAttempted ? (
+                  <Box textAlign="center" mt={10} p={3} sx={{ maxWidth: 600, mx: 'auto', bgcolor: 'background.paper', borderRadius: 2, boxShadow: 1 }}>
+                    <Typography variant="h4" gutterBottom color="primary">
+                      {qualification.isQualified ? 'Qualification Complete!' : 'Qualification Attempted'}
+                    </Typography>
+                    
+                    <Typography variant="h6" color={qualification.isQualified ? 'success.main' : 'error.main'} mb={3}>
+                      {qualification.isQualified 
+                        ? 'Congratulations! You have qualified for the quiz.' 
+                        : 'You have already attempted the qualification quiz.'}
+                    </Typography>
+                    
+                    {qualification.score !== undefined && qualification.totalQuestions && (
+                      <Box mb={3}>
+                        <Typography variant="body1">
+                          Your score: <strong>{qualification.score} / {qualification.totalQuestions}</strong>
+                          {qualification.percentageScore && ` (${qualification.percentageScore})`}
+                        </Typography>
+                        <Typography variant="body1">
+                          Minimum required: {qualification.minimumRequired || 50}%
+                        </Typography>
+                        {qualification.completed_at && (
+                          <Typography variant="body2" color="text.secondary" mt={1}>
+                            Attempted on: {new Date(qualification.completed_at).toLocaleString()}
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
+                    
+                    <Typography variant="body1" mb={3}>
+                      {qualification.message || 
+                        (qualification.isQualified 
+                          ? 'You can now participate in the main quiz.' 
+                          : 'You have already attempted the qualification quiz.')}
+                    </Typography>
+                    
+                    <Box>
+                      {qualification.isQualified ? (
+                        <Button 
+                          variant="contained" 
+                          color="primary"
+                          onClick={() => fetchQualification()}
+                          sx={{ mt: 2, mr: 2 }}
+                        >
+                          Continue to Quiz
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="outlined" 
+                          color="primary"
+                          onClick={() => window.location.reload()}
+                          sx={{ mt: 2, mr: 2 }}
+                        >
+                          Refresh Status
+                        </Button>
+                      )}
+                      <Button 
+                        variant="contained" 
+                        color="secondary"
+                        onClick={() => navigate('/leaderboard')}
+                        sx={{ mt: 2 }}
+                      >
+                        View Leaderboard
+                      </Button>
+                    </Box>
+                  </Box>
+                ) : (
                   <Box textAlign="center" mt={10}>
                     <Typography variant="h4" gutterBottom>
                       Welcome to the Quiz!
@@ -280,23 +351,9 @@ const App: React.FC = () => {
                       {loading ? 'Starting...' : 'Start Qualification Quiz'}
                     </Button>
                   </Box>
-                ) : qualification?.hasAttempted && !qualification?.isQualified ? (
-                  <Box textAlign="center" mt={10}>
-                    <Typography variant="h5" color="error" gutterBottom>
-                      Quiz Attempted
-                    </Typography>
-                    <Typography variant="body1" mb={4}>
-                      {qualification.message || 'You have already attempted this quiz.'}
-                    </Typography>
-                    <Button 
-                      variant="contained" 
-                      color="primary" 
-                      onClick={() => navigate('/leaderboard')}
-                    >
-                      View Leaderboard
-                    </Button>
-                  </Box>
-                ) : questions.length > 0 ? (
+                )}
+                
+                {questions.length > 0 ? (
                   <Quiz 
                     questions={questions.map(q => ({
                       id: q.id.toString(),
@@ -309,14 +366,32 @@ const App: React.FC = () => {
                     onComplete={(score, answers) => handleQuizComplete(score, answers)} 
                   />
                 ) : (
-                  <Box textAlign="center" mt={10}>
-                    <Typography variant="h5" gutterBottom>
-                      No Questions Available
-                    </Typography>
-                    <Typography variant="body1">
-                      There are no questions available at the moment. Please check back later.
-                    </Typography>
-                  </Box>
+                  qualification?.hasAttempted && !qualification?.isQualified ? (
+                    <Box textAlign="center" mt={10}>
+                      <Typography variant="h5" color="error" gutterBottom>
+                        Quiz Attempted
+                      </Typography>
+                      <Typography variant="body1" mb={4}>
+                        {qualification.message || 'You have already attempted this quiz.'}
+                      </Typography>
+                      <Button 
+                        variant="contained" 
+                        color="primary" 
+                        onClick={() => navigate('/leaderboard')}
+                      >
+                        View Leaderboard
+                      </Button>
+                    </Box>
+                  ) : (
+                    <Box textAlign="center" mt={10}>
+                      <Typography variant="h5" gutterBottom>
+                        No Questions Available
+                      </Typography>
+                      <Typography variant="body1">
+                        There are no questions available at the moment. Please check back later.
+                      </Typography>
+                    </Box>
+                  )
                 )}
               </Layout>
             </ProtectedRoute>
