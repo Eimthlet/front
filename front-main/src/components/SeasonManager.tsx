@@ -35,8 +35,10 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { type Season as SeasonType } from '../types';
 
 // TypeScript interfaces
-interface Season extends Omit<SeasonType, 'id'> {
+interface Season extends Omit<SeasonType, 'id' | 'is_qualification_round' | 'minimum_score_percentage'> {
   id?: string | number;  // Make id optional to match the API response
+  is_qualification_round: boolean;
+  minimum_score_percentage: number;
 }
 
 interface Question {
@@ -80,6 +82,8 @@ const SeasonManager: React.FC = () => {
     start_date: new Date().toISOString().split('T')[0],
     end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     is_active: false,
+    is_qualification_round: false,
+    minimum_score_percentage: 0,
   });
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [openDialog, setOpenDialog] = useState(false);
@@ -165,10 +169,22 @@ const SeasonManager: React.FC = () => {
   };
 
   // Handle opening the dialog
+  const handleEditSeason = (season: Season) => {
+    setCurrentSeason({
+      ...season,
+      start_date: season.start_date?.toString().split('T')[0],
+      end_date: season.end_date?.toString().split('T')[0],
+      is_qualification_round: season.is_qualification_round ?? false,
+      minimum_score_percentage: season.minimum_score_percentage ?? 50,
+    });
+  };
+
   const handleOpenDialog = useCallback((mode: 'create' | 'edit', season?: Season) => {
     setDialogMode(mode);
     if (mode === 'edit' && season) {
-      setCurrentSeason(season);
+      handleEditSeason(season);
+      setDialogMode('edit');
+      setOpenDialog(true);
     } else {
       setCurrentSeason({
         name: '',
@@ -330,12 +346,11 @@ const SeasonManager: React.FC = () => {
       
       // Trim string fields
       if (seasonInput.name) seasonInput.name = seasonInput.name.trim();
-      if (seasonInput.description) seasonInput.description = seasonInput.description.trim();
+      if (seasonInput.description) seasonInput.description = (seasonInput.description || '').trim();
 
       // Validation for required fields
       if (!seasonInput.name || !seasonInput.start_date || !seasonInput.end_date) {
         setError('Season Name, Start Date, and End Date are required.');
-        // setLoading(false); // setLoading would be in the finally block
         return;
       }
 
@@ -350,12 +365,12 @@ const SeasonManager: React.FC = () => {
 
       const seasonPayload = {
         name: seasonInput.name,
-        startDate: formattedStartDate,  
-        endDate: formattedEndDate,      
-        is_active: Boolean(seasonInput.is_active),
-        is_qualification_round: isQualificationRound,
-        minimum_score_percentage: minimumScorePercentage,
-        description: seasonInput.description || '',
+        startDate: formattedStartDate,
+        endDate: formattedEndDate,
+        isActive: Boolean(seasonInput.is_active),
+        isQualificationRound: isQualificationRound,
+        minimumScorePercentage: minimumScorePercentage,
+        description: seasonInput.description || ''
       };
       
       console.log('Submitting season data:', JSON.stringify(seasonPayload, null, 2));
@@ -375,17 +390,7 @@ const SeasonManager: React.FC = () => {
           return;
         }
         
-        const updatePayload = {
-          name: seasonInput.name,
-          startDate: formattedStartDate,
-          endDate: formattedEndDate,
-          is_active: Boolean(seasonInput.is_active),
-          is_qualification_round: isQualificationRound,
-          minimum_score_percentage: minimumScorePercentage,
-          description: seasonInput.description || ''
-        };
-        
-        response = await apiClient.put(`/admin/seasons/${currentSeason.id}`, updatePayload);
+        response = await apiClient.put(`/admin/seasons/${currentSeason.id}`, seasonPayload);
         if (response?.success || response?.id) {
           setSuccess('Season updated successfully');
         } else {
@@ -871,65 +876,101 @@ const SeasonManager: React.FC = () => {
       >
         <DialogTitle>{dialogMode === 'create' ? 'Create New Season' : 'Edit Season'}</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2, minWidth: 500 }}>
             <TextField
-              fullWidth
+              margin="dense"
+              name="name"
               label="Season Name"
+              type="text"
+              fullWidth
+              variant="outlined"
               value={currentSeason.name || ''}
               onChange={(e) => handleSeasonChange('name', e.target.value)}
+              required
             />
+            
             <TextField
-              fullWidth
-              type="date"
-              label="Start Date"
-              value={currentSeason.start_date || ''}
-              onChange={(e) => handleSeasonChange('start_date', e.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              fullWidth
-              type="date"
-              label="End Date"
-              value={currentSeason.end_date || ''}
-              onChange={(e) => handleSeasonChange('end_date', e.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={currentSeason.is_active || false}
-                  onChange={(e) => handleSeasonChange('is_active', e.target.checked)}
-                />
-              }
-              label="Active"
-            />
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={currentSeason.is_qualification_round || false}
-                  onChange={(e) => handleSeasonChange('is_qualification_round', e.target.checked)}
-                />
-              }
-              label="Qualification Round"
-            />
-            {currentSeason.is_qualification_round && (
-              <TextField
-                fullWidth
-                type="number"
-                label="Minimum Score Percentage"
-                value={currentSeason.minimum_score_percentage || 50}
-                onChange={(e) => handleSeasonChange('minimum_score_percentage', parseInt(e.target.value) || 50)}
-                inputProps={{ min: 0, max: 100 }}
-              />
-            )}
-            <TextField
-              fullWidth
+              margin="dense"
+              name="description"
               label="Description (Optional)"
+              type="text"
+              fullWidth
+              variant="outlined"
               multiline
               rows={3}
               value={currentSeason.description || ''}
               onChange={(e) => handleSeasonChange('description', e.target.value)}
             />
+            
+            <Box display="flex" gap={2}>
+              <TextField
+                margin="dense"
+                name="start_date"
+                label="Start Date"
+                type="date"
+                fullWidth
+                variant="outlined"
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                value={currentSeason.start_date || ''}
+                onChange={(e) => handleSeasonChange('start_date', e.target.value)}
+                required
+              />
+              
+              <TextField
+                margin="dense"
+                name="end_date"
+                label="End Date"
+                type="date"
+                fullWidth
+                variant="outlined"
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                value={currentSeason.end_date || ''}
+                onChange={(e) => handleSeasonChange('end_date', e.target.value)}
+                required
+              />
+            </Box>
+            
+            <Box display="flex" flexDirection="column" gap={1} mt={1}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={Boolean(currentSeason.is_qualification_round)}
+                    onChange={(e) => handleSeasonChange('is_qualification_round', e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label="Qualification Round"
+              />
+              
+              {currentSeason.is_qualification_round && (
+                <TextField
+                  margin="dense"
+                  name="minimum_score_percentage"
+                  label="Minimum Score to Qualify (%)"
+                  type="number"
+                  fullWidth
+                  variant="outlined"
+                  value={currentSeason.minimum_score_percentage || 50}
+                  onChange={(e) => handleSeasonChange('minimum_score_percentage', parseInt(e.target.value) || 0)}
+                  inputProps={{ min: 0, max: 100, step: 1 }}
+                />
+              )}
+              
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={Boolean(currentSeason.is_active)}
+                    onChange={(e) => handleSeasonChange('is_active', e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label="Active Season"
+              />
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>

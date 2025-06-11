@@ -5,7 +5,12 @@ import {
   Typography, 
   Card, 
   CardContent,
-  styled
+  styled,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import AccessAlarmIcon from '@mui/icons-material/AccessAlarm';
@@ -93,16 +98,124 @@ const ActionButton = styled(Button)(({ theme }) => ({
 // Quiz Component Props
 interface QuizProps {
   questions: Question[];
-  onComplete: (score: number, answers: { questionId: string; answer: string }[]) => void;
+  onComplete: (result: { 
+    score: number; 
+    answers: { questionId: string; answer: string }[];
+    passed?: boolean;
+    percentageScore?: number;
+  }) => void;
+  isQualificationRound?: boolean;
+  qualificationRoundId?: string;
+  minimumScorePercentage?: number;
 }
 
-const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
+const Quiz: FC<QuizProps> = ({ 
+  questions: initialQuestions, 
+  onComplete, 
+  isQualificationRound = false, 
+  qualificationRoundId,
+  minimumScorePercentage = 70
+}) => {
+  const [questions, setQuestions] = useState<Question[]>(initialQuestions);
+  const [isLoading, setIsLoading] = useState(isQualificationRound && initialQuestions.length === 0);
+  const [error, setError] = useState<string | null>(null);
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
+  const [showResult, setShowResult] = useState(false);
+  const [quizResult, setQuizResult] = useState<{
+    score: number;
+    percentageScore: number;
+    passed: boolean;
+  } | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Load questions for qualification round if needed
+  useEffect(() => {
+    const loadQualificationQuestions = async () => {
+      if (!isQualificationRound || !qualificationRoundId) return;
+      
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const response = await api.post('/api/quiz/start-qualification');
+        if (response.data.questions) {
+          setQuestions(response.data.questions.map((q: any) => ({
+            id: q.id,
+            question: q.question,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+            timeLimit: q.timeLimit || 30
+          })));
+          setAttemptId(response.data.attemptId);
+        }
+      } catch (err: any) {
+        console.error('Failed to load qualification questions:', err);
+        setError('Failed to load qualification questions. Please try again later.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (isQualificationRound && questions.length === 0) {
+      loadQualificationQuestions();
+    }
+  }, [isQualificationRound, qualificationRoundId]);
+
+  // Handle quiz completion
+  const handleComplete = async (score: number, answers: { questionId: string; answer: string }[]) => {
+    const percentageScore = (score / questions.length) * 100;
+    const passed = percentageScore >= minimumScorePercentage;
+    
+    const result = {
+      score,
+      answers,
+      percentageScore,
+      passed
+    };
+
+    if (isQualificationRound && attemptId) {
+      try {
+        const response = await api.post('/api/quiz/submit', {
+          attemptId,
+          answers: answers.map(a => ({
+            questionId: a.questionId,
+            answer: a.answer
+          }))
+        });
+        
+        // Update with server response
+        result.passed = response.data.passed;
+        result.percentageScore = response.data.percentageScore;
+      } catch (err) {
+        console.error('Failed to submit qualification attempt:', err);
+        // Continue with client-side result if submission fails
+      }
+    }
+    
+    const finalResult = {
+      score: result.score,
+      percentageScore: result.percentageScore,
+      passed: result.passed
+    };
+    
+    setQuizResult(finalResult);
+    setShowResult(true);
+    onComplete({
+      score: result.score,
+      answers: result.answers,
+      percentageScore: result.percentageScore,
+      passed: result.passed
+    });
+  };
+
+  // Handle terms acceptance
+  const handleAcceptTerms = () => {
+    setHasAcceptedTerms(true);
+  };
   // State hooks must be called first, before any early returns
   const [showTerms, setShowTerms] = useState(true);
-  const [showResult, setShowResult] = useState(false);
 
   // Validate and prepare questions
   const validQuestions = useMemo(() => 
@@ -185,7 +298,16 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
               questionId,
               answer
             }));
-            onComplete(prev.score, answers);
+            const percentageScore = (prev.score / questions.length) * 100;
+            const passed = percentageScore >= (minimumScorePercentage || 70);
+            
+            onComplete({
+              score: prev.score,
+              answers,
+              percentageScore,
+              passed
+            });
+            
             return { ...prev, isComplete: true };
           }
         });
@@ -242,6 +364,132 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
     }
   }, [user]);
 
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+        <CircularProgress />
+        <Typography sx={{ ml: 2 }}>Loading questions...</Typography>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+        <Typography color="error">{error}</Typography>
+      </Box>
+    );
+  }
+
+  // Handle loading and error states
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+        <CircularProgress />
+        <Typography sx={{ ml: 2 }}>Loading questions...</Typography>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+        <Typography color="error">{error}</Typography>
+      </Box>
+    );
+  }
+
+  // If there are no valid questions, show an error
+  if (questions.length === 0) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+        <Typography color="error">
+          No valid questions available for this quiz.
+        </Typography>
+      </Box>
+    );
+  }
+
+  // Show terms dialog if not accepted yet
+  if (!hasAcceptedTerms) {
+    return (
+      <Dialog open={true} maxWidth="sm" fullWidth>
+        <DialogTitle>Quiz Terms and Conditions</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" paragraph>
+            By starting this {isQualificationRound ? 'qualification ' : ''}quiz, you agree to the following:
+          </Typography>
+          <ul>
+            <li>You will answer all questions to the best of your ability</li>
+            {isQualificationRound && (
+              <li>
+                You must score at least {minimumScorePercentage}% to pass the qualification round
+              </li>
+            )}
+            <li>You will not use any external resources or assistance</li>
+            <li>Your answers will be recorded for evaluation</li>
+          </ul>
+          {isQualificationRound && (
+            <Typography variant="body2" color="primary" sx={{ mt: 2, fontWeight: 'bold' }}>
+              Note: You must pass this qualification round to participate in the main quiz.
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button onClick={() => navigate('/')} color="secondary">
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleAcceptTerms} 
+            variant="contained" 
+            color="primary"
+          >
+            I Accept
+          </Button>
+        </DialogActions>
+      </Dialog>
+    );
+  }
+
+  // Show quiz result if completed
+  if (showResult && quizResult) {
+    return (
+      <Box textAlign="center" p={4}>
+        <Typography variant="h4" gutterBottom>
+          {isQualificationRound ? 'Qualification ' : 'Quiz '} Complete!
+        </Typography>
+        <Typography variant="h6" color={quizResult.passed ? 'success.main' : 'error.main'} gutterBottom>
+          {quizResult.passed ? 'Congratulations! You passed!' : 'Sorry, you did not pass.'}
+        </Typography>
+        <Typography variant="body1" paragraph>
+          Your score: {quizResult.score} out of {questions.length} (
+          {quizResult.percentageScore.toFixed(1)}%)
+        </Typography>
+        {isQualificationRound && (
+<Typography variant="body1" paragraph>
+            {quizResult.passed 
+              ? 'You have qualified to participate in the main quiz.' 
+              : `You needed at least ${minimumScorePercentage}% to pass.`}
+          </Typography>
+        )}
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={() => {
+            if (isQualificationRound && !quizResult.passed) {
+              window.location.reload(); // Reload to retry
+            } else {
+              navigate('/');
+            }
+          }}
+          sx={{ mt: 2 }}
+        >
+          {isQualificationRound && !quizResult.passed ? 'Try Again' : 'Return to Home'}
+        </Button>
+      </Box>
+    );
+  }
+
   if (hasQualification === null) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -289,7 +537,14 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
         questionId,
         answer
       }));
-      onComplete(newState.score, answers);
+      const percentageScore = (newState.score / questions.length) * 100;
+      const passed = percentageScore >= (minimumScorePercentage || 70);
+      onComplete({
+        score: newState.score,
+        answers,
+        percentageScore,
+        passed
+      });
     }
   };
 
@@ -507,7 +762,14 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
                       questionId,
                       answer
                     }));
-                    onComplete(quizState.score, answers);
+                    const percentageScore = (quizState.score / questions.length) * 100;
+                    const passed = percentageScore >= (minimumScorePercentage || 70);
+                    onComplete({
+                      score: quizState.score,
+                      answers,
+                      percentageScore,
+                      passed
+                    });
                     navigate('/leaderboard');
                   }}
                 >

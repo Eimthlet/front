@@ -215,21 +215,35 @@ const UserManagement: React.FC<UserManagementProps> = (): JSX.Element => {
       setLoading(true);
       clearError();
       
-      const response = await api.put(`/admin/user/${editUser.id}`, { username: editUser.username, email: editUser.email, phone: editUser.phone, is_disqualified: editUser.is_disqualified, role: editUser.role });
-      const updatedUser = response?.data?.user || {};
+      // Ensure is_disqualified is properly set as a boolean
+      const userData = {
+        username: editUser.username,
+        email: editUser.email,
+        phone: editUser.phone,
+        is_disqualified: Boolean(editUser.is_disqualified), // Ensure boolean
+        role: editUser.role
+      };
       
-      // Update user in the list
-      setUsers(prevUsers => 
-        prevUsers.map(user => 
-          user.id === selectedUser.id ? { ...user, ...updatedUser } : user
-        )
-      );
+      // Update the user
+      const response = await api.put(`/admin/user/${editUser.id}`, userData);
       
-      setSuccess('User updated successfully');
-      setOpenUserDialog(false);
-      
-      // Reset form
-      setEditUser({});
+      if (response?.data?.success) {
+        // Refresh the users list to get the latest data
+        await fetchUsers(pagination.page, pagination.limit, searchQuery, roleFilter, statusFilter);
+        
+        // If the current user is being deactivated, update the selected user
+        if (selectedUser && selectedUser.id === editUser.id) {
+          setSelectedUser(prev => prev ? { ...prev, is_disqualified: userData.is_disqualified } : null);
+        }
+        
+        setSuccess('User updated successfully');
+        setOpenUserDialog(false);
+        
+        // Reset form
+        setEditUser({});
+      } else {
+        throw new Error(response?.data?.error || 'Failed to update user');
+      }
     } catch (err) {
       console.error('Error updating user:', err);
       handleError(

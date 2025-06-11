@@ -53,15 +53,19 @@ const Leaderboard: React.FC = () => {
       setError(null);
       
       // Fetch leaderboard data, including the timeRange query parameter
-      const apiUrl = `/leaderboard?range=${timeRange}`;
-      const responseData = await apiClient.get(apiUrl); // responseData is the actual data object
+      const apiUrl = `/api/leaderboard?range=${timeRange}`;
+      console.log('Fetching leaderboard from:', apiUrl);
       
-      if (responseData && Array.isArray(responseData.leaderboard)) {
-        setLeaderboard(responseData.leaderboard);
-        // const { userRank, currentUserId } = responseData; // Potentially use these later
+      const response = await apiClient.get(apiUrl);
+      console.log('Leaderboard response:', response);
+      
+      if (response && response.success && Array.isArray(response.leaderboard)) {
+        setLeaderboard(response.leaderboard);
+        console.log(`Set ${response.leaderboard.length} leaderboard entries`);
       } else {
-        console.warn('Unexpected leaderboard response format:', responseData);
+        console.warn('Unexpected leaderboard response format:', response);
         setLeaderboard([]);
+        setError('Failed to load leaderboard: Invalid data format');
       }
     } catch (err: any) {
       console.error('Error fetching leaderboard:', err);
@@ -78,8 +82,11 @@ const Leaderboard: React.FC = () => {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-        <CircularProgress sx={{ color: 'rgba(255, 255, 255, 0.7)' }} />
+      <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '50vh', p: 3 }}>
+        <CircularProgress sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 2 }} />
+        <Typography variant="body2" color="textSecondary">
+          Loading leaderboard data...
+        </Typography>
       </Box>
     );
   }
