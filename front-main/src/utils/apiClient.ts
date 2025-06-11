@@ -12,7 +12,7 @@ interface AuthResponse {
   };
 }
 
-// Simple API client interface
+// Define the API client interface
 interface IApiClient {
   get<T = any>(url: string, config?: any): Promise<T>;
   post<T = any>(url: string, data?: any, config?: any): Promise<T>;
@@ -24,38 +24,45 @@ interface IApiClient {
 // Create a simple API client instance
 const api = axios.create({
   baseURL: process.env.NODE_ENV === 'development' 
-    ? 'http://localhost:5000/api' 
-    : 'https://car-quizz.onrender.com/api',
+    ? 'http://localhost:5000' 
+    : 'https://car-quizz.onrender.com',
   headers: {
     'Content-Type': 'application/json',
   },
   withCredentials: true,
   timeout: 15000, // 15 seconds timeout
-  transformResponse: function(data) {
-    if (typeof data === 'string') {
-      try {
-        return JSON.parse(data);
-      } catch (e) {
-        return data;
-      }
-    }
-    return data;
-  }
 });
 
-// Add request interceptor to include auth token
+// Add request interceptor to handle API prefix and auth token
 api.interceptors.request.use((config) => {
+  // Add API prefix if not present
+  if (config.url && !config.url.startsWith('/api/') && !config.url.startsWith('http')) {
+    config.url = `/api${config.url.startsWith('/') ? '' : '/'}${config.url}`;
+  }
+  
+  // Add auth token if available
   const token = TokenManager.getToken();
   if (token) {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
   return config;
 });
 
 // Add response interceptor to handle token refresh
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Parse JSON response if needed
+    if (typeof response.data === 'string') {
+      try {
+        response.data = JSON.parse(response.data);
+      } catch (e) {
+        console.error('Error parsing response data:', e);
+      }
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
     
@@ -70,7 +77,12 @@ api.interceptors.response.use(
           const baseUrl = process.env.NODE_ENV === 'development' 
             ? 'http://localhost:5000' 
             : 'https://car-quizz.onrender.com';
-          const response = await axios.post<AuthResponse>(`${baseUrl}/api/auth/refresh`, { refreshToken });
+          const response = await axios.post<AuthResponse>(
+            `${baseUrl}/api/auth/refresh`, 
+            { refreshToken },
+            { withCredentials: true }
+          );
+          
           const { token, refreshToken: newRefreshToken } = response.data;
           
           // Update tokens in storage
@@ -82,6 +94,7 @@ api.interceptors.response.use(
         }
       } catch (error) {
         console.error('Error refreshing token:', error);
+        // Clear tokens and redirect to login
         TokenManager.clearTokens();
         window.location.href = '/login';
       }
