@@ -1,4 +1,4 @@
-import React, { FC, useState, useMemo, useEffect } from 'react';
+import React, { FC, useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   Box, 
   Button, 
@@ -110,23 +110,27 @@ interface QuizProps {
 }
 
 const Quiz: FC<QuizProps> = ({ 
-  questions: initialQuestions, 
+  questions: initialQuestions = [], 
   onComplete, 
   isQualificationRound = false, 
   qualificationRoundId,
   minimumScorePercentage = 70
 }) => {
+  // State hooks
   const [questions, setQuestions] = useState<Question[]>(initialQuestions);
-  const [isLoading, setIsLoading] = useState(isQualificationRound && initialQuestions.length === 0);
+  const [isLoading, setIsLoading] = useState<boolean>(isQualificationRound && initialQuestions.length === 0);
   const [error, setError] = useState<string | null>(null);
   const [attemptId, setAttemptId] = useState<string | null>(null);
-  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
-  const [showResult, setShowResult] = useState(false);
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState<boolean>(false);
+  const [showResult, setShowResult] = useState<boolean>(false);
+  const [showTerms, setShowTerms] = useState<boolean>(true);
   const [quizResult, setQuizResult] = useState<{
     score: number;
     percentageScore: number;
     passed: boolean;
   } | null>(null);
+
+  // Hooks
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -163,59 +167,63 @@ const Quiz: FC<QuizProps> = ({
     }
   }, [isQualificationRound, qualificationRoundId, initialQuestions.length]);
 
-  // Handle quiz completion - used by child components
-  const handleComplete = React.useCallback(async (score: number, answers: { questionId: string; answer: string }[]) => {
-    const percentageScore = (score / questions.length) * 100;
-    const passed = percentageScore >= minimumScorePercentage;
-    
-    const result = {
-      score,
-      answers,
-      percentageScore,
-      passed
-    };
+  // Handle quiz completion
+  const handleComplete = useCallback(async (score: number, answers: { questionId: string; answer: string }[]) => {
+    try {
+      const percentageScore = (score / questions.length) * 100;
+      const passed = percentageScore >= (minimumScorePercentage || 70);
+      
+      const result = {
+        score,
+        answers,
+        percentageScore,
+        passed
+      };
 
-    if (isQualificationRound && attemptId) {
-      try {
-        const response = await api.post('/api/quiz/submit', {
-          attemptId,
-          answers: answers.map(a => ({
-            questionId: a.questionId,
-            answer: a.answer
-          }))
-        });
-        
-        // Update with server response
-        result.passed = response.passed;
-        result.percentageScore = response.percentageScore;
-      } catch (err) {
-        console.error('Failed to submit qualification attempt:', err);
-        // Continue with client-side result if submission fails
+      if (isQualificationRound && attemptId) {
+        try {
+          const response = await api.post('/api/quiz/submit', {
+            attemptId,
+            answers: answers.map(a => ({
+              questionId: a.questionId,
+              answer: a.answer
+            }))
+          });
+          
+          // Update with server response
+          result.passed = response.passed;
+          result.percentageScore = response.percentageScore;
+        } catch (err) {
+          console.error('Failed to submit qualification attempt:', err);
+          // Continue with client-side result if submission fails
+        }
       }
+      
+      setQuizResult({
+        score: result.score,
+        percentageScore: result.percentageScore,
+        passed: result.passed
+      });
+      
+      setShowResult(true);
+      
+      onComplete({
+        score: result.score,
+        answers: result.answers,
+        percentageScore: result.percentageScore,
+        passed: result.passed
+      });
+    } catch (error) {
+      console.error('Error in handleComplete:', error);
+      setError('An error occurred while processing your quiz results.');
     }
-    
-    const finalResult = {
-      score: result.score,
-      percentageScore: result.percentageScore,
-      passed: result.passed
-    };
-    
-    setQuizResult(finalResult);
-    setShowResult(true);
-    onComplete({
-      score: result.score,
-      answers: result.answers,
-      percentageScore: result.percentageScore,
-      passed: result.passed
-    });
   }, [questions.length, minimumScorePercentage, isQualificationRound, attemptId, onComplete]);
 
   // Handle terms acceptance
-  const handleAcceptTerms = () => {
+  const handleAcceptTerms = useCallback(() => {
     setHasAcceptedTerms(true);
-  };
-  // State hooks must be called first, before any early returns
-  const [showTerms, setShowTerms] = useState(true);
+    setShowTerms(false);
+  }, []);
 
   // Validate and prepare questions
   const validQuestions = useMemo(() => 
@@ -225,30 +233,35 @@ const Quiz: FC<QuizProps> = ({
       Boolean(q.question) && 
       Array.isArray(q.options) && 
       q.options.length > 0 && 
-      q.correctAnswer !== undefined
-    ), [questions]
+      typeof q.correctAnswer !== 'undefined'
+    ), 
+    [questions]
   );
 
   // Session management
-  const session = loadQuizSession();
+  const session = useMemo(() => loadQuizSession(), []);
 
-  const [shuffledQuestions] = useState<Question[]>(() => {
+  const shuffledQuestions = useMemo(() => {
     if (validQuestions.length === 0 || !user) {
       return [];
     }
 
-    if (session?.shuffledOrder && session.shuffledOrder.length === validQuestions.length) {
+    if (session?.shuffledOrder?.length === validQuestions.length) {
       const idToQuestion = Object.fromEntries(validQuestions.map(q => [q.id, q]));
       return session.shuffledOrder
         .map((id: string) => idToQuestion[id])
-        .filter(Boolean);
+        .filter((q): q is Question => q !== undefined);
     }
     
     const shuffled = [...validQuestions].sort(() => Math.random() - 0.5);
     const order = shuffled.map(q => q.id);
-    saveQuizSession({ shuffledOrder: order });
+    saveQuizSession({ 
+      ...session, 
+      shuffledOrder: order 
+    });
+    
     return shuffled;
-  });
+  }, [validQuestions, session, user]);
 
   const [quizState, setQuizState] = useState<QuizState>(() => {
     if (validQuestions.length === 0 || !user) {
@@ -261,7 +274,7 @@ const Quiz: FC<QuizProps> = ({
       };
     }
 
-    if (session?.quizState && session.shuffledQuestions?.length === shuffledQuestions.length) {
+    if (session?.quizState && session.shuffledOrder?.length === shuffledQuestions.length) {
       return session.quizState;
     }
     
@@ -274,96 +287,157 @@ const Quiz: FC<QuizProps> = ({
     };
   });
 
-  // Timer and session management hook (always called)
-  useEffect(() => {
-    // Only set up timer if there are valid questions and a user
-    if (validQuestions.length > 0 && user) {
-      const timer = setInterval(() => {
-        setQuizState(prev => {
-          if (prev.timeRemaining > 0) {
-            return { ...prev, timeRemaining: prev.timeRemaining - 1 };
-          }
+  // Handle answer selection
+  const handleAnswerSelect = useCallback((questionId: string, selectedAnswer: string) => {
+    setQuizState(prev => {
+      const currentQuestion = shuffledQuestions[prev.currentQuestion];
+      if (!currentQuestion) return prev;
+      
+      const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
+      const newScore = isCorrect ? prev.score + 1 : prev.score;
+      const newAnswers = {
+        ...prev.answers,
+        [questionId]: selectedAnswer
+      };
+      
+      // Save progress
+      const newState = {
+        ...prev,
+        score: newScore,
+        answers: newAnswers
+      };
+      
+      // Move to next question or complete quiz
+      if (prev.currentQuestion < shuffledQuestions.length - 1) {
+        newState.currentQuestion = prev.currentQuestion + 1;
+        newState.timeRemaining = shuffledQuestions[prev.currentQuestion + 1]?.timeLimit || 30;
+      } else {
+        newState.isComplete = true;
+        // Convert answers to array format for onComplete
+        const answersArray = Object.entries(newAnswers).map(([qId, answer]) => ({
+          questionId: qId,
+          answer
+        }));
+        
+        const percentageScore = (newScore / shuffledQuestions.length) * 100;
+        const passed = percentageScore >= (minimumScorePercentage || 70);
+        
+        onComplete({
+          score: newScore,
+          answers: answersArray,
+          percentageScore,
+          passed
+        });
+        
+        setShowResult(true);
+      }
+      
+      // Save session
+      saveQuizSession({
+        ...session,
+        quizState: newState,
+        shuffledOrder: shuffledQuestions.map(q => q.id)
+      });
+      
+      return newState;
+    });
+  }, [shuffledQuestions, minimumScorePercentage, onComplete, session]);
 
-          // Time's up, move to next question or complete quiz
-          if (prev.currentQuestion + 1 < shuffledQuestions.length) {
-            return {
+  // Timer effect
+  useEffect(() => {
+    if (validQuestions.length === 0 || !user || quizState.isComplete) return;
+    
+    const timer = setInterval(() => {
+      setQuizState(prev => {
+        if (prev.timeRemaining <= 1) {
+          // Time's up, move to next question or complete
+          if (prev.currentQuestion < shuffledQuestions.length - 1) {
+            const newState = {
               ...prev,
               currentQuestion: prev.currentQuestion + 1,
               timeRemaining: shuffledQuestions[prev.currentQuestion + 1]?.timeLimit || 30
             };
+            
+            saveQuizSession({
+              ...session,
+              quizState: newState,
+              shuffledOrder: shuffledQuestions.map(q => q.id)
+            });
+            
+            return newState;
           } else {
-            setShowResult(true);
-            // Convert answers to the expected format
-            const answers = Object.entries(prev.answers).map(([questionId, answer]) => ({
-              questionId,
+            // Quiz complete
+            const answersArray = Object.entries(prev.answers).map(([qId, answer]) => ({
+              questionId: qId,
               answer
             }));
-            const percentageScore = (prev.score / validQuestions.length) * 100;
-            const passed = percentageScore >= minimumScorePercentage;
+            
+            const percentageScore = (prev.score / shuffledQuestions.length) * 100;
+            const passed = percentageScore >= (minimumScorePercentage || 70);
             
             onComplete({
               score: prev.score,
-              answers,
+              answers: answersArray,
               percentageScore,
               passed
             });
             
-            return { ...prev, isComplete: true };
+            const completedState = {
+              ...prev,
+              isComplete: true,
+              timeRemaining: 0
+            };
+            
+            saveQuizSession({
+              ...session,
+              quizState: completedState,
+              shuffledOrder: shuffledQuestions.map(q => q.id)
+            });
+            
+            setShowResult(true);
+            return completedState;
           }
-        });
-      }, 1000);
+        }
+        
+        return { ...prev, timeRemaining: prev.timeRemaining - 1 };
+      });
+    }, 1000);
 
-      return () => clearInterval(timer);
-    }
-    
-    // No-op return if conditions aren't met
-    return () => {};
-  }, [onComplete, shuffledQuestions, validQuestions.length, user, minimumScorePercentage]);
+    return () => clearInterval(timer);
+  }, [validQuestions.length, user, quizState.isComplete, shuffledQuestions, onComplete, minimumScorePercentage, session]);
 
-  // Qualification check
+  // Check if user is qualified
   const [hasQualification, setHasQualification] = useState<boolean | null>(null);
-
+  
   useEffect(() => {
     const checkQualification = async () => {
+      if (!user) return;
+      
       try {
-        // The API client returns a response with data property
-        const response = await api.get('/qualification');
-        const qualificationData = response?.data;
+        const response = await api.get<{
+          hasAttempted: boolean;
+          isQualified?: boolean;
+          qualifies_for_next_round?: boolean;
+          message?: string;
+        }>('/api/qualification');
         
-        // Type guard to validate the response data structure
-        if (!qualificationData || typeof qualificationData !== 'object') {
-          console.error('Invalid response data:', qualificationData);
-          throw new Error('Invalid response format from qualification endpoint');
-        }
-        
-        // Check if the response has the expected properties
-        const hasRequiredProps = 'hasAttempted' in qualificationData && 
-                              ('isQualified' in qualificationData || 'qualifies_for_next_round' in qualificationData);
-        
-        if (!hasRequiredProps) {
-          console.error('Unexpected response format:', qualificationData);
-          throw new Error('Invalid qualification data format from server');
-        }
-        
-        // Handle both response formats for the qualified flag
-        const isQualified = qualificationData.isQualified || qualificationData.qualifies_for_next_round || false;
+        // Handle both response formats
+        const isQualified = response.isQualified || response.qualifies_for_next_round || false;
         setHasQualification(isQualified);
         
-        if (!isQualified && qualificationData.message) {
-          console.warn('Qualification check warning:', qualificationData.message);
+        if (response.message) {
+          console.log('Qualification check:', response.message);
         }
       } catch (err) {
-        const error = handleApiError(err);
-        console.error('Qualification check failed:', error);
+        console.error('Failed to check qualification status:', handleApiError(err));
         setHasQualification(false);
       }
     };
-
-    if (user) {
-      checkQualification();
-    }
+    
+    checkQualification();
   }, [user]);
 
+  // Loading state
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
@@ -373,6 +447,7 @@ const Quiz: FC<QuizProps> = ({
     );
   }
 
+  // Error state
   if (error) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
@@ -381,20 +456,63 @@ const Quiz: FC<QuizProps> = ({
     );
   }
 
-  // Handle loading and error states
-  if (isLoading) {
+  // Check if user needs to accept terms
+  if (showTerms && !hasAcceptedTerms) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
-        <Typography sx={{ ml: 2 }}>Loading questions...</Typography>
-      </Box>
+      <GlassDialog>
+        <DialogTitle>Quiz Terms and Conditions</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" paragraph>
+            Before starting the quiz, please read and accept the terms and conditions:
+          </Typography>
+          <Typography variant="body2" color="textSecondary" paragraph>
+            - You will have a limited time to answer each question
+          </Typography>
+          <Typography variant="body2" color="textSecondary" paragraph>
+            - Once submitted, answers cannot be changed
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            - Your progress will be saved automatically
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => navigate('/')} 
+            color="secondary"
+            className="decline"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleAcceptTerms} 
+            color="primary"
+            variant="contained"
+            className="accept"
+          >
+            I Accept
+          </Button>
+        </DialogActions>
+      </GlassDialog>
     );
   }
 
-  if (error) {
+  // Check if user needs to complete qualification
+  if (isQualificationRound && hasQualification === false) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <Typography color="error">{error}</Typography>
+        <GlassCard>
+          <Typography variant="h5" gutterBottom>Qualification Required</Typography>
+          <Typography variant="body1" paragraph>
+            You need to complete the qualification round before attempting this quiz.
+          </Typography>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={() => navigate('/qualification')}
+          >
+            Go to Qualification
+          </Button>
+        </GlassCard>
       </Box>
     );
   }
@@ -406,6 +524,40 @@ const Quiz: FC<QuizProps> = ({
         <Typography color="error">
           No valid questions available for this quiz.
         </Typography>
+      </Box>
+    );
+  }
+
+  // Show quiz results if completed
+  if (quizState.isComplete || showResult) {
+    const percentageScore = (quizState.score / questions.length) * 100;
+    const passed = percentageScore >= (minimumScorePercentage || 70);
+    
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+        <GlassCard>
+          <Typography variant="h4" gutterBottom>
+            {passed ? '🎉 Quiz Completed! 🎉' : 'Quiz Completed'}
+          </Typography>
+          <Typography variant="h6" gutterBottom>
+            Your Score: {quizState.score} / {questions.length}
+          </Typography>
+          <Typography variant="h6" color={passed ? 'success.main' : 'error.main'} gutterBottom>
+            {percentageScore.toFixed(1)}% - {passed ? 'Passed!' : 'Not Passed'}
+          </Typography>
+          <Box mt={4}>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              onClick={() => {
+                clearQuizSession();
+                window.location.reload();
+              }}
+            >
+              Restart Quiz
+            </Button>
+          </Box>
+        </GlassCard>
       </Box>
     );
   }
@@ -466,7 +618,7 @@ const Quiz: FC<QuizProps> = ({
           {quizResult.percentageScore.toFixed(1)}%)
         </Typography>
         {isQualificationRound && (
-<Typography variant="body1" paragraph>
+          <Typography variant="body1" paragraph>
             {quizResult.passed 
               ? 'You have qualified to participate in the main quiz.' 
               : `You needed at least ${minimumScorePercentage}% to pass.`}
@@ -511,41 +663,47 @@ const Quiz: FC<QuizProps> = ({
   // Answer handling
   const handleAnswer = (selectedAnswer: string): void => {
     const currentQuestion = shuffledQuestions[quizState.currentQuestion];
+    if (!currentQuestion) return;
+    
     const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
 
-    const newState: QuizState = {
-      ...quizState,
-      answers: {
-        ...quizState.answers,
-        [currentQuestion.id]: selectedAnswer
-      },
-      score: isCorrect ? quizState.score + 1 : quizState.score
-    };
+    setQuizState(prevState => {
+      const newState: QuizState = {
+        ...prevState,
+        answers: {
+          ...prevState.answers,
+          [currentQuestion.id]: selectedAnswer
+        },
+        score: isCorrect ? prevState.score + 1 : prevState.score
+      };
 
-    // Move to next question or complete quiz
-    if (quizState.currentQuestion + 1 < shuffledQuestions.length) {
-      newState.currentQuestion += 1;
-      newState.timeRemaining = shuffledQuestions[newState.currentQuestion]?.timeLimit || 30;
-      setQuizState(newState);
-    } else {
-      newState.isComplete = true;
-      setQuizState(newState);
-      setShowResult(true);
+      // Move to next question or complete quiz
+      if (prevState.currentQuestion + 1 < shuffledQuestions.length) {
+        newState.currentQuestion += 1;
+        newState.timeRemaining = shuffledQuestions[newState.currentQuestion]?.timeLimit || 30;
+      } else {
+        newState.isComplete = true;
+        setShowResult(true);
+        
+        // Convert answers to the expected format
+        const answers = Object.entries(newState.answers).map(([questionId, answer]) => ({
+          questionId,
+          answer
+        }));
+        
+        const percentageScore = (newState.score / questions.length) * 100;
+        const passed = percentageScore >= (minimumScorePercentage || 70);
+        
+        onComplete({
+          score: newState.score,
+          answers,
+          percentageScore,
+          passed
+        });
+      }
       
-      // Convert answers to the expected format
-      const answers = Object.entries(newState.answers).map(([questionId, answer]) => ({
-        questionId,
-        answer
-      }));
-      const percentageScore = (newState.score / questions.length) * 100;
-      const passed = percentageScore >= (minimumScorePercentage || 70);
-      onComplete({
-        score: newState.score,
-        answers,
-        percentageScore,
-        passed
-      });
-    }
+      return newState;
+    });
   };
 
   if (showTerms) {
@@ -795,6 +953,6 @@ const Quiz: FC<QuizProps> = ({
       </Box>
     </Box>
   );
-}
+};
 
 export default Quiz;
