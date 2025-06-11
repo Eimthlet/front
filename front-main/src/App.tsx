@@ -306,7 +306,7 @@ const App: React.FC = () => {
                       timeLimit: q.timeLimit,
                       explanation: q.explanation
                     }))} 
-                    onComplete={(score, answers) => handleQuizComplete(score, answers)} 
+                    onComplete={(result) => handleQuizComplete(result.score, result.answers)} 
                   />
                 ) : (
                   <Box textAlign="center" mt={10}>
