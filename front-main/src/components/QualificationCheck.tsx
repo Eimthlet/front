@@ -40,15 +40,15 @@ const QualificationCheck: React.FC<{ children: React.ReactNode }> = ({ children 
         setLoading(true);
         const response = await api.get<QualificationCheckResponse>('/api/quiz/check-qualification');
         
-        setNeedsQualification(response.data.needsQualification);
-        setHasPassed(response.data.hasPassed);
-        setHasAttempted(response.data.hasAttempted || false);
-        setQualificationRound(response.data.qualificationRound || null);
+        setNeedsQualification(response.needsQualification);
+        setHasPassed(response.hasPassed);
+        setHasAttempted(response.hasAttempted || false);
+        setQualificationRound(response.qualificationRound || null);
         
         // If no qualification needed or already passed, show children
-        if (!response.data.needsQualification || response.data.hasPassed) {
+        if (!response.needsQualification || response.hasPassed) {
           setShowQuiz(false);
-        } else if (response.data.canProceed) {
+        } else if (response.canProceed) {
           // If no active qualification round, allow proceeding
           setShowQuiz(true);
         }
