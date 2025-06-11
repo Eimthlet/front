@@ -171,9 +171,9 @@ const App: React.FC = () => {
   useEffect(() => {
     // Only fetch qualification if auth is loaded and user is present
     if (!authLoading && user) {
-      fetchQualification().then(() => {
+      fetchQualification().then((qualData) => {
         // Show status dialog if user has already attempted
-        if (qualification?.hasAttempted) {
+        if (qualData?.hasAttempted) {
           setShowStatusDialog(true);
         }
       });
@@ -181,7 +181,7 @@ const App: React.FC = () => {
       // If auth is loaded and there's no user, no need to fetch qualification, stop app loading
       setLoading(false);
     }
-  }, [authLoading, user, fetchQualification]);
+  }, [authLoading, user, fetchQualification]); // Removed qualification?.hasAttempted from deps as we use the data from the promise
 
   const handleQuizComplete = useCallback(async (score: number, answers: { questionId: string; answer: string }[]) => {
     try {
