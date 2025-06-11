@@ -31,19 +31,6 @@ import UserManagement from './components/UserManagement';
 import AdminPanel from './components/AdminPanel';
 import Leaderboard from './components/Leaderboard';
 
-// Internal question format from API
-interface ApiQuestion {
-  id: string | number;
-  question_text?: string;
-  question?: string;
-  options: string[] | any;
-  correct_answer?: string | number;
-  correctAnswer?: string;
-  timeLimit?: number;
-  explanation?: string;
-  category?: string;
-  difficulty?: string;
-}
 
 // Quiz component props
 export type Question = {
