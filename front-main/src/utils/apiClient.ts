@@ -23,7 +23,9 @@ interface IApiClient {
 
 // Create a simple API client instance
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: process.env.NODE_ENV === 'development' 
+    ? 'http://localhost:5000/api' 
+    : 'https://car-quizz.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -65,7 +67,10 @@ api.interceptors.response.use(
         // Try to refresh the token
         const refreshToken = TokenManager.getRefreshToken();
         if (refreshToken) {
-          const response = await axios.post<AuthResponse>(`${getBaseUrl()}/api/auth/refresh`, { refreshToken });
+          const baseUrl = process.env.NODE_ENV === 'development' 
+            ? 'http://localhost:5000' 
+            : 'https://car-quizz.onrender.com';
+          const response = await axios.post<AuthResponse>(`${baseUrl}/api/auth/refresh`, { refreshToken });
           const { token, refreshToken: newRefreshToken } = response.data;
           
           // Update tokens in storage
@@ -85,12 +90,6 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-// Helper function to get base URL
-function getBaseUrl(): string {
-  if (typeof window === 'undefined') return ''; // SSR
-  return window.location.origin;
-}
 
 // Create a typed API client
 const apiClient: IApiClient = {
