@@ -91,7 +91,7 @@ const ActionButton = styled(Button)(({ theme }) => ({
 // Quiz Component Props
 interface QuizProps {
   questions: Question[];
-  onComplete: (result: { score: number; answers: Record<string, string> }) => void;
+  onComplete: (score: number, answers: { questionId: string; answer: string }[]) => void;
 }
 
 const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
@@ -160,6 +160,14 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
     };
   });
 
+  // Helper function to convert answers to expected format
+  const convertAnswersToArray = (answers: Record<string, string>): { questionId: string; answer: string; }[] => {
+    return Object.entries(answers).map(([questionId, answer]) => ({
+      questionId,
+      answer
+    }));
+  };
+
   // Timer and session management hook (always called)
   useEffect(() => {
     // Only set up timer if there are valid questions and a user
@@ -179,7 +187,7 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
             };
           } else {
             setShowResult(true);
-            onComplete({ score: prev.score, answers: prev.answers });
+            onComplete(prev.score, convertAnswersToArray(prev.answers));
             return { ...prev, isComplete: true };
           }
         });
@@ -220,7 +228,7 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
       newState.isComplete = true;
       setQuizState(newState);
       setShowResult(true);
-      onComplete(newState);
+      onComplete(newState.score, convertAnswersToArray(newState.answers));
     }
   };
 
@@ -446,7 +454,7 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
                   variant="contained"
                   onClick={() => {
                     clearQuizSession();
-                    onComplete({ score: quizState.score, answers: quizState.answers });
+                    onComplete(quizState.score, convertAnswersToArray(quizState.answers));
                     navigate('/leaderboard');
                   }}
                 >
