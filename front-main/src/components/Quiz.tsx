@@ -91,7 +91,7 @@ const ActionButton = styled(Button)(({ theme }) => ({
 // Quiz Component Props
 interface QuizProps {
   questions: Question[];
-  onComplete: (score: number) => void;
+  onComplete: (result: { score: number; answers: Record<string, string> }) => void;
 }
 
 const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
@@ -179,7 +179,7 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
             };
           } else {
             setShowResult(true);
-            onComplete(prev.score);
+            onComplete({ score: prev.score, answers: prev.answers });
             return { ...prev, isComplete: true };
           }
         });
@@ -220,7 +220,7 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
       newState.isComplete = true;
       setQuizState(newState);
       setShowResult(true);
-      onComplete(newState.score);
+      onComplete(newState);
     }
   };
 
@@ -446,7 +446,7 @@ const Quiz: FC<QuizProps> = ({ questions, onComplete }) => {
                   variant="contained"
                   onClick={() => {
                     clearQuizSession();
-                    onComplete(quizState.score);
+                    onComplete({ score: quizState.score, answers: quizState.answers });
                     navigate('/leaderboard');
                   }}
                 >
