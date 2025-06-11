@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Checkbox, FormControlLabel, Link, IconButton } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -81,8 +80,7 @@ const AuthForm: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
   const [error, setError] = useState<string | React.ReactElement>('');
   const [loading, setLoading] = useState(false);
 
-  const { login, register: authRegister, error: authError, clearError } = useAuth();
-  const navigate = useNavigate();
+  const { login, error: authError, clearError } = useAuth();
 
   // Check if there's a pending registration for the given email
   const checkPendingRegistration = async (email: string): Promise<{ pending: boolean; tx_ref?: string }> => {
