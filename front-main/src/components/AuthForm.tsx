@@ -9,8 +9,10 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import './AuthForm.css';
 
 interface PendingRegistrationResponse {
+  success: boolean;
   pending: boolean;
   tx_ref?: string;
+  email?: string;
 }
 
 interface ResumePaymentResponse {
@@ -124,13 +126,22 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
   // Removed unused state variables
 
   // Check for pending registration
-  const checkPendingRegistration = async (emailToCheck: string): Promise<PendingRegistrationResponse | null> => {
+  const checkPendingRegistration = async (emailToCheck: string): Promise<PendingRegistrationResponse> => {
     try {
       const response = await apiClient.post('/auth/check-pending-registration', { email: emailToCheck });
-      return response?.data || null;
+      console.log('Check pending registration response:', response.data);
+      if (response?.data?.success) {
+        return {
+          success: true,
+          pending: response.data.pending || false,
+          tx_ref: response.data.tx_ref,
+          email: response.data.email
+        };
+      }
+      return { success: true, pending: false };
     } catch (error) {
       console.error('Error checking pending registration:', error);
-      return null;
+      return { success: false, pending: false };
     }
   };
 
