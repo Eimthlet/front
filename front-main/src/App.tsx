@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { ThemeProvider, CssBaseline, Box, Typography, CircularProgress, Button } from '@mui/material';
+import { ThemeProvider, CssBaseline, Box, Typography, CircularProgress, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -46,6 +46,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [qualification, setQualification] = useState<QualificationResponse | null>(null);
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
   
   // Memoized function to set error state
   const handleError = useCallback((error: unknown) => {
@@ -170,7 +171,12 @@ const App: React.FC = () => {
   useEffect(() => {
     // Only fetch qualification if auth is loaded and user is present
     if (!authLoading && user) {
-      fetchQualification();
+      fetchQualification().then(() => {
+        // Show status dialog if user has already attempted
+        if (qualification?.hasAttempted) {
+          setShowStatusDialog(true);
+        }
+      });
     } else if (!authLoading && !user) {
       // If auth is loaded and there's no user, no need to fetch qualification, stop app loading
       setLoading(false);
@@ -252,106 +258,128 @@ const App: React.FC = () => {
                     <CircularProgress />
                     <Typography variant="body1" mt={2}>Loading quiz data...</Typography>
                   </Box>
-                ) : qualification.hasAttempted ? (
-                  <Box textAlign="center" mt={10} p={3} sx={{ maxWidth: 600, mx: 'auto', bgcolor: 'background.paper', borderRadius: 2, boxShadow: 1 }}>
-                    <Typography variant="h4" gutterBottom color="primary">
-                      {qualification.isQualified ? 'Qualification Complete!' : 'Qualification Attempted'}
-                    </Typography>
-                    
-                    <Typography variant="h6" color={qualification.isQualified ? 'success.main' : 'error.main'} mb={3}>
-                      {qualification.isQualified 
-                        ? 'Congratulations! You have qualified for the quiz.' 
-                        : 'You have already attempted the qualification quiz.'}
-                    </Typography>
-                    
-                    {qualification.score !== undefined && qualification.totalQuestions && (
-                      <Box mb={3}>
-                        <Typography variant="body1">
-                          Your score: <strong>{qualification.score} / {qualification.totalQuestions}</strong>
-                          {qualification.percentageScore && ` (${qualification.percentageScore})`}
-                        </Typography>
-                        <Typography variant="body1">
-                          Minimum required: {qualification.minimumRequired || 50}%
-                        </Typography>
-                        {qualification.completed_at && (
-                          <Typography variant="body2" color="text.secondary" mt={1}>
-                            Attempted on: {new Date(qualification.completed_at).toLocaleString()}
-                          </Typography>
-                        )}
-                      </Box>
-                    )}
-                    
-                    <Typography variant="body1" mb={3}>
-                      {qualification.message || 
-                        (qualification.isQualified 
-                          ? 'You can now participate in the main quiz.' 
-                          : 'You have already attempted the qualification quiz.')}
-                    </Typography>
-                    
-                    <Box>
-                      {qualification.isQualified ? (
-                        <Button 
-                          variant="contained" 
-                          color="primary"
-                          onClick={() => fetchQualification()}
-                          sx={{ mt: 2, mr: 2 }}
-                        >
-                          Continue to Quiz
-                        </Button>
-                      ) : (
-                        <Button 
-                          variant="outlined" 
-                          color="primary"
-                          onClick={() => window.location.reload()}
-                          sx={{ mt: 2, mr: 2 }}
-                        >
-                          Refresh Status
-                        </Button>
-                      )}
-                      <Button 
-                        variant="contained" 
-                        color="secondary"
-                        onClick={() => navigate('/leaderboard')}
-                        sx={{ mt: 2 }}
-                      >
-                        View Leaderboard
-                      </Button>
-                    </Box>
-                  </Box>
                 ) : (
                   <Box textAlign="center" mt={10}>
                     <Typography variant="h4" gutterBottom>
                       Welcome to the Quiz!
                     </Typography>
                     <Typography variant="body1" mb={4}>
-                      You need to complete a qualification quiz before you can start.
+                      {qualification.hasAttempted 
+                        ? 'Your qualification status is shown below.'
+                        : 'You need to complete a qualification quiz before you can start.'}
                     </Typography>
-                    <Button 
-                      variant="contained" 
-                      color="primary" 
-                      size="large"
-                      onClick={async () => {
-                        try {
-                          setLoading(true);
-                          const qualificationData = await startQualificationAttempt();
-                          if (qualificationData.success && qualificationData.questions?.length) {
-                            setQuestions(qualificationData.questions);
-                          } else {
-                            handleError(new Error(qualificationData.message || 'Failed to start qualification quiz'));
+                    
+                    {!qualification.hasAttempted && (
+                      <Button 
+                        variant="contained" 
+                        color="primary" 
+                        size="large"
+                        onClick={async () => {
+                          try {
+                            setLoading(true);
+                            const qualificationData = await startQualificationAttempt();
+                            if (qualificationData.success && qualificationData.questions?.length) {
+                              setQuestions(qualificationData.questions);
+                            } else {
+                              handleError(new Error(qualificationData.message || 'Failed to start qualification quiz'));
+                            }
+                          } catch (error) {
+                            handleError(error);
+                          } finally {
+                            setLoading(false);
                           }
-                        } catch (error) {
-                          handleError(error);
-                        } finally {
-                          setLoading(false);
-                        }
-                      }}
-                      disabled={loading}
-                      sx={{ mt: 2 }}
-                    >
-                      {loading ? 'Starting...' : 'Start Qualification Quiz'}
-                    </Button>
+                        }}
+                        disabled={loading}
+                        sx={{ mt: 2 }}
+                      >
+                        {loading ? 'Starting...' : 'Start Qualification Quiz'}
+                      </Button>
+                    )}
+                    
+                    {qualification.hasAttempted && qualification.isQualified && (
+                      <Button 
+                        variant="contained" 
+                        color="primary"
+                        onClick={() => fetchQualification()}
+                        sx={{ mt: 2, mr: 2 }}
+                      >
+                        Continue to Main Quiz
+                      </Button>
+                    )}
                   </Box>
                 )}
+                
+                {/* Status Dialog */}
+                <Dialog
+                  open={showStatusDialog && !!qualification?.hasAttempted}
+                  onClose={() => setShowStatusDialog(false)}
+                  aria-labelledby="qualification-status-dialog"
+                >
+                  <DialogTitle id="qualification-status-dialog">
+                    {qualification?.isQualified ? '🎉 Qualification Passed!' : '⚠️ Qualification Status'}
+                  </DialogTitle>
+                  <DialogContent>
+                    <DialogContentText component="div">
+                      {qualification?.isQualified ? (
+                        <>
+                          <Typography variant="h6" color="success.main" gutterBottom>
+                            Congratulations! You've passed the qualification round.
+                          </Typography>
+                          <Typography variant="body1" paragraph>
+                            You can now participate in the main quiz and compete with others.
+                          </Typography>
+                        </>
+                      ) : (
+                        <>
+                          <Typography variant="h6" color="error" gutterBottom>
+                            Qualification Attempted
+                          </Typography>
+                          <Typography variant="body1" paragraph>
+                            You have already attempted the qualification quiz.
+                          </Typography>
+                        </>
+                      )}
+                      
+                      {qualification?.score !== undefined && qualification?.totalQuestions && (
+                        <Box mt={2} mb={2}>
+                          <Typography variant="body1">
+                            Your score: <strong>{qualification.score} / {qualification.totalQuestions}</strong>
+                            {qualification.percentageScore && ` (${qualification.percentageScore})`}
+                          </Typography>
+                          <Typography variant="body1">
+                            Minimum required: {qualification.minimumRequired || 50}%
+                          </Typography>
+                          {qualification.completed_at && (
+                            <Typography variant="body2" color="text.secondary" mt={1}>
+                              Attempted on: {new Date(qualification.completed_at).toLocaleString()}
+                            </Typography>
+                          )}
+                        </Box>
+                      )}
+                      
+                      <Typography variant="body2" color="text.secondary">
+                        {qualification?.message || 
+                          (qualification?.isQualified 
+                            ? 'You can now participate in the main quiz.' 
+                            : 'If you believe this is an error, please contact support.')}
+                      </Typography>
+                    </DialogContentText>
+                  </DialogContent>
+                  <DialogActions>
+                    <Button onClick={() => setShowStatusDialog(false)} color="primary">
+                      {qualification?.isQualified ? 'Continue to Quiz' : 'Close'}
+                    </Button>
+                    {!qualification?.isQualified && (
+                      <Button 
+                        onClick={() => navigate('/leaderboard')} 
+                        color="primary"
+                        variant="contained"
+                      >
+                        View Leaderboard
+                      </Button>
+                    )}
+                  </DialogActions>
+                </Dialog>
                 
                 {questions.length > 0 ? (
                   <Quiz 
