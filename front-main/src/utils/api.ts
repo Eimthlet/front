@@ -566,69 +566,129 @@ export async function startQualificationAttempt(): Promise<QualificationStartRes
   try {
     console.log('[API] Starting qualification attempt...');
     
-    const endpoint = '/quiz/start-qualification';
-    console.log(`[API] Making POST request to ${endpoint}`);
+    // Use environment variable or default to development URL
+    const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    const endpoint = '/api/quiz/start-qualification';
+    const url = `${baseUrl}${endpoint}`;
+    
+    console.log(`[API] Making POST request to ${url}`);
     
     const token = localStorage.getItem('token');
     if (!token) {
-      throw new Error('No authentication token found');
+      throw new Error('No authentication token found in localStorage');
     }
     
-    const response = await api.post(endpoint, {}, { 
-      withCredentials: true,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    console.log('[API] Using token:', token ? 'Token exists' : 'No token');
     
-    console.log('[API] Raw response:', {
-      status: response.status,
-      statusText: response.statusText,
-      data: response.data
-    });
-
-    // Handle successful response
-    if (response.data && response.data.success === true) {
-      const { attemptId, questions, totalQuestions, minimumScorePercentage } = response.data;
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
       
-      return {
-        success: true,
-        attemptId: attemptId.toString(),
-        questions: questions.map((q: any) => ({
-          id: q.id,
-          question: q.question,
-          options: q.options,
-          category: q.category,
-          difficulty: q.difficulty,
-          timeLimit: q.timeLimit || 30
-        })),
-        totalQuestions: totalQuestions || questions?.length || 0,
-        minimumScorePercentage: minimumScorePercentage || 0
-      };
+      console.log('[API] Request completed, status:', response.status);
+      
+      // Try to parse response as JSON, but handle non-JSON responses
+      let responseData;
+      try {
+        responseData = await response.json();
+        console.log('[API] Parsed response data:', responseData);
+      } catch (parseError) {
+        console.error('[API] Failed to parse response as JSON:', parseError);
+        const text = await response.text();
+        console.log('[API] Raw response text:', text);
+        throw new Error(`Invalid response format: ${text.substring(0, 100)}`);
+      }
+      
+      // Handle non-2xx responses
+      if (!response.ok) {
+        const errorMessage = responseData?.message || 
+                           response.statusText || 
+                           `Request failed with status ${response.status}`;
+        console.error('[API] Server responded with error:', errorMessage);
+        
+        if (response.status === 401) {
+          throw new Error('Session expired. Please log in again.');
+        }
+        
+        if (response.status === 403) {
+          throw new Error('You do not have permission to start a qualification.');
+        }
+        
+        throw new Error(errorMessage);
+      }
+      
+      // Handle successful response
+      if (responseData && responseData.success === true) {
+        const { attemptId, questions, totalQuestions, minimumScore, minimumScorePercentage } = responseData;
+        
+        if (!questions || !Array.isArray(questions)) {
+          console.error('[API] Invalid questions data in response:', questions);
+          throw new Error('Invalid questions data received from server');
+        }
+        
+        const result = {
+          success: true,
+          attemptId: attemptId?.toString() || '',
+          questions: questions.map((q: any) => ({
+            id: q.id,
+            question: q.question,
+            options: q.options || [],
+            category: q.category || '',
+            difficulty: q.difficulty || 'medium',
+            timeLimit: q.timeLimit || 30
+          })),
+          totalQuestions: totalQuestions || questions?.length || 0,
+          minimumScorePercentage: minimumScorePercentage || minimumScore || 0
+        };
+        
+        console.log('[API] Successfully processed qualification attempt:', result);
+        return result;
+      }
+      
+      // Handle case where success is not true
+      const errorMessage = responseData?.message || 'Failed to start qualification attempt';
+      console.error('[API] Server responded with success: false, message:', errorMessage);
+      throw new Error(errorMessage);
+      
+    } catch (error: any) {
+      console.error('[API] Network or API error:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        status: error.status
+      });
+      
+      // Handle network errors
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        throw new Error('Unable to connect to the server. Please check your internet connection.');
+      }
+      
+      throw error; // Re-throw to be handled by outer catch
     }
-
-    // Handle error response
-    const errorMessage = response.data?.message || 'Failed to start qualification attempt';
-    console.error('[API] Error from server:', errorMessage);
-    throw new Error(errorMessage);
-
+    
   } catch (error: any) {
     console.error('[API] Error in startQualificationAttempt:', {
-      error: error.message,
-      response: error.response?.data
+      name: error.name,
+      message: error.message,
+      stack: error.stack
     });
     
     // Handle specific error cases
-    if (error.response?.data?.error === 'Game Already Played') {
+    if (error.message.includes('Game Already Played')) {
       throw new Error('You have already played this quiz.');
     }
     
-    if (error.response?.status === 401) {
+    if (error.message.includes('Session expired')) {
       throw new Error('Session expired. Please log in again.');
     }
     
-    throw new Error(error.response?.data?.message || 'Failed to start qualification. Please try again.');
+    throw new Error(error.message || 'Failed to start qualification. Please try again.');
   }
 }
 
