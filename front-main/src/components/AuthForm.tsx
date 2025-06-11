@@ -309,24 +309,78 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
         const apiError = err.response?.data?.message || err.response?.data?.error || err.message;
         
         // Check if this is a pending registration error
-        if (apiError && (apiError.includes('pending registration') || apiError.includes('pending for this email'))) {
+        if (apiError && (apiError.includes('pending registration') || apiError.includes('pending for this username') || apiError.includes('pending for this email'))) {
           setLoading(true);
           try {
             // First check for pending registration to get the tx_ref
             const pendingResponse = await checkPendingRegistration(email);
+            console.log('Pending registration response:', pendingResponse);
+            
             if (pendingResponse?.pending && pendingResponse.tx_ref) {
+              console.log('Attempting to resume payment with tx_ref:', pendingResponse.tx_ref);
               // Now we have the tx_ref, try to resume payment
-              await resumePayment(pendingResponse.tx_ref, email);
-              return;
+              const resumeResponse = await resumePayment(pendingResponse.tx_ref, email);
+              console.log('Resume payment response:', resumeResponse);
+              
+              if (resumeResponse?.success) {
+                // Configure and launch payment popup
+                const paychanguConfig: PayChanguConfig = {
+                  public_key: resumeResponse.public_key,
+                  tx_ref: resumeResponse.tx_ref,
+                  amount: resumeResponse.amount,
+                  currency: PAYMENT_CONFIG.CURRENCY,
+                  callback_url: PAYMENT_CONFIG.CALLBACK_URL,
+                  return_url: PAYMENT_CONFIG.RETURN_URL,
+                  customer: {
+                    email: resumeResponse.email,
+                    first_name: username,
+                    last_name: ''
+                  },
+                  customization: {
+                    title: 'Complete Your Registration Payment',
+                    description: 'Please complete your registration by making the payment.'
+                  },
+                  meta: {
+                    uuid: generateUUID(),
+                    response: 'standard'
+                  }
+                };
+
+                console.log('Resuming payment with config:', paychanguConfig);
+                waitForPayChanguAndLaunch(paychanguConfig, setError, setLoading);
+                setError('Please complete your payment to finalize registration.');
+                return;
+              } else {
+                setError('Failed to process payment. Please try again or contact support.');
+              }
+            } else {
+              setError('A registration is pending but we couldn\'t resume payment. Please contact support.');
+              console.error('Pending registration but no tx_ref found:', pendingResponse);
             }
           } catch (error) {
             console.error('Error handling pending registration:', error);
-          } finally {
-            setLoading(false);
+            const errorMessage = error?.response?.data?.message || 
+                                error?.message || 
+                                'Failed to resume payment. Please try again or contact support.';
+            
+            // Add a retry button for pending registration errors
+            setError(
+              <>
+                {errorMessage}
+                <Button 
+                  variant="contained" 
+                  color="primary" 
+                  onClick={() => handleSubmit(e)} 
+                  sx={{ mt: 2, display: 'block' }}
+                >
+                  Retry Payment
+                </Button>
+              </>
+            );
           }
         }
         
-        // Display the exact API error message if it exists
+        // If we get here, handle other types of errors
         if (apiError) {
           setError(apiError);
         } else {
