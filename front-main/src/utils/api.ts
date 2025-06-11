@@ -567,8 +567,8 @@ export async function startQualificationAttempt(): Promise<QualificationStartRes
     console.log('[API] Starting qualification attempt...');
     
     // Use environment variable or default to development URL
-    const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-    const endpoint = '/api/quiz/start-qualification';
+    const baseUrl = (process.env.REACT_APP_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+    const endpoint = '/quiz/start-qualification';
     const url = `${baseUrl}${endpoint}`;
     
     console.log(`[API] Making POST request to ${url}`);
