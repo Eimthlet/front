@@ -87,7 +87,7 @@ interface QualificationAttemptResponse {
 
 const App: React.FC = () => {
   const navigate = useNavigate();
-  const { user, isAdmin, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [startingQuiz, setStartingQuiz] = useState<boolean>(false);
