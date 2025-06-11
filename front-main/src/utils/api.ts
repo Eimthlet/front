@@ -566,11 +566,9 @@ export async function startQualificationAttempt(): Promise<QualificationStartRes
   try {
     console.log('[API] Starting qualification attempt...');
     
-    // Use the direct endpoint that exists on the server
     const endpoint = '/quiz/start-qualification';
     console.log(`[API] Making POST request to ${endpoint}`);
     
-    // Get the token from local storage
     const token = localStorage.getItem('token');
     if (!token) {
       throw new Error('No authentication token found');
@@ -584,95 +582,53 @@ export async function startQualificationAttempt(): Promise<QualificationStartRes
       }
     });
     
-    // Log the raw response for debugging
-    console.log('[API] Raw qualification attempt response:', {
+    console.log('[API] Raw response:', {
       status: response.status,
       statusText: response.statusText,
-      headers: response.headers,
       data: response.data
     });
-    
-    // The response data should be the direct response from the server
-    let responseData = response?.data;
-    
-    // If the user has already played, throw an error with the server's message
-    if (responseData?.error === 'Game Already Played') {
-      throw new Error(responseData.message || 'You have already played this quiz.');
-    }
-    
-    // If the response has a data property, use that
-    if (responseData && typeof responseData === 'object' && 'data' in responseData) {
-      responseData = responseData.data;
-    }
-    
-    console.log('[API] Processed response data:', responseData);
-    
-    if (!responseData) {
-      console.error('[API] No data in response from qualification start endpoint');
-      throw new Error('No data received from qualification start endpoint');
-    }
-    
-    // Handle case where the response is just the questions array
-    if (Array.isArray(responseData)) {
-      console.log('[API] Response is an array of questions');
-      const result = {
-        success: true,
-        attemptId: '',
-        questions: responseData,
-        totalQuestions: responseData.length,
-        minimumScorePercentage: 0,
-        message: 'Qualification questions loaded successfully'
-      };
-      console.log('[API] Processed qualification response (array format):', result);
-      return result;
-    }
-    
-    // Handle case where response is an object with questions and other properties
-    if (responseData && typeof responseData === 'object') {
-      console.log('[API] Response is an object with questions');
-      const result = {
-        success: responseData.success !== false, // Default to true if not specified
-        attemptId: responseData.attemptId || '',
-        questions: Array.isArray(responseData.questions) ? responseData.questions : [],
-        totalQuestions: responseData.totalQuestions || 
-                        (Array.isArray(responseData.questions) ? responseData.questions.length : 0),
-        minimumScorePercentage: responseData.minimumScorePercentage || 0,
-        message: responseData.message || 'Qualification attempt started'
-      };
+
+    // Handle successful response
+    if (response.data && response.data.success === true) {
+      const { attemptId, questions, totalQuestions, minimumScorePercentage } = response.data;
       
-      console.log('[API] Processed qualification response (object format):', result);
-      return result;
-    }
-    
-    // If we get here, the response format is unexpected
-    console.error('[API] Unexpected response format:', responseData);
-    throw new Error('Unexpected response format from qualification endpoint');
-  } catch (error) {
-    console.error('[API] Error starting qualification attempt:', error);
-    if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
-      console.error('[API] Response data:', error.response.data);
-      console.error('[API] Response status:', error.response.status);
-      console.error('[API] Response headers:', error.response.headers);
-      
-      // Return a structured error response
       return {
-        success: false,
-        message: error.response.data?.message || 'Failed to start qualification',
-        questions: [],
-        totalQuestions: 0,
-        minimumScorePercentage: 0
+        success: true,
+        attemptId: attemptId.toString(),
+        questions: questions.map((q: any) => ({
+          id: q.id,
+          question: q.question,
+          options: q.options,
+          category: q.category,
+          difficulty: q.difficulty,
+          timeLimit: q.timeLimit || 30
+        })),
+        totalQuestions: totalQuestions || questions?.length || 0,
+        minimumScorePercentage: minimumScorePercentage || 0
       };
-    } else if (error.request) {
-      // The request was made but no response was received
-      console.error('[API] No response received:', error.request);
-      throw new Error('No response received from server');
-    } else {
-      // Something happened in setting up the request that triggered an Error
-      console.error('[API] Request setup error:', error.message);
-      throw error;
     }
+
+    // Handle error response
+    const errorMessage = response.data?.message || 'Failed to start qualification attempt';
+    console.error('[API] Error from server:', errorMessage);
+    throw new Error(errorMessage);
+
+  } catch (error: any) {
+    console.error('[API] Error in startQualificationAttempt:', {
+      error: error.message,
+      response: error.response?.data
+    });
+    
+    // Handle specific error cases
+    if (error.response?.data?.error === 'Game Already Played') {
+      throw new Error('You have already played this quiz.');
+    }
+    
+    if (error.response?.status === 401) {
+      throw new Error('Session expired. Please log in again.');
+    }
+    
+    throw new Error(error.response?.data?.message || 'Failed to start qualification. Please try again.');
   }
 }
 
