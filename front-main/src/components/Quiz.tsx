@@ -167,57 +167,7 @@ const Quiz: FC<QuizProps> = ({
     }
   }, [isQualificationRound, qualificationRoundId, initialQuestions.length]);
 
-  // Handle quiz completion
-  const handleComplete = useCallback(async (score: number, answers: { questionId: string; answer: string }[]) => {
-    try {
-      const percentageScore = (score / questions.length) * 100;
-      const passed = percentageScore >= (minimumScorePercentage || 70);
-      
-      const result = {
-        score,
-        answers,
-        percentageScore,
-        passed
-      };
-
-      if (isQualificationRound && attemptId) {
-        try {
-          const response = await api.post('/api/quiz/submit', {
-            attemptId,
-            answers: answers.map(a => ({
-              questionId: a.questionId,
-              answer: a.answer
-            }))
-          });
-          
-          // Update with server response
-          result.passed = response.passed;
-          result.percentageScore = response.percentageScore;
-        } catch (err) {
-          console.error('Failed to submit qualification attempt:', err);
-          // Continue with client-side result if submission fails
-        }
-      }
-      
-      setQuizResult({
-        score: result.score,
-        percentageScore: result.percentageScore,
-        passed: result.passed
-      });
-      
-      setShowResult(true);
-      
-      onComplete({
-        score: result.score,
-        answers: result.answers,
-        percentageScore: result.percentageScore,
-        passed: result.passed
-      });
-    } catch (error) {
-      console.error('Error in handleComplete:', error);
-      setError('An error occurred while processing your quiz results.');
-    }
-  }, [questions.length, minimumScorePercentage, isQualificationRound, attemptId, onComplete]);
+  // Quiz completion is handled in the handleAnswer function
 
   // Handle terms acceptance
   const handleAcceptTerms = useCallback(() => {
