@@ -307,7 +307,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
         
         // Get the specific error message from the API response
         const apiErrorMessage = err?.response?.data?.message || err?.message || '';
-        const errorStr = typeof apiErrorMessage === 'string' ? apiErrorMessage : JSON.stringify(apiErrorMessage);
         
         if (apiErrorMessage && (apiErrorMessage.includes('pending registration') || apiErrorMessage.includes('pending for this username') || apiErrorMessage.includes('pending for this email'))) {
           setLoading(true);
