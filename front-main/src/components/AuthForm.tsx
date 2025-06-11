@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { PAYMENT_CONFIG } from '../config';
-import { Checkbox, FormControlLabel, Link, IconButton } from '@mui/material';
+import { Checkbox, FormControlLabel, Link, IconButton, Button } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import './AuthForm.css';
@@ -109,7 +109,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [amount, setAmount] = useState<number>(1000); // Default amount, adjust as needed
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | React.ReactElement>('');
   const [loading, setLoading] = useState(false);
   const [currentMode, setCurrentMode] = useState<'login' | 'register'>(mode);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -306,10 +306,9 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
         console.error('Registration error:', err);
         
         // Get the specific error message from the API response
-        const apiError = err.response?.data?.message || err.response?.data?.error || err.message;
+        const errorStr = typeof err === 'string' ? err : '';
         
-        // Check if this is a pending registration error
-        if (apiError && (apiError.includes('pending registration') || apiError.includes('pending for this username') || apiError.includes('pending for this email'))) {
+        if (errorStr && (errorStr.includes('pending registration') || errorStr.includes('pending for this username') || errorStr.includes('pending for this email'))) {
           setLoading(true);
           try {
             // First check for pending registration to get the tx_ref
@@ -359,33 +358,47 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
             }
           } catch (error) {
             console.error('Error handling pending registration:', error);
-            const errorMessage = error?.response?.data?.message || 
-                                error?.message || 
-                                'Failed to resume payment. Please try again or contact support.';
-            
-            // Add a retry button for pending registration errors
+            const errorMessage = (error as any)?.response?.data?.message || 
+                             (error as Error)?.message || 
+                             'Failed to resume payment. Please try again or contact support.';
+
+            // Create a retry button
+            const retryButton = (
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }}
+                style={{
+                  marginTop: '16px',
+                  display: 'block',
+                  padding: '8px 16px',
+                  backgroundColor: '#1976d2',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Retry Payment
+              </button>
+            );
+
+            // Set error with retry button
             setError(
               <>
                 {errorMessage}
-                <Button 
-                  variant="contained" 
-                  color="primary" 
-                  onClick={() => handleSubmit(e)} 
-                  sx={{ mt: 2, display: 'block' }}
-                >
-                  Retry Payment
-                </Button>
+                {retryButton}
               </>
             );
           }
         }
         
         // If we get here, handle other types of errors
-        if (apiError) {
-          setError(apiError);
-        } else {
-          setError('Unable to complete registration. Please try again.');
-        }
+        const errorMessage = (err as any)?.response?.data?.message || 
+                          (err as Error)?.message || 
+                          'Unable to complete registration. Please try again.';
+        setError(errorMessage);
         
         setLoading(false);
       }
@@ -577,7 +590,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }): JSX.Element => {
         {(error || authError) && (
           <div className="auth-error">
             <p>{error || authError}</p>
-            {error && error.includes('already pending for this email') && (
+            {typeof error === 'string' && error.includes('already pending for this email') && (
               <button 
                 type="button" 
                 onClick={() => checkPendingRegistration(email)}
