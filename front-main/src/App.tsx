@@ -158,7 +158,7 @@ const App: React.FC = () => {
     
     try {
       setLoading(true);
-      const response = await api.get('/quiz/qualification');
+      const response = await api.get('/qualification');
       
       if (!isMountedRef.current) return null;
       
@@ -200,7 +200,7 @@ const App: React.FC = () => {
   const startQualification = useCallback(async (): Promise<QualificationAttemptResponse> => {
     try {
       setStartingQuiz(true);
-      const response = await api.post('/quiz/start-qualification');
+      const response = await api.post('/qualification/start');
       
       if (!isMountedRef.current) {
         return { success: false, message: 'Component unmounted' };
