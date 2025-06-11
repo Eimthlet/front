@@ -15,11 +15,7 @@ const PAYMENT_CONFIG = {
   PUBLIC_KEY: process.env.REACT_APP_PAYCHANGU_PUBLIC_KEY || ''
 } as const;
 
-declare global {
-  interface Window {
-    PaychanguCheckout: any;
-  }
-}
+// No global declaration needed - handled elsewhere or will be typed as any
 
 interface PendingRegistrationResponse {
   data: {
@@ -104,8 +100,9 @@ const AuthForm: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
 
   // Wait for PayChangu script to load before calling the popup
   const waitForPayChanguAndLaunch = (config: PayChanguConfig, errorSetter: (msg: string) => void, loadingSetter: (loading: boolean) => void, retries = 10) => {
-    if (window.PaychanguCheckout) {
-      window.PaychanguCheckout(config);
+    const paychangu = (window as any).PaychanguCheckout;
+    if (paychangu) {
+      paychangu(config);
     } else if (retries > 0) {
       setTimeout(() => waitForPayChanguAndLaunch(config, errorSetter, loadingSetter, retries - 1), 300);
     } else {
@@ -116,7 +113,7 @@ const AuthForm: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
 
   // Load PayChangu popup script if not already loaded
   useEffect(() => {
-    if (!window.PaychanguCheckout) {
+    if (!(window as any).PaychanguCheckout) {
       const script = document.createElement('script');
       script.src = 'https://in.paychangu.com/js/popup.js';
       script.async = true;
