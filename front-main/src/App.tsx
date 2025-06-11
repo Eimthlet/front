@@ -210,8 +210,8 @@ const App: React.FC = () => {
         return { success: false, message: 'Component unmounted' };
       }
       
-      console.log('Received response:', response);
-      const responseData = response?.data;
+      // The response from the API is already the data we need
+      const responseData = response;
       console.log('Response data:', responseData);
       
       if (!responseData) {
@@ -220,19 +220,29 @@ const App: React.FC = () => {
       
       let questions: Question[] = [];
       
-      if (responseData?.questions) {
-        console.log('Normalizing questions...');
-        questions = normalizeQuestions(responseData.questions);
-        console.log(`Normalized ${questions.length} questions`);
+      if (responseData.questions && Array.isArray(responseData.questions)) {
+        console.log('Processing questions...');
+        questions = responseData.questions.map((q: any) => ({
+          id: String(q.id || Math.random()),
+          question: q.question || 'No question provided',
+          options: Array.isArray(q.options) ? q.options : [],
+          correctAnswer: q.correct_answer || '',
+          category: q.category,
+          difficulty: q.difficulty,
+          timeLimit: q.time_limit || 30
+        }));
+        console.log(`Processed ${questions.length} questions`);
       } else {
-        console.warn('No questions in response');
+        console.warn('No questions in response or invalid format');
       }
       
       const result = {
         success: true,
         questions,
-        attemptId: responseData?.attemptId,
-        message: responseData?.message || 'Quiz started successfully'
+        attemptId: responseData.attemptId,
+        totalQuestions: responseData.totalQuestions,
+        minimumScore: responseData.minimumScore,
+        message: responseData.message || 'Quiz started successfully'
       };
       
       console.log('Qualification quiz started successfully:', result);
