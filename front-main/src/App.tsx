@@ -83,6 +83,7 @@ interface QualificationAttemptResponse {
   questions?: Question[];
   message?: string;
   attemptId?: string;
+  error?: any; // For detailed error information
 }
 
 const App: React.FC = () => {
@@ -198,37 +199,77 @@ const App: React.FC = () => {
 
   // Function to start qualification attempt
   const startQualification = useCallback(async (): Promise<QualificationAttemptResponse> => {
+    console.log('Starting qualification quiz...');
     try {
       setStartingQuiz(true);
+      console.log('Sending request to /api/quiz/start-qualification');
       const response = await api.post('/quiz/start-qualification');
       
       if (!isMountedRef.current) {
+        console.log('Component unmounted, aborting');
         return { success: false, message: 'Component unmounted' };
       }
       
+      console.log('Received response:', response);
       const responseData = response?.data;
+      console.log('Response data:', responseData);
+      
+      if (!responseData) {
+        throw new Error('No data received from server');
+      }
+      
       let questions: Question[] = [];
       
       if (responseData?.questions) {
+        console.log('Normalizing questions...');
         questions = normalizeQuestions(responseData.questions);
+        console.log(`Normalized ${questions.length} questions`);
+      } else {
+        console.warn('No questions in response');
       }
       
-      return {
+      const result = {
         success: true,
         questions,
         attemptId: responseData?.attemptId,
-        message: responseData?.message
+        message: responseData?.message || 'Quiz started successfully'
       };
-    } catch (error) {
+      
+      console.log('Qualification quiz started successfully:', result);
+      return result;
+      
+    } catch (error: any) {
       console.error('Failed to start qualification:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to start qualification';
+      
+      // Log detailed error information
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error('Error response data:', error.response.data);
+        console.error('Error status:', error.response.status);
+        console.error('Error headers:', error.response.headers);
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error('No response received:', error.request);
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Error message:', error.message);
+      }
+      
+      const errorMessage = error.response?.data?.message || 
+                         error.message || 
+                         'Failed to start qualification quiz. Please try again.';
+                         
       if (isMountedRef.current) {
         handleError(error, errorMessage);
       }
+      
       return {
         success: false,
-        message: errorMessage
+        message: errorMessage,
+        error: error.response?.data || error.message
       };
+      
     } finally {
       if (isMountedRef.current) {
         setStartingQuiz(false);
