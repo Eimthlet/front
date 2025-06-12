@@ -18,7 +18,13 @@ interface IApiClient {
   post<T = any>(url: string, data?: any, config?: any): Promise<T>;
   put<T = any>(url: string, data?: any, config?: any): Promise<T>;
   delete<T = any>(url: string, config?: any): Promise<T>;
-  request<T = any>(config: any): Promise<{ data: T }>;
+  request<T = any>(config: any): Promise<{
+    data: T;
+    status: number;
+    statusText: string;
+    headers: any;
+    config: any;
+  }>;
 }
 
 // Create a simple API client instance
@@ -110,31 +116,38 @@ api.interceptors.response.use(
   }
 );
 
-// Create a typed API client
+// Create a typed API client that returns full response
 const apiClient: IApiClient = {
-  get: async <T = any>(url: string, config?: any): Promise<T> => {
-    const response = await api.get<T>(url, config);
+  get: async <T = any>(url: string, config?: any) => {
+    const response = await api.request<T>({ ...config, method: 'GET', url });
     return response.data;
   },
   
-  post: async <T = any>(url: string, data?: any, config?: any): Promise<T> => {
-    const response = await api.post<T>(url, data, config);
+  post: async <T = any>(url: string, data?: any, config?: any) => {
+    const response = await api.request<T>({ ...config, method: 'POST', url, data });
     return response.data;
   },
   
-  put: async <T = any>(url: string, data?: any, config?: any): Promise<T> => {
-    const response = await api.put<T>(url, data, config);
+  put: async <T = any>(url: string, data?: any, config?: any) => {
+    const response = await api.request<T>({ ...config, method: 'PUT', url, data });
     return response.data;
   },
   
-  delete: async <T = any>(url: string, config?: any): Promise<T> => {
-    const response = await api.delete<T>(url, config);
+  delete: async <T = any>(url: string, config?: any) => {
+    const response = await api.request<T>({ ...config, method: 'DELETE', url });
     return response.data;
   },
   
-  request: async <T = any>(config: any): Promise<{ data: T }> => {
+  // This method returns the full response including status, headers, etc.
+  request: async <T = any>(config: any) => {
     const response = await api.request<T>(config);
-    return { data: response.data };
+    return {
+      data: response.data,
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+      config: response.config
+    };
   }
 };
 

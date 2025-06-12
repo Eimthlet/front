@@ -250,15 +250,27 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
         if (pending && tx_ref) {
           // Attempt to resume payment for pending registration
           try {
-            const response = await apiClient.post<ApiResponse<ResumePaymentResponse>>('/auth/resume-payment', { 
-              email: email,
-              tx_ref,
-              original_tx_ref: tx_ref // Add original_tx_ref as required by backend
+            const { data, status, statusText, headers } = await apiClient.request<ApiResponse<ResumePaymentResponse>>({
+              method: 'POST',
+              url: '/auth/resume-payment',
+              data: { 
+                email: email,
+                tx_ref,
+                original_tx_ref: tx_ref
+              },
+              validateStatus: (status) => status < 500 // Don't throw for 4xx errors
             });
 
-            if (response.data?.success && response.data.data) {
+            console.log('Resume payment response:', {
+              status,
+              statusText,
+              data,
+              headers
+            });
+
+            if (data?.success && data.data) {
               // Launch payment popup with the resumed payment details
-              const paymentData = response.data.data;
+              const paymentData = data.data;
               const config: PayChanguConfig = {
                 public_key: paymentData.public_key || PAYMENT_CONFIG.PUBLIC_KEY,
                 tx_ref: paymentData.tx_ref || '',
@@ -318,39 +330,38 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
           console.log('Sending registration request to:', '/auth/register');
           console.log('Request payload:', JSON.stringify(payload, null, 2));
           
-          const response = await apiClient.post<ApiResponse<RegistrationResponseData>>(
-            '/auth/register', 
-            payload,
-            { 
-              validateStatus: (status) => true, // Always resolve, never reject HTTP status
-              timeout: 15000,
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              }
+          const { data, status, statusText, headers } = await apiClient.request<ApiResponse<RegistrationResponseData>>({
+            method: 'POST',
+            url: '/auth/register',
+            data: payload,
+            validateStatus: (status) => status < 500, // Don't throw for 4xx errors
+            timeout: 15000,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
             }
-          ) as any; // Temporary any cast to access response properties
+          });
 
-          console.log('Registration response status:', response.status);
-          if (response.headers) {
-            console.log('Registration response headers:', response.headers);
+          console.log('Registration response status:', status);
+          if (headers) {
+            console.log('Registration response headers:', headers);
           }
-          console.log('Registration response data:', response.data);
+          console.log('Registration response data:', data);
 
-          if (!response.data) {
+          if (!data) {
             console.error('No response data received from server');
             throw new Error('No response data received from server');
           }
 
           // Handle error responses - check response status and success flag
-          if (response.status >= 400) {
-            // For error responses, response.data might not follow ApiResponse structure
-            const responseData = response.data as any;
+          if (status >= 400) {
+            // For error responses, data might not follow ApiResponse structure
+            const responseData = data as any;
             console.error('Registration error response:', {
-              status: response.status,
-              statusText: response.statusText,
+              status,
+              statusText,
               data: responseData,
-              headers: response.headers
+              headers
             });
             
             // Try to extract error message from backend response format
@@ -370,15 +381,15 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
             }
             
             // Add status code if available
-            if (response.status) {
-              errorMessage += ` (Status: ${response.status})`;
+            if (status) {
+              errorMessage += ` (Status: ${status})`;
             }
             
             throw new Error(errorMessage);
           }
 
-          // Safely parse the response data
-          const responseData = response.data;
+          // responseData is already destructured as 'data'
+          const responseData = data;
           
           // Check if the response has the expected structure
           if (!responseData || typeof responseData !== 'object') {
