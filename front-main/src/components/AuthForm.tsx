@@ -4,11 +4,7 @@ import {
   FormControlLabel, 
   Link, 
   IconButton, 
-  Box, 
-  TextField, 
-  Button, 
-  Typography,
-  CircularProgress
+  Box
 } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -23,8 +19,6 @@ const PAYMENT_CONFIG = {
   CURRENCY: 'MWK',
   PUBLIC_KEY: process.env.REACT_APP_PAYCHANGU_PUBLIC_KEY || ''
 } as const;
-
-// No global declaration needed - handled elsewhere or will be typed as any
 
 interface ResumePaymentData {
   tx_ref: string;
@@ -80,7 +74,6 @@ interface PayChanguConfig {
   };
 }
 
-// Generate UUID for payment reference
 const generateUUID = (): string => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
@@ -90,7 +83,6 @@ const generateUUID = (): string => {
 };
 
 const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement => {
-  // State for form fields
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -112,20 +104,10 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
   const auth = useAuth();
   const { login, error: authError, clearError } = auth || {};
   
-  // Destructure state for easier access in JSX
   const { username, email, password, confirmPassword, phone, amount } = formData;
   const { showPassword, showConfirmPassword, acceptedTerms, loading, currentMode } = uiState;
   
-  // Helper to update form data
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'number' ? Number(value) : value
-    }));
-  };
-  
-  // Individual setters for backward compatibility with existing JSX
+
   const setUsername = (value: string) => {
     setFormData(prev => ({ ...prev, username: value }));
   };
@@ -166,7 +148,6 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
     setUiState(prev => ({ ...prev, currentMode: value }));
   };
   
-  // Toggle password visibility
   const togglePasswordVisibility = (field: 'password' | 'confirmPassword') => {
     setUiState(prev => ({
       ...prev,
@@ -175,7 +156,6 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
     }));
   };
 
-  // Check if there's a pending registration for the given email
   const checkPendingRegistration = async (email: string): Promise<{ pending: boolean; tx_ref?: string }> => {
     console.log('Checking pending registration for:', email);
     try {
