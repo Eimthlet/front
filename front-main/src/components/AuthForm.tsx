@@ -154,15 +154,18 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
     pending: boolean;
     tx_ref?: string;
     email?: string;
+    username?: string;
     error?: string;
   }
   
   // Axios response structure is already handled by the apiClient
 
-  const checkPendingRegistration = async (email: string): Promise<{ pending: boolean; tx_ref?: string; email?: string }> => {
-    console.log('Checking pending registration for:', email);
+  const checkPendingRegistration = async (email: string, username: string): Promise<{ pending: boolean; tx_ref?: string; email?: string }> => {
+    console.log('Checking pending registration for email:', email, 'and username:', username);
+    
     try {
-      const response = await apiClient.request<CheckPendingResponseData>({
+      // First check by email
+      const emailResponse = await apiClient.request<CheckPendingResponseData>({
         method: 'POST',
         url: '/auth/check-pending-registration',
         data: { email },
@@ -170,23 +173,47 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
         validateStatus: (status) => status < 500 // Don't throw on 4xx errors
       });
       
-      console.log('Check pending registration response status:', response.status);
-      console.log('Response data:', response.data);
+      console.log('Check pending registration by email response status:', emailResponse.status);
+      console.log('Response data (email check):', emailResponse.data);
       
-      const responseData = response.data;
+      const emailData = emailResponse.data;
       
-      // If there's an error in the response, log it but continue
-      if (!responseData.success) {
-        console.warn('Backend warning:', responseData.error || 'Unknown error checking pending registration');
-        return { pending: false };
+      // If there's a pending registration by email, return it
+      if (emailData.success && emailData.pending) {
+        return {
+          pending: true,
+          tx_ref: emailData.tx_ref,
+          email: emailData.email
+        };
       }
       
-      // Return the pending status and transaction reference if pending
-      return {
-        pending: responseData.pending,
-        tx_ref: responseData.tx_ref,
-        email: responseData.email
-      };
+      // Then check by username if it's provided and different from email
+      if (username && username !== email) {
+        const usernameResponse = await apiClient.request<CheckPendingResponseData>({
+          method: 'POST',
+          url: '/auth/check-pending-registration',
+          data: { email: username }, // Using the same endpoint but with username as email
+          timeout: 10000,
+          validateStatus: (status) => status < 500
+        });
+        
+        console.log('Check pending registration by username response status:', usernameResponse.status);
+        console.log('Response data (username check):', usernameResponse.data);
+        
+        const usernameData = usernameResponse.data;
+        
+        // If there's a pending registration by username, return it
+        if (usernameData.success && usernameData.pending) {
+          return {
+            pending: true,
+            tx_ref: usernameData.tx_ref,
+            email: usernameData.email
+          };
+        }
+      }
+      
+      // No pending registration found
+      return { pending: false };
     } catch (error) {
       console.error('Error checking pending registration:', error);
       // Return default values that indicate no pending registration
@@ -248,8 +275,8 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
           return;
         }
 
-        // Check for pending registration
-        const { pending, tx_ref } = await checkPendingRegistration(email);
+        // Check for pending registration by both email and username
+        const { pending, tx_ref } = await checkPendingRegistration(email, username);
         
         if (pending && tx_ref) {
           // Attempt to resume payment for pending registration
