@@ -132,14 +132,6 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
     setFormData(prev => ({ ...prev, amount: value }));
   };
   
-  const setShowPassword = (value: boolean) => {
-    setUiState(prev => ({ ...prev, showPassword: value }));
-  };
-  
-  const setShowConfirmPassword = (value: boolean) => {
-    setUiState(prev => ({ ...prev, showConfirmPassword: value }));
-  };
-  
   const setAcceptedTerms = (value: boolean) => {
     setUiState(prev => ({ ...prev, acceptedTerms: value }));
   };
