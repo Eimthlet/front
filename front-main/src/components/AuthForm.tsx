@@ -313,6 +313,9 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
         console.log('Registration payload:', JSON.stringify(payload, null, 2));
 
         try {
+          console.log('Sending registration request to:', '/auth/register');
+          console.log('Request payload:', JSON.stringify(payload, null, 2));
+          
           const response = await apiClient.post<ApiResponse<RegistrationResponseData>>(
             '/auth/register', 
             payload,
@@ -320,15 +323,20 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
               validateStatus: (status) => true, // Always resolve, never reject HTTP status
               timeout: 15000,
               headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
               }
             }
-          );
+          ) as any; // Temporary any cast to access response properties
 
           console.log('Registration response status:', response.status);
+          if (response.headers) {
+            console.log('Registration response headers:', response.headers);
+          }
           console.log('Registration response data:', response.data);
 
           if (!response.data) {
+            console.error('No response data received from server');
             throw new Error('No response data received from server');
           }
 
@@ -336,9 +344,20 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
           if (response.status >= 400) {
             // For error responses, response.data might not follow ApiResponse structure
             const responseData = response.data as any;
+            console.error('Registration error response:', {
+              status: response.status,
+              statusText: response.statusText,
+              data: responseData,
+              headers: response.headers
+            });
+            
+            // Try to extract error message from different possible response formats
             const errorMessage = responseData?.message || 
-                              responseData?.error || 
+                              responseData?.error?.message ||
+                              responseData?.error ||
+                              (typeof responseData === 'string' ? responseData : null) ||
                               `Registration failed with status ${response.status || 'unknown'}`;
+            
             throw new Error(errorMessage);
           }
 
