@@ -370,17 +370,24 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
             throw new Error(errorMessage);
           }
 
-          // For successful responses, check the success flag
-          const apiResponse = response.data as ApiResponse<RegistrationResponseData>;
-          if (!apiResponse.success) {
-            const errorMessage = apiResponse.message || 
-                              apiResponse.error || 
+          // Safely parse the response data
+          const responseData = response.data;
+          
+          // Check if the response has the expected structure
+          if (!responseData || typeof responseData !== 'object') {
+            throw new Error('Invalid response format from server');
+          }
+          
+          // Check if this is an error response
+          if ('error' in responseData || !('success' in responseData) || !responseData.success) {
+            const errorMessage = (responseData as any).message || 
+                              (responseData as any).error || 
                               'Registration failed';
             throw new Error(errorMessage);
           }
 
           // Get the transaction reference from the response data
-          const tx_ref = apiResponse.data.tx_ref;
+          const tx_ref = (responseData as any).tx_ref || (responseData as any).data?.tx_ref;
 
           // Log the full response for debugging
           console.log('Transaction reference:', tx_ref);
