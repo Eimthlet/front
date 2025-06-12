@@ -148,49 +148,60 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
     }));
   };
 
-  const checkPendingRegistration = async (email: string): Promise<{ pending: boolean; tx_ref?: string }> => {
+  // Response from /auth/check-pending-registration
+  interface CheckPendingResponseData {
+    success: boolean;
+    pending: boolean;
+    tx_ref?: string;
+    email?: string;
+    error?: string;
+  }
+  
+  // The full axios response structure
+  interface AxiosResponse<T> {
+    data: T;
+    status: number;
+    statusText: string;
+    headers: any;
+    config: any;
+  }
+
+  const checkPendingRegistration = async (email: string): Promise<{ pending: boolean; tx_ref?: string; email?: string }> => {
     console.log('Checking pending registration for:', email);
     try {
-      const response = await apiClient.post<any>(
-        '/auth/check-pending-registration', 
-        { email },
-        { 
-          timeout: 10000, // Increased timeout to 10 seconds
-          validateStatus: (status) => status < 500, // Don't throw on 4xx errors
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const response = await apiClient.request<CheckPendingResponseData>({
+        method: 'POST',
+        url: '/auth/check-pending-registration',
+        data: { email },
+        timeout: 10000, // 10 seconds timeout
+        validateStatus: (status) => status < 500 // Don't throw on 4xx errors
+      });
       
       console.log('Check pending registration response status:', response.status);
       console.log('Response data:', response.data);
       
-      // Handle different response formats
-      if (response.data?.data) {
-        return {
-          pending: Boolean(response.data.data.pending),
-          tx_ref: response.data.data.tx_ref
-        };
-      } else if (response.data?.pending !== undefined) {
-        // Handle direct response format
-        return {
-          pending: Boolean(response.data.pending),
-          tx_ref: response.data.tx_ref
-        };
-      } else if (response.data) {
-        // If we have data but not in expected format, log it
-        console.warn('Unexpected response format:', response.data);
+      const responseData = response.data;
+      
+      // If there's an error in the response, log it but continue
+      if (!responseData.success) {
+        console.warn('Backend warning:', responseData.error || 'Unknown error checking pending registration');
+        return { pending: false };
       }
       
+      // Return the pending status and transaction reference if pending
       return {
-        pending: response.data?.data?.pending || false,
-        tx_ref: response.data?.data?.tx_ref
+        pending: responseData.pending,
+        tx_ref: responseData.tx_ref,
+        email: responseData.email
       };
     } catch (error) {
       console.error('Error checking pending registration:', error);
-      // Continue with registration if we can't check pending status
-      return { pending: false };
+      // Return default values that indicate no pending registration
+      return { 
+        pending: false, 
+        tx_ref: undefined,
+        email: undefined
+      };
     }
   };
 
