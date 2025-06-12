@@ -147,7 +147,7 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
   const setCurrentMode = (value: 'login' | 'register') => {
     setUiState(prev => ({ ...prev, currentMode: value }));
   };
-  
+
   const togglePasswordVisibility = (field: 'password' | 'confirmPassword') => {
     setUiState(prev => ({
       ...prev,
@@ -494,7 +494,7 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
             autoComplete={currentMode === 'login' ? "current-password" : "new-password"}
           />
           <IconButton
-            onClick={() => setShowPassword(!showPassword)}
+            onClick={() => togglePasswordVisibility('password')}
             edge="end"
             className="password-toggle"
             tabIndex={-1}
@@ -515,7 +515,7 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
                 autoComplete="new-password"
               />
               <IconButton
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                onClick={() => togglePasswordVisibility('confirmPassword')}
                 edge="end"
                 className="password-toggle"
                 tabIndex={-1}
