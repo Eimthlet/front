@@ -157,14 +157,7 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
     error?: string;
   }
   
-  // The full axios response structure
-  interface AxiosResponse<T> {
-    data: T;
-    status: number;
-    statusText: string;
-    headers: any;
-    config: any;
-  }
+  // Axios response structure is already handled by the apiClient
 
   const checkPendingRegistration = async (email: string): Promise<{ pending: boolean; tx_ref?: string; email?: string }> => {
     console.log('Checking pending registration for:', email);
