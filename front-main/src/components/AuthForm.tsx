@@ -252,7 +252,8 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
           try {
             const response = await apiClient.post<ApiResponse<ResumePaymentResponse>>('/auth/resume-payment', { 
               email: email,
-              tx_ref 
+              tx_ref,
+              original_tx_ref: tx_ref // Add original_tx_ref as required by backend
             });
 
             if (response.data?.success && response.data.data) {
@@ -302,12 +303,13 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
           amount: Number(amount) // Ensure amount is a number
         };
 
-        // Validate required fields
-        const requiredFields = ['username', 'email', 'password', 'amount'] as const;
-        const missingFields = requiredFields.filter(field => !payload[field]);
+        // Backend will handle validation, but we'll do basic client-side validation
+        if (!payload.phone) {
+          throw new Error('Phone number is required');
+        }
         
-        if (missingFields.length > 0) {
-          throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+        if (isNaN(payload.amount) || payload.amount <= 0) {
+          throw new Error('Amount must be a positive number');
         }
 
         console.log('Registration payload:', JSON.stringify(payload, null, 2));
@@ -351,12 +353,26 @@ const AuthForm: FC<{ mode: 'login' | 'register' }> = ({ mode }): ReactElement =>
               headers: response.headers
             });
             
-            // Try to extract error message from different possible response formats
-            const errorMessage = responseData?.message || 
-                              responseData?.error?.message ||
-                              responseData?.error ||
-                              (typeof responseData === 'string' ? responseData : null) ||
-                              `Registration failed with status ${response.status || 'unknown'}`;
+            // Try to extract error message from backend response format
+            let errorMessage = 'Registration failed';
+            
+            if (responseData) {
+              // Handle different backend error formats
+              if (typeof responseData === 'string') {
+                errorMessage = responseData;
+              } else if (responseData.error) {
+                errorMessage = typeof responseData.error === 'string' 
+                  ? responseData.error 
+                  : responseData.error.message || 'Unknown error';
+              } else if (responseData.message) {
+                errorMessage = responseData.message;
+              }
+            }
+            
+            // Add status code if available
+            if (response.status) {
+              errorMessage += ` (Status: ${response.status})`;
+            }
             
             throw new Error(errorMessage);
           }
